@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon Plan Semi-Marathon — 1h50</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f5; --bg3: #eeeeee;
+    --text: #1a1a2e; --text2: #555; --text3: #888;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.2);
+    --orange: #E8500A; --orange-light: #FFF0E8;
+    --blue: #2980B9; --blue-light: #EBF5FB;
+    --green: #27AE60; --green-light: #E9F7EF;
+    --purple: #8E44AD; --purple-light: #F4ECF7;
+    --red: #C0392B; --red-light: #FDEDEC;
+    --amber: #B8860B; --amber-light: #FFF9E6;
+    --radius: 8px; --radius-lg: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a2e; --bg2: #222236; --bg3: #2a2a40;
+      --text: #f0f0f0; --text2: #aaa; --text3: #666;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.2);
+      --orange-light: #3a1a08; --blue-light: #0a2030;
+      --green-light: #0a2018; --purple-light: #1a0a28;
+      --red-light: #280a0a; --amber-light: #281a00;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+  .app-shell { max-width: 800px; margin: 0 auto; padding: 0 0 40px; }
+
+/* TOPBAR */
+.topbar { background: var(–orange); padding: 16px 20px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 100; }
+.topbar-icon { width: 38px; height: 38px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.topbar-text h1 { font-size: 16px; font-weight: 600; color: white; }
+.topbar-text p { font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 1px; }
+
+/* TABS */
+.tabs { background: var(–bg); border-bottom: 1px solid var(–border); display: flex; gap: 0; position: sticky; top: 70px; z-index: 99; }
+.tab { flex: 1; padding: 12px 8px; font-size: 13px; border: none; background: transparent; color: var(–text2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: inherit; }
+.tab.active { color: var(–orange); border-bottom-color: var(–orange); font-weight: 500; }
+.tab:hover:not(.active) { background: var(–bg2); }
+
+/* SECTIONS */
+.section { display: none; padding: 16px; }
+.section.active { display: block; }
+
+/* –– PLAN TAB –– */
+.phase-block { margin-bottom: 20px; }
+.phase-title { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(–text3); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.phase-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.week-card { background: var(–bg); border: 1px solid var(–border); border-radius: var(–radius-lg); margin-bottom: 6px; overflow: hidden; box-shadow: var(–shadow); }
+.week-card.vacation { background: var(–amber-light); }
+.week-card.done { border-left: 3px solid var(–green); }
+.week-card.current { border-left: 3px solid var(–orange); }
+.week-summary { padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none; }
+.week-summary:hover { background: var(–bg2); }
+.week-n { font-size: 11px; font-weight: 600; color: var(–text3); min-width: 26px; }
+.week-dates { font-size: 11px; color: var(–text3); min-width: 110px; }
+.week-ttl { font-size: 13px; color: var(–text); flex: 1; line-height: 1.4; }
+.week-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+.bz2 { background: var(–green-light); color: var(–green); }
+.bz3 { background: var(–orange-light); color: var(–orange); }
+.bz4 { background: var(–red-light); color: var(–red); }
+.bz5 { background: var(–purple-light); color: var(–purple); }
+.bswim { background: var(–blue-light); color: var(–blue); }
+.bvac { background: var(–amber-light); color: var(–amber); }
+.bdone { background: var(–green-light); color: var(–green); }
+.bcurrent { background: var(–orange-light); color: var(–orange); }
+.chevron { font-size: 11px; color: var(–text3); transition: transform 0.2s; }
+.week-detail { display: none; padding: 0 14px 14px; border-top: 1px solid var(–border); }
+.week-detail.open { display: block; }
+.seances-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media(max-width: 520px) { .seances-grid { grid-template-columns: 1fr; } }
+.seance-block { background: var(–bg2); border-radius: var(–radius); padding: 10px 12px; }
+.seance-title { font-size: 12px; font-weight: 600; margin-bottom: 7px; }
+.step-row { display: flex; gap: 6px; font-size: 11.5px; margin-bottom: 3px; line-height: 1.4; }
+.step-k { color: var(–text3); min-width: 82px; font-weight: 500; flex-shrink: 0; }
+.step-v { color: var(–text); }
+.log-btn { margin-top: 10px; padding: 8px 16px; font-size: 12px; background: var(–orange); color: white; border: none; border-radius: var(–radius); cursor: pointer; font-family: inherit; font-weight: 500; }
+.log-btn:hover { background: #CF4508; }
+
+/* –– LOG TAB –– */
+.card { background: var(–bg); border: 1px solid var(–border); border-radius: var(–radius-lg); padding: 16px; box-shadow: var(–shadow); margin-bottom: 14px; }
+.field { margin-bottom: 13px; }
+.label { font-size: 12px; font-weight: 500; color: var(–text2); margin-bottom: 5px; display: block; }
+select, input[type=text], input[type=number], textarea {
+width: 100%; padding: 9px 11px; font-size: 13px;
+border: 1px solid var(–border2); border-radius: var(–radius);
+background: var(–bg2); color: var(–text); font-family: inherit;
+outline: none; transition: border-color 0.15s;
+}
+select:focus, input:focus, textarea:focus { border-color: var(–orange); }
+textarea { resize: vertical; min-height: 64px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+@media(max-width:400px) { .grid2,.grid3 { grid-template-columns: 1fr; } }
+.rating-row { display: flex; gap: 6px; margin-top: 4px; }
+.rbt { width: 36px; height: 36px; border: 1px solid var(–border2); border-radius: var(–radius); background: var(–bg2); color: var(–text2); font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.rbt.sel { background: var(–orange); color: white; border-color: var(–orange); font-weight: 600; }
+.analyze-btn { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: var(–orange); color: white; border: none; border-radius: var(–radius); cursor: pointer; font-family: inherit; margin-top: 4px; transition: background 0.15s; }
+.analyze-btn:hover { background: #CF4508; }
+.section-title { font-size: 13px; font-weight: 600; color: var(–text); margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+.section-title span { width: 3px; height: 14px; background: var(–orange); border-radius: 2px; display: inline-block; }
+
+/* –– STATS TAB –– */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(–bg); border: 1px solid var(–border); border-radius: var(–radius-lg); padding: 14px; box-shadow: var(–shadow); }
+.stat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(–text3); margin-bottom: 4px; }
+.stat-val { font-size: 26px; font-weight: 600; color: var(–text); line-height: 1; }
+.stat-sub { font-size: 11px; color: var(–text3); margin-top: 3px; }
+.prog-section { background: var(–bg); border: 1px solid var(–border); border-radius: var(–radius-lg); padding: 14px; margin-bottom: 14px; box-shadow: var(–shadow); }
+.prog-header { display: flex; justify-content: space-between; font-size: 13px; color: var(–text); font-weight: 500; margin-bottom: 8px; }
+.prog-bar { height: 8px; background: var(–bg3); border-radius: 4px; overflow: hidden; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, var(–orange), #ff7040); border-radius: 4px; transition: width 0.6s ease; }
+.history-title { font-size: 13px; font-weight: 600; color: var(–text); margin-bottom: 10px; }
+.history-item { background: var(–bg); border: 1px solid var(–border); border-radius: var(–radius-lg); padding: 11px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; box-shadow: var(–shadow); }
+.hi-left { flex: 1; }
+.hi-title { font-size: 13px; font-weight: 500; color: var(–text); }
+.hi-sub { font-size: 11px; color: var(–text3); margin-top: 3px; }
+.hi-right { text-align: right; flex-shrink: 0; margin-left: 10px; }
+.hi-rating { font-size: 13px; color: var(–orange); letter-spacing: 1px; }
+.hi-pace { font-size: 11px; color: var(–text3); margin-top: 2px; }
+.del-btn { font-size: 10px; color: var(–red); background: none; border: none; cursor: pointer; padding: 2px 4px; font-family: inherit; margin-top: 4px; }
+.no-data { text-align: center; padding: 40px 20px; color: var(–text3); font-size: 14px; line-height: 1.6; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(–text); color: var(–bg); padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+</style>
+
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="topbar">
+    <div class="topbar-icon">🏃</div>
+    <div class="topbar-text">
+      <h1>Mon plan semi-marathon</h1>
+      <p>Objectif 1h50 · Course du 4 octobre 2026</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('plan')">📋 Plan</button>
+    <button class="tab" onclick="switchTab('log')">✏️ Saisir</button>
+    <button class="tab" onclick="switchTab('stats')">📊 Progression</button>
+  </div>
+
+  <!-- PLAN -->
+
+  <div class="section active" id="tab-plan">
+    <div id="plan-content"></div>
+  </div>
+
+  <!-- LOG -->
+
+  <div class="section" id="tab-log">
+    <div class="card">
+      <div class="section-title"><span></span>Quelle séance ?</div>
+      <div class="field">
+        <label class="label">Semaine du plan</label>
+        <select id="log-week"></select>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label class="label">Date</label>
+          <input type="text" id="log-date" placeholder="ex: 16/03/2026">
+        </div>
+        <div class="field">
+          <label class="label">Type de séance</label>
+          <select id="log-type">
+            <option>Course en plein air</option>
+            <option>Natation</option>
+            <option>Trail / Dénivelé</option>
+            <option>Footing récupération</option>
+            <option>Autre</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+```
+<div class="card">
+  <div class="section-title"><span></span>Données de la séance</div>
+  <div class="grid3">
+    <div class="field">
+      <label class="label">Distance (km)</label>
+      <input type="number" id="log-dist" placeholder="ex: 14" step="0.1">
+    </div>
+    <div class="field">
+      <label class="label">Durée (min)</label>
+      <input type="number" id="log-dur" placeholder="ex: 82">
+    </div>
+    <div class="field">
+      <label class="label">Dénivelé + (m)</label>
+      <input type="number" id="log-d" placeholder="ex: 120">
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="field">
+      <label class="label">Allure moyenne</label>
+      <input type="text" id="log-pace" placeholder="ex: 5:45/km">
+    </div>
+    <div class="field">
+      <label class="label">FC moyenne (bpm)</label>
+      <input type="number" id="log-hr" placeholder="ex: 155">
+    </div>
+    <div class="field">
+      <label class="label">FC max (bpm)</label>
+      <input type="number" id="log-hrmax" placeholder="ex: 172">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-title"><span></span>Ressenti</div>
+  <div class="field">
+    <label class="label">Ressenti général (1 = très dur · 5 = très facile)</label>
+    <div class="rating-row">
+      <button class="rbt" onclick="setRating(1)">1</button>
+      <button class="rbt" onclick="setRating(2)">2</button>
+      <button class="rbt" onclick="setRating(3)">3</button>
+      <button class="rbt" onclick="setRating(4)">4</button>
+      <button class="rbt" onclick="setRating(5)">5</button>
+    </div>
+  </div>
+  <div class="field">
+    <label class="label">Respect des allures cibles</label>
+    <select id="log-paceok">
+      <option value="">— Sélectionner</option>
+      <option>Oui, parfaitement</option>
+      <option>Globalement oui, quelques écarts</option>
+      <option>Non, trop rapide</option>
+      <option>Non, trop lent</option>
+      <option>Séance libre / pas d'allure cible</option>
+    </select>
+  </div>
+  <div class="field">
+    <label class="label">Commentaire libre (douleurs, météo, fatigue, sensations…)</label>
+    <textarea id="log-comment" placeholder="Ex: Mollets lourds au km 8, bonne météo, gel testé au km 10, belle sortie !"></textarea>
+  </div>
+</div>
+
+<div class="card" style="background: var(--orange-light); border-color: var(--orange);">
+  <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;">
+    💡 Une fois les données saisies, copie le texte ci-dessous et colle-le dans Claude pour obtenir une analyse personnalisée de ta séance.
+  </p>
+  <button class="analyze-btn" onclick="generatePrompt()">Générer le texte d'analyse</button>
+  <div id="prompt-output" style="display:none;margin-top:12px;">
+    <textarea id="prompt-text" style="min-height:160px;font-size:11px;background:var(--bg);border-color:var(--border2);" readonly></textarea>
+    <button onclick="copyPrompt()" style="margin-top:8px;width:100%;padding:9px;font-size:13px;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;">Copier le texte</button>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- STATS -->
+
+  <div class="section" id="tab-stats">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="prog-section">
+      <div class="prog-header"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--orange);font-weight:600;">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="prog-bar" style="width:0%"></div></div>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px;" id="prog-sub"></p>
+    </div>
+    <div class="history-title">Historique des séances</div>
+    <div id="history-list"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PLAN = [
+  {phase:'Phase 1 — Maintien & Transition', color:'#2980B9', weeks:[
+    {n:1,dates:'16-22 mars',title:'Footing bilan 12 km Z2',badges:['z2'],
+     s1:{title:'Footing bilan — 12 km Z2',steps:[['Échauffement','10 min Z1 (6:45/km), marche 2 min'],['Corps','10 km Z2 (5:50-6:10/km) allure confortable'],['Retour au calme','10 min Z1 + étirements 5 min'],['Durée / distance','~1h15 · 12 km']]},
+     s2:{title:'Footing récup — 30 min Z1',steps:[['Corps','25 min Z1 (6:30-7:00/km) très facile'],['Retour','5 min marche + étirements'],['Durée','~35 min · ~4 km']]}},
+    {n:2,dates:'23-29 mars',title:'Fractions 5×5 min Z3 + Natation',badges:['z3','swim'],
+     s1:{title:'14 km avec 5×5 min Z3',steps:[['Échauffement','15 min Z1-Z2 progressif'],['Corps','5 × 5 min à 5:10-5:15/km'],['Récupération','3 min Z1 entre chaque répétition'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h20 · 14 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements'],['Objectif','Récupération active']]}},
+    {n:3,dates:'30 mars – 5 avr',title:'Sortie longue 16 km Z2',badges:['z2'],
+     s1:{title:'16 km Z2',steps:[['Échauffement','10 min Z1'],['Corps','14 km Z2 (5:50-6:10/km)'],['Ravitaillement','Tester un gel vers km 10'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h35 · 16 km']]},
+     s2:{title:'40 min Z1',steps:[['Corps','30 min Z1 (6:30-7:00/km)'],['Retour','10 min marche + étirements'],['Durée','~40 min · 5.5 km']]}},
+  ]},
+  {phase:'Phase 2 — Construction de la Vitesse', color:'#27AE60', weeks:[
+    {n:4,dates:'6-12 avr',title:'VMA 8×400m + récupération',badges:['z5'],
+     s1:{title:'8×400m à Z5 (4:20-4:30/km)',steps:[['Échauffement','15 min progressif + 4 accélérations 20s'],['Corps','8 × 400m à Z5 (~1\'44\'-1\'48\' par 400m)'],['Récupération','90 sec Z1 entre chaque 400m'],['Retour','10 min Z1 + étirements 8 min'],['Durée / distance','~55 min · 9 km']]},
+     s2:{title:'35 min Z1',steps:[['Corps','25 min Z1 très facile'],['Retour','10 min marche + étirements'],['Durée','~35 min · 4 km']]}},
+    {n:5,dates:'13-19 avr',title:'Sortie longue 18 km + Natation',badges:['z2','swim'],
+     s1:{title:'18 km Z2',steps:[['Échauffement','10 min Z1'],['Corps','16 km Z2 (5:50/km)'],['Ravitaillement','Eau toutes les 40 min, gel km 12'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h45 · 18 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:6,dates:'20-26 avr',title:'Seuil 6×1 km Z3-Z4',badges:['z4'],
+     s1:{title:'6×1 km à Z3-Z4 (5:05-5:15/km)',steps:[['Échauffement','15 min progressif + 3 accélérations 20s'],['Corps','6 × 1 km à 5:05-5:15/km'],['Récupération','2 min Z1 entre chaque km'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h05 · 12 km']]},
+     s2:{title:'30 min Z1',steps:[['Corps','20 min Z1 très facile'],['Retour','10 min marche + étirements']]}},
+    {n:7,dates:'27 avr – 3 mai',title:'Footing confort 14 km (semaine allégée)',badges:['z2'],
+     s1:{title:'14 km Z2 — semaine allégée',steps:[['Échauffement','10 min Z1'],['Corps','12 km Z2 (5:55-6:10/km) très confortable'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h25 · 14 km']]},
+     s2:{title:'Repos',steps:[['Conseil','Semaine allégée — repos ou marche légère']]}},
+    {n:8,dates:'4-10 mai',title:'Fractions 5×2 km Z3 + Natation',badges:['z3','swim'],
+     s1:{title:'5×2 km à 5:13-5:20/km',steps:[['Échauffement','15 min progressif + 3 accélérations 30s'],['Corps','5 × 2 km à Z3 (5:13-5:20/km)'],['Récupération','3 min Z1 entre chaque 2 km'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h15 · 14 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:9,dates:'11-17 mai',title:'Sortie longue 19 km Z2',badges:['z2'],
+     s1:{title:'19 km Z2',steps:[['Échauffement','10 min Z1'],['Corps','17 km Z2 (5:45-6:00/km)'],['Ravitaillement','Gel km 10 et km 15'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h50 · 19 km']]},
+     s2:{title:'40 min Z1',steps:[['Corps','30 min Z1 très facile'],['Retour','10 min marche + étirements']]}},
+    {n:10,dates:'18-24 mai',title:'Blocs 3×3 km Z3',badges:['z3'],
+     s1:{title:'3×3 km à 5:15-5:20/km',steps:[['Échauffement','15 min progressif Z1→Z2'],['Corps','3 × 3 km à 5:15-5:20/km'],['Récupération','4 min Z1 entre chaque bloc'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h05 · 13 km']]},
+     s2:{title:'Repos',steps:[['Conseil','Repos ou marche légère 30 min']]}},
+  ]},
+  {phase:'Phase 3 — Préparation Spécifique', color:'#E8500A', weeks:[
+    {n:11,dates:'25-31 mai',title:'17 km spécifique + Natation',badges:['z3','swim'],
+     s1:{title:'17 km avec 10 km à allure semi',steps:[['Échauffement','10 min Z1 + 5 min Z2'],['Corps','3 km Z2, 10 km à Z3 (5:13-5:20/km), 2 km Z2'],['Ravitaillement','Gel km 8 et km 14'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h40 · 17 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:12,dates:'1-7 juin',title:'Seuil 6×1 km Z4',badges:['z4'],
+     s1:{title:'6×1 km à Z4 (4:55-5:05/km)',steps:[['Échauffement','15 min progressif + 4 accélérations 20s'],['Corps','6 × 1 km à 4:55-5:05/km'],['Récupération','2 min Z1 entre chaque km'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h05 · 12 km']]},
+     s2:{title:'40 min Z1',steps:[['Corps','35 min Z1 très facile'],['Retour','5 min marche']]}},
+    {n:13,dates:'8-14 juin',title:'Sortie longue 20 km Z2',badges:['z2'],
+     s1:{title:'20 km Z2',steps:[['Échauffement','10 min Z1'],['Corps','18 km Z2 (5:45-6:00/km)'],['Ravitaillement','Gel km 8, km 14 — eau toutes les 30 min'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h58 · 20 km']]},
+     s2:{title:'Repos',steps:[['Conseil','Repos complet ou marche légère']]}},
+    {n:14,dates:'15-21 juin',title:'16 km (12 km allure semi) + Natation',badges:['z3','swim'],
+     s1:{title:'16 km avec 12 km à Z3',steps:[['Échauffement','10 min Z1 + 5 min Z2'],['Corps','2 km Z2, 12 km à Z3 (5:13-5:20/km), 2 km Z2'],['Ravitaillement','Gel km 9'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h32 · 16 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:15,dates:'22-28 juin',title:'VMA 10×400m Z5',badges:['z5'],
+     s1:{title:'10×400m à Z5 (4:20-4:30/km)',steps:[['Échauffement','15 min progressif + 5 accélérations 20s'],['Corps','10 × 400m (~1\'44\'-1\'48\' par 400m)'],['Récupération','90 sec Z1 entre chaque 400m'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h00 · 11 km']]},
+     s2:{title:'35 min Z1',steps:[['Corps','30 min Z1 très facile'],['Retour','5 min marche + étirements']]}},
+    {n:16,dates:'29 juin – 5 juil',title:'Footing récup 18 km (semaine allégée)',badges:['z2'],
+     s1:{title:'18 km Z2 — semaine allégée',steps:[['Échauffement','10 min Z1'],['Corps','16 km Z2 (6:00/km) très confortable'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h45 · 18 km']]},
+     s2:{title:'Repos',steps:[['Conseil','Semaine allégée — repos ou marche 30 min']]}},
+    {n:17,dates:'6-12 juil',title:'20 km (14 km allure semi) + Natation',badges:['z3','swim'],
+     s1:{title:'20 km avec 14 km à Z3',steps:[['Échauffement','10 min Z1 + 5 min Z2'],['Corps','3 km Z2, 14 km à Z3 (5:13-5:18/km), 3 km Z2'],['Ravitaillement','Gel km 9 et km 14 — eau toutes les 30 min'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h55 · 20 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:18,dates:'13-19 juil',title:'Répétitions 4×3 km Z3',badges:['z3'],
+     s1:{title:'4×3 km à 5:13-5:18/km',steps:[['Échauffement','15 min progressif Z1→Z2'],['Corps','4 × 3 km à 5:13-5:18/km'],['Récupération','4 min Z1 entre chaque bloc'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h20 · 16 km']]},
+     s2:{title:'40 min Z1',steps:[['Corps','35 min Z1 très facile'],['Retour','5 min marche']]}},
+    {n:19,dates:'20-26 juil',title:'DERNIER GROS LONG RUN 20 km + Natation',badges:['z2','swim'],
+     s1:{title:'20 km Z2 — dernier long run',steps:[['Échauffement','10 min Z1'],['Corps','18 km Z2 (5:45-6:00/km)'],['Ravitaillement','Gel km 9 et km 15'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h55 · 20 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:20,dates:'27 juil – 2 août',title:'Dernière séance intense avant vacances',badges:['z3'],
+     s1:{title:'16 km + 3×2 km à Z3',steps:[['Échauffement','15 min progressif Z1→Z2'],['Corps','10 km Z2, puis 3 × 2 km à Z3 (5:13/km)'],['Récupération','3 min Z1 entre les blocs'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h35 · 16 km']]},
+     s2:{title:'Repos',steps:[['Conseil','Repos — partir en vacances avec de bonnes jambes !']]}},
+  ]},
+  {phase:'Vacances — Maintien actif', color:'#B8860B', weeks:[
+    {n:21,dates:'3-9 août',title:'Footing vacances 30-40 min Z1',badges:['vac'],vacation:true,
+     s1:{title:'Footing plaisir — 30-40 min Z1',steps:[['Corps','25-35 min Z1 (6:30-7:00/km) aucune pression'],['Retour','5 min marche + étirements si envie'],['Conseil','Pas de natation — profiter !']]},
+     s2:{title:'Repos',steps:[['','Vacances !']]}},
+    {n:22,dates:'10-16 août',title:'Footing vacances 30-40 min Z1',badges:['vac'],vacation:true,
+     s1:{title:'Footing plaisir — 30-40 min Z1',steps:[['Corps','25-35 min Z1 très facile, dépaysement'],['Conseil','Si fatigue : 30 min de marche rapide']]},
+     s2:{title:'Repos',steps:[['','Vacances !']]}},
+    {n:23,dates:'17-23 août',title:'Footing vacances + remise en route',badges:['vac'],vacation:true,
+     s1:{title:'40 min Z1 + accélérations',steps:[['Corps','30 min Z1 + 4 × 20s accélérations légères'],['Retour','5 min marche + étirements'],['Conseil','Fin de semaine : commencer à se remettre en jambes']]},
+     s2:{title:'Repos',steps:[['','Derniers jours de vacances !']]}},
+  ]},
+  {phase:'Phase 4 — Reprise & Consolidation', color:'#8E44AD', weeks:[
+    {n:24,dates:'24-30 août',title:'Reprise douce 12 km Z2',badges:['z2'],
+     s1:{title:'12 km Z2 — semaine de transition',steps:[['Échauffement','10 min Z1 très lent (6:45/km)'],['Corps','10 km Z2 (5:55-6:10/km) — PAS d\'intensité'],['Retour','10 min Z1 + étirements 8 min'],['Durée / distance','~1h15 · 12 km']]},
+     s2:{title:'30 min Z1',steps:[['Corps','25 min Z1 très facile'],['Retour','5 min marche + étirements']]}},
+    {n:25,dates:'31 août – 6 sep',title:'16 km (8 km allure semi) + Natation',badges:['z3','swim'],
+     s1:{title:'16 km avec 8 km à Z3',steps:[['Échauffement','12 min progressif Z1→Z2'],['Corps','4 km Z2, 8 km à Z3 (5:15-5:20/km), 4 km Z2'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h35 · 16 km']]},
+     s2:{title:'Natation — 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
+    {n:26,dates:'7-13 sep',title:'Dernière séance intense — 6×800m Z4',badges:['z4'],
+     s1:{title:'6×800m à Z4 (4:55-5:05/km)',steps:[['Échauffement','15 min progressif + 4 accélérations 20s'],['Corps','6 × 800m (~4\'00\'-4\'04\' par 800m)'],['Récupération','2 min Z1 entre chaque 800m'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h00 · 12 km']]},
+     s2:{title:'35 min Z1',steps:[['Corps','30 min Z1 très facile'],['Retour','5 min marche + étirements']]}},
+  ]},
+  {phase:'Phase 5 — Affûtage final', color:'#C0392B', weeks:[
+    {n:27,dates:'14-20 sep',title:'12 km avec 5 km Z3 (volume –40%)',badges:['z3'],
+     s1:{title:'12 km — 5 km à allure semi',steps:[['Échauffement','10 min Z1'],['Corps','3.5 km Z2, 5 km à Z3 (5:13-5:18/km), 3.5 km Z2'],['Retour','8 min Z1 + étirements'],['Volume','–40% vs semaines normales']]},
+     s2:{title:'25 min Z1 léger',steps:[['Corps','20 min Z1 très facile'],['Retour','5 min marche + étirements']]}},
+    {n:28,dates:'21-27 sep',title:'8 km avec 3×1 km Z3 (volume –60%)',badges:['z3'],
+     s1:{title:'8 km — rappel allure',steps:[['Échauffement','10 min Z1-Z2'],['Corps','2.5 km Z2, 3 × 1 km à Z3 / 2 min récup, 2.5 km Z2'],['Retour','8 min Z1 + étirements'],['Volume','–60% vs semaines normales']]},
+     s2:{title:'Repos / préparation',steps:[['Conseil','Préparer dossard, tester tenues, hydratation ++']]}},
+    {n:29,dates:'28 sep – 3 oct',title:'Activation légère + repos pré-course',badges:['z2'],
+     s1:{title:'Activations légères (lun-ven)',steps:[['Lundi','20 min très facile Z1'],['Mardi','20 min Z1 + 4×100m à allure semi'],['Mer-Jeu','Repos complet'],['Vendredi','15 min jogging très léger'],['Samedi','Repos total — préparer son sac, dormir tôt']]},
+     s2:{title:'Préparation mentale',steps:[['Sommeil','8h minimum chaque nuit'],['Hydratation','2L/jour minimum'],['Sam soir','Repas glucidique (pâtes, riz)'],['Visualisation','Partir à 5:30/km et accélérer']]}},
+    {n:30,dates:'Dim 4 oct',title:'🏁 JOUR J — SEMI-MARATHON !',badges:['z3'],
+     s1:{title:'Stratégie de course',steps:[['Matin','Lever 2h30 avant — repas léger'],['Avant départ','10-15 min jogging léger + 4 accélérations'],['0-3 km','5:30-5:40/km — patience !'],['3-16 km','5:13/km — allure cible'],['16-21 km','Accélérer si possible'],['Objectif','1h50 !!']]},
+     s2:{title:'Mental',steps:[['','Sourire aux photos km 15 😊'],['','3 blocs de 7 km mentalement'],['','Sprint final : tout donner !']]}},
+  ]},
+];
+
+let sessions = JSON.parse(localStorage.getItem('semi_sessions_v4') || '[]');
+let currentRating = 0;
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((el,i) => el.classList.toggle('active', ['plan','log','stats'][i]===t));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='stats') renderStats();
+}
+
+function getTodayWeek() {
+  const start = new Date('2026-03-16');
+  const now = new Date();
+  const diff = Math.floor((now - start) / (7*24*3600*1000));
+  return Math.max(1, Math.min(30, diff+1));
+}
+
+function badgeHtml(b) {
+  const map = {z2:['bz2','Z2'],z3:['bz3','Z3 cible'],z4:['bz4','Z4 seuil'],z5:['bz5','VMA'],swim:['bswim','Natation'],vac:['bvac','Vacances']};
+  const [cls,lbl] = map[b]||['bz2',b];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function renderPlan() {
+  const doneWeeks = sessions.map(s=>s.week);
+  const cur = getTodayWeek();
+  let html = '';
+  PLAN.forEach(phase => {
+    html += `<div class="phase-block"><div class="phase-title"><span class="phase-dot" style="background:${phase.color}"></span>${phase.phase}</div>`;
+    phase.weeks.forEach(w => {
+      const done = doneWeeks.includes(w.n);
+      const isCur = w.n === cur;
+      let cls = 'week-card';
+      if(w.vacation) cls += ' vacation';
+      if(done) cls += ' done';
+      else if(isCur) cls += ' current';
+      html += `<div class="${cls}">
+        <div class="week-summary" onclick="toggleWeek(${w.n},this)">
+          <span class="week-n">S${w.n}</span>
+          <span class="week-dates">${w.dates}</span>
+          <span class="week-ttl">${w.title}</span>
+          <div class="week-right">
+            ${(w.badges||[]).map(badgeHtml).join('')}
+            ${isCur?'<span class="badge bcurrent">En cours</span>':''}
+            ${done?'<span class="badge bdone">✓ Fait</span>':''}
+            <span class="chevron" id="chev-${w.n}">▼</span>
+          </div>
+        </div>
+        <div class="week-detail" id="detail-${w.n}">
+          <div class="seances-grid">
+            <div class="seance-block">
+              <div class="seance-title" style="color:${phase.color}">${w.s1.title}</div>
+              ${w.s1.steps.map(s=>`<div class="step-row"><span class="step-k">${s[0]}</span><span class="step-v">${s[1]}</span></div>`).join('')}
+            </div>
+            <div class="seance-block">
+              <div class="seance-title" style="color:#27AE60">${w.s2.title}</div>
+              ${w.s2.steps.map(s=>`<div class="step-row"><span class="step-k">${s[0]}</span><span class="step-v">${s[1]}</span></div>`).join('')}
+            </div>
+          </div>
+          <button class="log-btn" onclick="event.stopPropagation();prefillLog(${w.n})">✏️ Saisir cette séance</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('plan-content').innerHTML = html;
+}
+
+function toggleWeek(n, summaryEl) {
+  const d = document.getElementById('detail-'+n);
+  const c = document.getElementById('chev-'+n);
+  const open = d.classList.toggle('open');
+  if(c) c.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function prefillLog(n) {
+  document.getElementById('log-week').value = n;
+  switchTab('log');
+  window.scrollTo(0,0);
+}
+
+function populateWeekSelect() {
+  const sel = document.getElementById('log-week');
+  PLAN.forEach(p => p.weeks.forEach(w => {
+    const o = document.createElement('option');
+    o.value = w.n;
+    o.text = `S${w.n} — ${w.dates}`;
+    sel.appendChild(o);
+  }));
+  sel.value = getTodayWeek();
+}
+
+function setRating(r) {
+  currentRating = r;
+  document.querySelectorAll('.rbt').forEach((b,i) => b.classList.toggle('sel', i<r));
+}
+
+function generatePrompt() {
+  const wn = parseInt(document.getElementById('log-week').value);
+  const week = PLAN.flatMap(p=>p.weeks).find(w=>w.n===wn);
+  const dist = document.getElementById('log-dist').value;
+  const dur = document.getElementById('log-dur').value;
+  const dplus = document.getElementById('log-d').value;
+  const hr = document.getElementById('log-hr').value;
+  const hrmax = document.getElementById('log-hrmax').value;
+  const pace = document.getElementById('log-pace').value;
+  const paceok = document.getElementById('log-paceok').value;
+  const comment = document.getElementById('log-comment').value;
+  const date = document.getElementById('log-date').value;
+  const type = document.getElementById('log-type').value;
+
+  if(!dist && !dur) { showToast('Saisis au moins la distance ou la durée !'); return; }
+
+  const session = {week:wn,date,type,dist:parseFloat(dist)||0,dur:parseInt(dur)||0,dplus:parseInt(dplus)||0,hr:parseInt(hr)||0,hrmax:parseInt(hrmax)||0,pace,paceok,comment,rating:currentRating,savedAt:new Date().toISOString()};
+  sessions = sessions.filter(s=>s.week!==wn);
+  sessions.push(session);
+  localStorage.setItem('semi_sessions_v4', JSON.stringify(sessions));
+  renderPlan();
+
+  const planSeance = week ? `Séance prévue : "${week.s1.title}" — ${week.s1.steps.map(s=>s[0]+': '+s[1]).join(' | ')}` : '';
+  let msg = `Analyse de ma séance — Semi-marathon 4 octobre 2026 (objectif 1h50)\n\n`;
+  msg += `Semaine S${wn}${week?' ('+week.dates+')':''} — ${type}\n`;
+  if(date) msg += `Date : ${date}\n`;
+  if(dist) msg += `Distance : ${dist} km\n`;
+  if(dur) msg += `Durée : ${dur} min\n`;
+  if(dplus) msg += `Dénivelé + : ${dplus} m\n`;
+  if(pace) msg += `Allure : ${pace}\n`;
+  if(dist && dur) { const a = parseFloat(dur)/parseFloat(dist); msg += `Allure calculée : ${Math.floor(a)}:${String(Math.round((a%1)*60)).padStart(2,'0')}/km\n`; }
+  if(hr) msg += `FC moyenne : ${hr} bpm\n`;
+  if(hrmax) msg += `FC max : ${hrmax} bpm\n`;
+  if(paceok) msg += `Respect des allures : ${paceok}\n`;
+  if(currentRating) msg += `Ressenti : ${currentRating}/5\n`;
+  if(comment) msg += `Commentaire : ${comment}\n`;
+  if(planSeance) msg += `\n${planSeance}\n`;
+  msg += `\nPeux-tu analyser cette séance ? Dis-moi si je suis dans les clous par rapport au plan, comment je progresse vers l'objectif 1h50, et tes conseils pour la prochaine séance.`;
+
+  document.getElementById('prompt-text').value = msg;
+  document.getElementById('prompt-output').style.display = 'block';
+  showToast('Séance enregistrée !');
+}
+
+function copyPrompt() {
+  const txt = document.getElementById('prompt-text').value;
+  navigator.clipboard.writeText(txt).then(() => showToast('Texte copié ! Colle-le dans Claude.')).catch(() => {
+    document.getElementById('prompt-text').select();
+    document.execCommand('copy');
+    showToast('Texte copié !');
+  });
+}
+
+function renderStats() {
+  const total = sessions.length;
+  const km = sessions.reduce((s,x)=>s+(x.dist||0),0);
+  const min = sessions.reduce((s,x)=>s+(x.dur||0),0);
+  const avg = total ? (sessions.reduce((s,x)=>s+(x.rating||0),0)/total) : 0;
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Séances</div><div class="stat-val">${total}</div><div class="stat-sub">sur 30 semaines</div></div>
+    <div class="stat-card"><div class="stat-label">Kilomètres</div><div class="stat-val">${km.toFixed(1)}</div><div class="stat-sub">km courus</div></div>
+    <div class="stat-card"><div class="stat-label">Temps total</div><div class="stat-val">${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}</div><div class="stat-sub">d'entraînement</div></div>
+    <div class="stat-card"><div class="stat-label">Ressenti moy.</div><div class="stat-val">${avg?avg.toFixed(1):'—'}</div><div class="stat-sub">sur 5</div></div>
+  `;
+  const pct = Math.min(100, Math.round(total/30*100));
+  document.getElementById('prog-pct').textContent = pct+'%';
+  document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('prog-sub').textContent = `${total} séance${total>1?'s':''} enregistrée${total>1?'s':''} sur 30 semaines de préparation`;
+
+  const list = document.getElementById('history-list');
+  if(!sessions.length) { list.innerHTML = '<div class="no-data">Aucune séance enregistrée pour l\'instant.<br>Utilise l\'onglet "Saisir" pour ajouter ta première séance.</div>'; return; }
+  list.innerHTML = [...sessions].sort((a,b)=>b.week-a.week).map(s => {
+    const stars = s.rating ? '★'.repeat(s.rating)+'☆'.repeat(5-s.rating) : '';
+    return `<div class="history-item">
+      <div class="hi-left">
+        <div class="hi-title">S${s.week} — ${s.type}</div>
+        <div class="hi-sub">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}</div>
+      </div>
+      <div class="hi-right">
+        <div class="hi-rating">${stars}</div>
+        <div class="hi-pace">${s.pace||''}</div>
+        <button class="del-btn" onclick="deleteSession(${s.week})">Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteSession(week) {
+  sessions = sessions.filter(s=>s.week!==week);
+  localStorage.setItem('semi_sessions_v4', JSON.stringify(sessions));
+  renderStats();
+  renderPlan();
+  showToast('Séance supprimée');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+renderPlan();
+populateWeekSelect();
+</script>
+
+</body>
+</html>
