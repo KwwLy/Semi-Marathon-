@@ -624,6 +624,15 @@ function resetForm(){
   document.getElementById('ai-loading').classList.remove('show');
   document.getElementById('copy-prompt-area').style.display='none';
   document.getElementById('prompt-text').value='';
+  // Reset photo Strava
+  stravaImageB64='';
+  stravaImageType='';
+  document.getElementById('strava-preview').style.display='none';
+  document.getElementById('strava-img').src='';
+  document.getElementById('strava-extract-btn').style.display='none';
+  document.getElementById('strava-result').style.display='none';
+  document.getElementById('strava-loading').style.display='none';
+  document.getElementById('strava-file').value='';
   onSportChange();
 }
 
@@ -906,18 +915,123 @@ function renderHistory(){
     const stars=s.rating?'★'.repeat(s.rating)+'☆'.repeat(5-s.rating):'';
     const sportLbl=SPORT_LABELS[s.sport]||s.sport;
     const sportCls=SPORT_CLASSES[s.sport]||'s-autre';
-    return`<div class="hist-item">
-      <div class="hi-l">
-        <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week?'S'+s.week:''}</div>
-        <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+'kcal':''}</div>
+    const week=s.week?getWeek(s.week):null;
+    // KM table
+    const kmHtml=s.kmRows&&s.kmRows.length?`
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div>
+        <table class="km-table">
+          <thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead>
+          <tbody>${s.kmRows.map((r,i)=>`<tr>
+            <td style="font-weight:600;color:var(--text3)">${i+1}</td>
+            <td>${r.pace||'—'}</td>
+            <td>${r.dplus?r.dplus+'m':'—'}</td>
+            <td style="color:var(--text2)">${r.note||''}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`:'';
+    // Comparaison plan
+    const compHtml=week?`
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px">
+          <span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span>
+          <span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span>
+        </div>
+      </div>`:'';
+    // Commentaire
+    const commentHtml=s.comment?`<div style="margin-top:8px;font-size:12px;color:var(--text2);font-style:italic">"${s.comment}"</div>`:'';
+    // Analyse sauvegardée
+    const analysisHtml=s.claudeAnalysis?`
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div>
+        <div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div>
+      </div>`:`
+      <div style="margin-top:10px">
+        <button class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button>
+      </div>`;
+    const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
+
+    return`<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
+        <div class="hi-l">
+          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week?'<b>S'+s.week+'</b>':''}</div>
+          <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}</div>
+        </div>
+        <div class="hi-r">
+          <div class="hi-stars">${stars}</div>
+          <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
+          <span id="chev-hist-${s.id}" style="font-size:10px;color:var(--text3);transition:transform .2s;display:inline-block">▼</span>
+        </div>
       </div>
-      <div class="hi-r">
-        <div class="hi-stars">${stars}</div>
-        <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
-        <button class="del-btn" onclick="delSession(${s.id})">Supprimer</button>
+      <div id="hist-detail-${s.id}" style="display:none;width:100%;padding-top:10px;border-top:1px solid var(--border);margin-top:10px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:8px">
+          ${s.dist?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Distance</div><div style="font-size:16px;font-weight:700">${s.dist} km</div></div>`:''}
+          ${s.dur?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Durée</div><div style="font-size:16px;font-weight:700">${s.dur} min</div></div>`:''}
+          ${s.pace?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Allure</div><div style="font-size:16px;font-weight:700">${s.pace}/km</div></div>`:''}
+          ${s.hr?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC moy</div><div style="font-size:16px;font-weight:700">${s.hr} bpm</div></div>`:''}
+          ${s.hrmax?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC max</div><div style="font-size:16px;font-weight:700">${s.hrmax} bpm</div></div>`:''}
+          ${s.dplus?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">D+</div><div style="font-size:16px;font-weight:700">${s.dplus} m</div></div>`:''}
+          ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
+        </div>
+        ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
+        ${commentHtml}
+        ${compHtml}
+        ${kmHtml}
+        ${analysisHtml}
+        ${aiLoadHtml}
+        <div style="margin-top:10px;text-align:right">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delSession(${s.id})">🗑️ Supprimer</button>
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleHistDetail(id){
+  const d=document.getElementById('hist-detail-'+id);
+  const c=document.getElementById('chev-hist-'+id);
+  const open=d.style.display==='none';
+  d.style.display=open?'block':'none';
+  if(c)c.style.transform=open?'rotate(180deg)':'';
+}
+
+async function analyzeFromHistory(id){
+  const s=sessions.find(x=>x.id===id);
+  if(!s)return;
+  const apiKey=settings.apiKey||'';
+  if(!apiKey){toast('⚠️ Ajoute ta clé API dans Réglages !');return}
+  const week=s.week?getWeek(s.week):null;
+  const loadEl=document.getElementById('ai-hist-load-'+id);
+  if(loadEl)loadEl.style.display='flex';
+  // Masquer le bouton analyser
+  const btn=loadEl?.previousElementSibling;
+  if(btn)btn.style.display='none';
+
+  const prompt=buildPrompt(s,week);
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    if(loadEl)loadEl.style.display='none';
+    if(data.content&&data.content[0]){
+      // Sauvegarder l'analyse dans la session
+      const idx=sessions.findIndex(x=>x.id===id);
+      if(idx>=0){sessions[idx].claudeAnalysis=data.content[0].text;localStorage.setItem('smi_s',JSON.stringify(sessions));}
+      renderHistory();
+      // Rouvrir le détail
+      const d=document.getElementById('hist-detail-'+id);
+      const c=document.getElementById('chev-hist-'+id);
+      if(d){d.style.display='block';if(c)c.style.transform='rotate(180deg)';}
+    }else{toast('Erreur API');if(btn)btn.style.display='block';}
+  }catch(e){
+    if(loadEl)loadEl.style.display='none';
+    if(btn)btn.style.display='block';
+    toast('Erreur réseau');
+  }
 }
 
 function delSession(id){sessions=sessions.filter(s=>s.id!==id);localStorage.setItem('smi_s',JSON.stringify(sessions));renderStats();renderPlan();toast('Séance supprimée')}
