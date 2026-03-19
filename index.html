@@ -245,15 +245,34 @@ canvas{display:block;width:100%!important}
     </div>
   </div>
 
+  <!-- IMPORT STRAVA SCREENSHOT -->
+  <div class="card" id="strava-import-card">
+    <div class="card-title"><span class="bar"></span>📸 Import depuis Strava / Apple Watch</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Fais une capture d'écran de ton activité Strava ou Apple Watch et envoie-la ici. Claude extraira automatiquement toutes les données (distance, durée, allure, FC, dénivelé, détail km).</p>
+    <div id="strava-drop-zone" onclick="document.getElementById('strava-file').click()" style="border:2px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:10px">
+      <div style="font-size:26px;margin-bottom:5px">📷</div>
+      <div style="font-size:13px;font-weight:500;color:var(--text2)">Appuyer pour choisir une image</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">Screenshot Strava, Apple Watch, Garmin…</div>
+    </div>
+    <input type="file" id="strava-file" accept="image/*" style="display:none" onchange="handleStravaFile(this)">
+    <div id="strava-preview" style="display:none;margin-bottom:10px">
+      <img id="strava-img" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="preview">
+    </div>
+    <button id="strava-extract-btn" class="btn btn-or btn-full" style="display:none" onclick="extractStravaData()">🔍 Extraire les données avec Claude</button>
+    <div id="strava-loading" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Extraction des données en cours…</span></div>
+    <div id="strava-result" style="display:none;background:var(--grl);border:1px solid var(--gr);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text);margin-top:8px;line-height:1.7"></div>
+    <p style="font-size:11px;color:var(--text3);margin-top:8px">⚠️ Nécessite une clé API dans les Réglages. Sans clé, utilise la saisie manuelle ci-dessous.</p>
+  </div>
+
   <!-- KM PAR KM -->
   <div class="card" id="km-detail-card">
     <div class="card-title"><span class="bar"></span>Détail kilomètre par kilomètre</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Optionnel — ajoute chaque km avec son allure et son dénivelé.</p>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Saisie manuelle — ou rempli automatiquement via l'import screenshot ci-dessus.</p>
     <table class="km-table">
       <thead><tr><th>Km</th><th>Allure (/km)</th><th>D+ (m)</th><th>Note</th><th></th></tr></thead>
       <tbody id="km-tbody"></tbody>
     </table>
-    <button class="add-km-btn" onclick="addKmRow()">+ Ajouter un kilomètre</button>
+    <button class="add-km-btn" onclick="addKmRow()">+ Ajouter un kilomètre manuellement</button>
   </div>
 
   <div class="card">
@@ -578,6 +597,36 @@ document.getElementById('lg-dur')?.addEventListener('input',()=>{
   if(!['plan','course-libre','velo','natation-plan','natation-libre'].includes(s))updateCalEst();
 });
 
+// ── RESET FORM ────────────────────────────────────────────────────────────
+function resetForm(){
+  document.getElementById('lg-sport').value='plan';
+  document.getElementById('lg-week').value=todayWeek();
+  document.getElementById('lg-date').value='';
+  document.getElementById('lg-dur').value='';
+  document.getElementById('lg-dist').value='';
+  document.getElementById('lg-d').value='';
+  document.getElementById('lg-pace').value='';
+  document.getElementById('lg-hr').value='';
+  document.getElementById('lg-hrmax').value='';
+  document.getElementById('lg-paceok').value='';
+  document.getElementById('lg-comment').value='';
+  const intEl=document.getElementById('lg-intensity');
+  if(intEl)intEl.value='moderate';
+  const wEl=document.getElementById('lg-weight');
+  if(wEl)wEl.value='';
+  curRating=0;
+  document.querySelectorAll('.rbt').forEach(b=>b.classList.remove('sel'));
+  kmRows=[];
+  renderKmTable();
+  document.getElementById('calories-estimate').style.display='none';
+  document.getElementById('compare-section').style.display='none';
+  document.getElementById('ai-result').classList.remove('show');
+  document.getElementById('ai-loading').classList.remove('show');
+  document.getElementById('copy-prompt-area').style.display='none';
+  document.getElementById('prompt-text').value='';
+  onSportChange();
+}
+
 // ── SAVE + ANALYZE ────────────────────────────────────────────────────────
 function saveAndAnalyze(){
   const sport=document.getElementById('lg-sport').value;
@@ -600,7 +649,6 @@ function saveAndAnalyze(){
 
   if(!dist&&!dur){toast('Saisis au moins la distance ou la durée !');return}
 
-  // Computed allure
   let compPace='';
   if(dist&&dur){const a=dur/dist;compPace=Math.floor(a)+':'+(Math.round((a%1)*60)<10?'0':'')+Math.round((a%1)*60)}
 
@@ -613,10 +661,18 @@ function saveAndAnalyze(){
   if(wn)sessions=sessions.filter(s=>s.week!==wn||s.sport!=='plan');
   sessions.push(session);
   localStorage.setItem('smi_s',JSON.stringify(sessions));
+
+  // Sauvegarder les données pour l'analyse AVANT le reset
+  const sessionCopy={...session,kmRows:[...session.kmRows]};
+  const weekCopy=week;
+
   toast('Séance enregistrée !');
   renderPlan();
-  showCompare(session,week);
-  runAnalysis(session,week);
+  showCompare(sessionCopy,weekCopy);
+  runAnalysis(sessionCopy,weekCopy);
+
+  // Reset le formulaire après enregistrement
+  resetForm();
 }
 
 // ── COMPARE ───────────────────────────────────────────────────────────────
@@ -884,6 +940,136 @@ function saveSettings(){
   toast('Réglages enregistrés ✓');
 }
 function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');sessions=[];renderPlan();toast('Données effacées')}}
+
+// ── STRAVA SCREENSHOT IMPORT ──────────────────────────────────────────────
+let stravaImageB64='';
+let stravaImageType='';
+
+function handleStravaFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const dataUrl=e.target.result;
+    stravaImageB64=dataUrl.split(',')[1];
+    stravaImageType=file.type||'image/jpeg';
+    document.getElementById('strava-img').src=dataUrl;
+    document.getElementById('strava-preview').style.display='block';
+    document.getElementById('strava-extract-btn').style.display='block';
+    document.getElementById('strava-result').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractStravaData(){
+  const apiKey=settings.apiKey||'';
+  if(!apiKey){toast('⚠️ Ajoute ta clé API dans Réglages d\'abord !');return}
+  if(!stravaImageB64){toast('Sélectionne d\'abord une image !');return}
+
+  document.getElementById('strava-loading').style.display='flex';
+  document.getElementById('strava-extract-btn').style.display='none';
+  document.getElementById('strava-result').style.display='none';
+
+  const prompt=`Tu es un assistant qui extrait des données d'une capture d'écran d'application de running (Strava, Apple Watch, Garmin, etc.).
+
+Extrais TOUTES les données visibles et réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaires, avec cette structure exacte :
+{
+  "date": "JJ/MM/AAAA ou vide",
+  "distance_km": nombre ou null,
+  "duree_min": nombre ou null,
+  "allure_moy": "M:SS ou vide",
+  "fc_moy": nombre ou null,
+  "fc_max": nombre ou null,
+  "denivele_plus": nombre ou null,
+  "calories": nombre ou null,
+  "sport": "course/velo/natation/autre",
+  "km_details": [
+    {"km": 1, "allure": "M:SS", "denivele": nombre ou null},
+    ...
+  ],
+  "notes": "autres infos visibles"
+}
+
+Si une valeur n'est pas visible, mets null. Pour km_details, extrais chaque split/km visible. Pour l'allure, utilise le format M:SS (ex: 5:42).`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:stravaImageType,data:stravaImageB64}},
+          {type:'text',text:prompt}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    document.getElementById('strava-loading').style.display='none';
+
+    if(!data.content||!data.content[0]){toast('Erreur API');document.getElementById('strava-extract-btn').style.display='block';return}
+
+    let raw=data.content[0].text.trim();
+    // Nettoyer si JSON dans un bloc markdown
+    raw=raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+
+    let extracted;
+    try{extracted=JSON.parse(raw)}
+    catch(e){
+      document.getElementById('strava-result').style.display='block';
+      document.getElementById('strava-result').textContent='Impossible de parser les données. Réessaie avec une meilleure capture.';
+      document.getElementById('strava-extract-btn').style.display='block';
+      return;
+    }
+
+    // Remplir le formulaire
+    if(extracted.date)document.getElementById('lg-date').value=extracted.date;
+    if(extracted.distance_km)document.getElementById('lg-dist').value=extracted.distance_km;
+    if(extracted.duree_min)document.getElementById('lg-dur').value=extracted.duree_min;
+    if(extracted.allure_moy)document.getElementById('lg-pace').value=extracted.allure_moy;
+    if(extracted.fc_moy)document.getElementById('lg-hr').value=extracted.fc_moy;
+    if(extracted.fc_max)document.getElementById('lg-hrmax').value=extracted.fc_max;
+    if(extracted.denivele_plus)document.getElementById('lg-d').value=extracted.denivele_plus;
+    if(extracted.sport){
+      const sportMap={'course':'plan','velo':'velo','natation':'natation-plan','autre':'autre'};
+      const s=sportMap[extracted.sport]||'plan';
+      document.getElementById('lg-sport').value=s;
+      onSportChange();
+    }
+
+    // Remplir le détail km
+    if(extracted.km_details&&extracted.km_details.length){
+      kmRows=extracted.km_details.map(k=>({
+        pace:k.allure||'',
+        dplus:k.denivele||'',
+        note:''
+      }));
+      renderKmTable();
+    }
+
+    // Afficher le résumé
+    let summary='✅ Données extraites :\n';
+    if(extracted.distance_km)summary+=`• Distance : ${extracted.distance_km} km\n`;
+    if(extracted.duree_min)summary+=`• Durée : ${extracted.duree_min} min\n`;
+    if(extracted.allure_moy)summary+=`• Allure : ${extracted.allure_moy}/km\n`;
+    if(extracted.fc_moy)summary+=`• FC moy : ${extracted.fc_moy} bpm\n`;
+    if(extracted.fc_max)summary+=`• FC max : ${extracted.fc_max} bpm\n`;
+    if(extracted.denivele_plus)summary+=`• Dénivelé+ : ${extracted.denivele_plus} m\n`;
+    if(extracted.km_details&&extracted.km_details.length)summary+=`• ${extracted.km_details.length} km détaillés\n`;
+    if(extracted.notes)summary+=`• Notes : ${extracted.notes}`;
+    summary+='\n👆 Vérifie et complète les données si besoin, puis clique Enregistrer.';
+
+    document.getElementById('strava-result').textContent=summary;
+    document.getElementById('strava-result').style.display='block';
+    toast('Données extraites ! Vérifie le formulaire.');
+
+  }catch(e){
+    document.getElementById('strava-loading').style.display='none';
+    document.getElementById('strava-extract-btn').style.display='block';
+    toast('Erreur réseau — réessaie');
+  }
+}
 
 // ── INIT ──────────────────────────────────────────────────────────────────
 renderPlan();
