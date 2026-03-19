@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Semi-Marathon 1h50 — Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -245,23 +247,54 @@ canvas{display:block;width:100%!important}
     </div>
   </div>
 
-  <!-- IMPORT STRAVA SCREENSHOT -->
+  <!-- IMPORT STRAVA / FIT / GPX -->
   <div class="card" id="strava-import-card">
-    <div class="card-title"><span class="bar"></span>📸 Import depuis Strava / Apple Watch</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Fais une capture d'écran de ton activité Strava ou Apple Watch et envoie-la ici. Claude extraira automatiquement toutes les données (distance, durée, allure, FC, dénivelé, détail km).</p>
-    <div id="strava-drop-zone" onclick="document.getElementById('strava-file').click()" style="border:2px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:10px">
-      <div style="font-size:26px;margin-bottom:5px">📷</div>
-      <div style="font-size:13px;font-weight:500;color:var(--text2)">Appuyer pour choisir une image</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">Screenshot Strava, Apple Watch, Garmin…</div>
+    <div class="card-title"><span class="bar"></span>📥 Import activité Strava</div>
+
+    <!-- MODE TABS -->
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button id="mode-fit-btn" class="btn btn-or btn-sm" onclick="setImportMode('fit')" style="flex:1">📄 Fichier FIT/GPX</button>
+      <button id="mode-img-btn" class="btn btn-ghost btn-sm" onclick="setImportMode('img')" style="flex:1">📷 Capture d'écran</button>
     </div>
-    <input type="file" id="strava-file" accept="image/*" style="display:none" onchange="handleStravaFile(this)">
-    <div id="strava-preview" style="display:none;margin-bottom:10px">
-      <img id="strava-img" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="preview">
+
+    <!-- MODE FIT -->
+    <div id="import-fit-panel">
+      <div style="background:var(--bll);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--bl);margin-bottom:10px;line-height:1.6">
+        <b>💡 Comment récupérer ton fichier FIT depuis Strava :</b><br>
+        1. Ouvre ton activité sur Strava (navigateur)<br>
+        2. Clique sur les <b>trois points "…"</b> en haut à droite<br>
+        3. Sélectionne <b>"Exporter l'original"</b><br>
+        4. Tu obtiens un fichier <b>.fit</b> — uploade-le ici<br>
+        <span style="opacity:.8">✅ Contient : distance, allure/km, FC moy+max, dénivelé, cadence, GPS</span>
+      </div>
+      <div id="fit-drop-zone" onclick="document.getElementById('fit-file').click()" style="border:2px dashed var(--border2);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:border-color .2s">
+        <div style="font-size:28px;margin-bottom:6px">📄</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text2)">Appuyer pour choisir un fichier</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Formats acceptés : .fit · .gpx · .tcx</div>
+      </div>
+      <input type="file" id="fit-file" accept=".fit,.gpx,.tcx,.FIT,.GPX,.TCX" style="display:none" onchange="handleFitFile(this)">
+      <div id="fit-file-info" style="display:none;margin-top:8px;background:var(--bg2);border-radius:var(--r);padding:8px 12px;font-size:12px;color:var(--text2)"></div>
+      <div id="fit-loading" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Lecture du fichier en cours…</span></div>
     </div>
-    <button id="strava-extract-btn" class="btn btn-or btn-full" style="display:none" onclick="extractStravaData()">🔍 Extraire les données avec Claude</button>
-    <div id="strava-loading" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Extraction des données en cours…</span></div>
-    <div id="strava-result" style="display:none;background:var(--grl);border:1px solid var(--gr);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text);margin-top:8px;line-height:1.7"></div>
-    <p style="font-size:11px;color:var(--text3);margin-top:8px">⚠️ Nécessite une clé API dans les Réglages. Sans clé, utilise la saisie manuelle ci-dessous.</p>
+
+    <!-- MODE IMAGE -->
+    <div id="import-img-panel" style="display:none">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Capture d'écran de Strava, Apple Watch… Claude extraira les données visibles (moins précis qu'un fichier FIT).</p>
+      <div id="strava-drop-zone" onclick="document.getElementById('strava-file').click()" style="border:2px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s">
+        <div style="font-size:26px;margin-bottom:5px">📷</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text2)">Appuyer pour choisir une image</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Screenshot Strava, Apple Watch, Garmin…</div>
+      </div>
+      <input type="file" id="strava-file" accept="image/*" style="display:none" onchange="handleStravaFile(this)">
+      <div id="strava-preview" style="display:none;margin-top:8px">
+        <img id="strava-img" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="preview">
+      </div>
+      <button id="strava-extract-btn" class="btn btn-or btn-full" style="display:none;margin-top:8px" onclick="extractStravaData()">🔍 Extraire les données avec Claude</button>
+      <div id="strava-loading" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Extraction en cours…</span></div>
+      <p style="font-size:11px;color:var(--text3);margin-top:8px">⚠️ Nécessite une clé API dans les Réglages.</p>
+    </div>
+
+    <div id="strava-result" style="display:none;background:var(--grl);border:1px solid var(--gr);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text);margin-top:10px;line-height:1.7;white-space:pre-wrap"></div>
   </div>
 
   <!-- KM PAR KM -->
@@ -633,6 +666,11 @@ function resetForm(){
   document.getElementById('strava-result').style.display='none';
   document.getElementById('strava-loading').style.display='none';
   document.getElementById('strava-file').value='';
+  // Reset fichier FIT
+  document.getElementById('fit-file').value='';
+  document.getElementById('fit-file-info').style.display='none';
+  document.getElementById('fit-loading').style.display='none';
+  pendingGpsTrace=[];
   onSportChange();
 }
 
@@ -665,6 +703,7 @@ function saveAndAnalyze(){
     id:Date.now(),sport,week:wn,date,dist,dur,dplus:d,hr,hrmax,
     pace:pace||compPace,paceok,comment,rating:curRating,
     kmRows:[...kmRows],intensity,calEst,
+    gpsTrace:pendingGpsTrace.length?[...pendingGpsTrace]:[],
     savedAt:new Date().toISOString()
   };
   if(wn)sessions=sessions.filter(s=>s.week!==wn||s.sport!=='plan');
@@ -952,11 +991,23 @@ function renderHistory(){
       </div>`;
     const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
 
+    // Carte GPS
+    const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`
+      <div style="margin-top:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div>
+        <div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div>
+        <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--text3)">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:16px;height:3px;background:#E8500A;display:inline-block;border-radius:2px"></span>Tracé</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#27AE60;border-radius:50%;display:inline-block"></span>Départ</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#C0392B;border-radius:50%;display:inline-block"></span>Arrivée</span>
+        </div>
+      </div>`:'';
+
     return`<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
         <div class="hi-l">
           <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week?'<b>S'+s.week+'</b>':''}</div>
-          <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}</div>
+          <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
         </div>
         <div class="hi-r">
           <div class="hi-stars">${stars}</div>
@@ -976,6 +1027,7 @@ function renderHistory(){
         </div>
         ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
         ${commentHtml}
+        ${mapHtml}
         ${compHtml}
         ${kmHtml}
         ${analysisHtml}
@@ -988,12 +1040,98 @@ function renderHistory(){
   }).join('');
 }
 
+const mapInstances={};
+
 function toggleHistDetail(id){
   const d=document.getElementById('hist-detail-'+id);
   const c=document.getElementById('chev-hist-'+id);
   const open=d.style.display==='none';
   d.style.display=open?'block':'none';
   if(c)c.style.transform=open?'rotate(180deg)':'';
+  if(open){
+    // Rendre la carte si pas encore initialisée
+    setTimeout(()=>renderMap(id),50);
+  }
+}
+
+function renderMap(id){
+  const mapEl=document.getElementById('map-'+id);
+  if(!mapEl||mapInstances[id])return;
+  const s=sessions.find(x=>x.id===id);
+  if(!s||!s.gpsTrace||s.gpsTrace.length<2)return;
+
+  const pts=s.gpsTrace.map(p=>[p.lat,p.lon]);
+  const hrVals=s.gpsTrace.map(p=>p.hr||0);
+  const maxHr=Math.max(...hrVals.filter(h=>h>0))||180;
+  const minHr=Math.min(...hrVals.filter(h=>h>0))||120;
+
+  // Créer la carte
+  const map=L.map(mapEl,{zoomControl:true,attributionControl:true});
+  mapInstances[id]=map;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:18
+  }).addTo(map);
+
+  // Tracer le parcours coloré par FC si dispo, sinon couleur unie
+  const hasHr=hrVals.some(h=>h>0);
+  if(hasHr&&pts.length>1){
+    // Segments colorés selon FC
+    for(let i=0;i<pts.length-1;i++){
+      const hr=hrVals[i]||hrVals[i+1]||0;
+      let color='#E8500A';
+      if(hr>0){
+        const ratio=(hr-minHr)/Math.max(1,maxHr-minHr);
+        // Bleu (repos) → orange (modéré) → rouge (intense)
+        if(ratio<0.33) color=`#2980B9`;
+        else if(ratio<0.66) color=`#E8500A`;
+        else color=`#C0392B`;
+      }
+      L.polyline([pts[i],pts[i+1]],{color,weight:3.5,opacity:.85}).addTo(map);
+    }
+  } else {
+    L.polyline(pts,{color:'#E8500A',weight:3.5,opacity:.85}).addTo(map);
+  }
+
+  // Marqueurs départ / arrivée
+  const greenIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:#27AE60;border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
+  const redIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:#C0392B;border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
+  L.marker(pts[0],{icon:greenIcon}).addTo(map).bindPopup('Départ');
+  L.marker(pts[pts.length-1],{icon:redIcon}).addTo(map).bindPopup('Arrivée');
+
+  // Marqueurs km
+  if(s.kmRows&&s.kmRows.length){
+    let cumDist=0;
+    let ptIdx=0;
+    s.kmRows.forEach((km,i)=>{
+      const targetDist=(i+1)*1000;
+      // Trouver le point GPS le plus proche du km
+      while(ptIdx<s.gpsTrace.length-1&&(s.gpsTrace[ptIdx].dist||0)<targetDist) ptIdx++;
+      if(ptIdx<pts.length){
+        const kmIcon=L.divIcon({
+          html:`<div style="background:white;border:1.5px solid #E8500A;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;color:#E8500A;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)">${i+1}</div>`,
+          className:'',iconAnchor:[12,10]
+        });
+        L.marker(pts[ptIdx],{icon:kmIcon}).addTo(map)
+          .bindPopup(`<b>Km ${i+1}</b><br>Allure : ${km.pace||'—'}<br>FC : ${km.note||'—'}`);
+      }
+    });
+  }
+
+  // Légende FC si dispo
+  if(hasHr){
+    const legend=L.control({position:'bottomright'});
+    legend.onAdd=()=>{
+      const d=L.DomUtil.create('div','');
+      d.style.cssText='background:rgba(255,255,255,.85);padding:5px 8px;border-radius:6px;font-size:10px;line-height:1.6;box-shadow:0 1px 3px rgba(0,0,0,.2)';
+      d.innerHTML=`<b>Fréquence cardiaque</b><br><span style="color:#2980B9">■</span> Modérée<br><span style="color:#E8500A">■</span> Élevée<br><span style="color:#C0392B">■</span> Intense`;
+      return d;
+    };
+    legend.addTo(map);
+  }
+
+  // Ajuster la vue
+  map.fitBounds(L.latLngBounds(pts),{padding:[15,15]});
 }
 
 async function analyzeFromHistory(id){
@@ -1055,10 +1193,351 @@ function saveSettings(){
 }
 function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');sessions=[];renderPlan();toast('Données effacées')}}
 
-// ── STRAVA SCREENSHOT IMPORT ──────────────────────────────────────────────
+// ── IMPORT MODE ───────────────────────────────────────────────────────────
 let stravaImageB64='';
 let stravaImageType='';
+let currentImportMode='fit';
 
+function setImportMode(mode){
+  currentImportMode=mode;
+  document.getElementById('import-fit-panel').style.display=mode==='fit'?'block':'none';
+  document.getElementById('import-img-panel').style.display=mode==='img'?'block':'none';
+  document.getElementById('mode-fit-btn').className='btn btn-sm '+(mode==='fit'?'btn-or':'btn-ghost');
+  document.getElementById('mode-img-btn').className='btn btn-sm '+(mode==='img'?'btn-or':'btn-ghost');
+}
+
+// ── FIT / GPX PARSER ──────────────────────────────────────────────────────
+function handleFitFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  document.getElementById('fit-file-info').style.display='block';
+  document.getElementById('fit-file-info').textContent=`📄 ${file.name} (${(file.size/1024).toFixed(1)} Ko) — lecture en cours…`;
+  document.getElementById('fit-loading').style.display='flex';
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      if(ext==='gpx'||ext==='tcx'){
+        parseGpxTcx(e.target.result, ext, file.name);
+      } else {
+        // FIT = binaire
+        parseFit(e.target.result, file.name);
+      }
+    }catch(err){
+      document.getElementById('fit-loading').style.display='none';
+      document.getElementById('fit-file-info').textContent='❌ Erreur de lecture — essaie le format GPX';
+      toast('Erreur lecture fichier');
+    }
+  };
+  if(ext==='gpx'||ext==='tcx') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function parseGpxTcx(text, ext, filename){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(text,'text/xml');
+  const data={date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[],gpsTrace:[]};
+
+  if(ext==='gpx'){
+    const timeEl=doc.querySelector('metadata time')||doc.querySelector('trkpt time');
+    if(timeEl){const d=new Date(timeEl.textContent);data.date=d.toLocaleDateString('fr-FR');}
+    const pts=[...doc.querySelectorAll('trkpt')];
+    if(pts.length){
+      let totalDist=0,elevGain=0,prevElev=null;
+      const hrVals=[];
+      const startTime=new Date(pts[0].querySelector('time')?.textContent||0);
+      const endTime=new Date(pts[pts.length-1].querySelector('time')?.textContent||0);
+      data.duree_min=Math.round((endTime-startTime)/60000);
+      const kmSplits=[];
+      let kmDist=0,kmStartTime=startTime,kmHr=[];
+      // Sous-échantillonner les points GPS (max 500 points pour perf)
+      const step=Math.max(1,Math.floor(pts.length/500));
+
+      for(let i=1;i<pts.length;i++){
+        const p=pts[i],pp=pts[i-1];
+        const lat1=parseFloat(pp.getAttribute('lat')),lon1=parseFloat(pp.getAttribute('lon'));
+        const lat2=parseFloat(p.getAttribute('lat')),lon2=parseFloat(p.getAttribute('lon'));
+        const d=haversine(lat1,lon1,lat2,lon2);
+        totalDist+=d;kmDist+=d;
+        const elev=parseFloat(p.querySelector('ele')?.textContent||0);
+        if(prevElev!==null&&elev>prevElev)elevGain+=(elev-prevElev);
+        prevElev=elev;
+        const hr=parseInt(p.querySelector('hr,heartrate,gpxtpx\\:hr')?.textContent||0);
+        if(hr>0){hrVals.push(hr);kmHr.push(hr);}
+        // Stocker GPS sous-échantillonné
+        if(i%step===0){
+          const pace=totalDist>0?paceToSec(secToPace(Math.round((data.duree_min*60*totalDist/totalDist)))):0;
+          data.gpsTrace.push({lat:lat2,lon:lon2,hr:hr||0,dist:Math.round(totalDist)});
+        }
+        if(kmDist>=1000){
+          const t=new Date(p.querySelector('time')?.textContent||0);
+          const secs=(t-kmStartTime)/1000;
+          const pace=secToPace(Math.round(secs/(kmDist/1000)));
+          const avgKmHr=kmHr.length?Math.round(kmHr.reduce((a,b)=>a+b,0)/kmHr.length):0;
+          kmSplits.push({km:kmSplits.length+1,allure:pace,denivele:Math.round(elevGain),fc_moy:avgKmHr});
+          kmDist=0;kmStartTime=t;kmHr=[];
+        }
+      }
+      // Ajouter premier et dernier point GPS
+      const fp=pts[0],lp=pts[pts.length-1];
+      data.gpsTrace.unshift({lat:parseFloat(fp.getAttribute('lat')),lon:parseFloat(fp.getAttribute('lon')),hr:0,dist:0});
+      data.gpsTrace.push({lat:parseFloat(lp.getAttribute('lat')),lon:parseFloat(lp.getAttribute('lon')),hr:0,dist:Math.round(totalDist)});
+      data.distance_km=Math.round(totalDist/10)/100;
+      data.denivele_plus=Math.round(elevGain);
+      data.fc_moy=hrVals.length?Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length):0;
+      data.fc_max=hrVals.length?Math.max(...hrVals):0;
+      if(data.duree_min&&data.distance_km){const s=(data.duree_min*60)/data.distance_km;data.allure_moy=secToPace(Math.round(s));}
+      data.km_details=kmSplits.map((k,i)=>({km:i+1,allure:k.allure,denivele:k.dplus||k.denivele,fc_moy:k.fc_moy}));
+    }
+  } else if(ext==='tcx'){
+    const laps=[...doc.querySelectorAll('Lap')];
+    let totalDist=0,totalTime=0,hrVals=[];
+    laps.forEach(lap=>{
+      totalDist+=parseFloat(lap.querySelector('DistanceMeters')?.textContent||0);
+      totalTime+=parseFloat(lap.querySelector('TotalTimeSeconds')?.textContent||0);
+      [...lap.querySelectorAll('HeartRateBpm Value')].forEach(h=>hrVals.push(parseInt(h.textContent)));
+    });
+    // GPS depuis TCX
+    const tpts=[...doc.querySelectorAll('Trackpoint')];
+    const step=Math.max(1,Math.floor(tpts.length/500));
+    tpts.forEach((tp,i)=>{
+      if(i%step===0){
+        const lat=parseFloat(tp.querySelector('LatitudeDegrees')?.textContent||'NaN');
+        const lon=parseFloat(tp.querySelector('LongitudeDegrees')?.textContent||'NaN');
+        const hr=parseInt(tp.querySelector('HeartRateBpm Value')?.textContent||0);
+        if(!isNaN(lat)&&!isNaN(lon))data.gpsTrace.push({lat,lon,hr});
+      }
+    });
+    data.distance_km=Math.round(totalDist/10)/100;
+    data.duree_min=Math.round(totalTime/60);
+    if(totalTime&&totalDist){data.allure_moy=secToPace(Math.round(totalTime/data.distance_km));}
+    data.fc_moy=hrVals.length?Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length):0;
+    data.fc_max=hrVals.length?Math.max(...hrVals):0;
+    const startEl=doc.querySelector('Activity Id');
+    if(startEl){const d=new Date(startEl.textContent);data.date=d.toLocaleDateString('fr-FR');}
+  }
+  applyExtractedData(data, filename);
+}
+
+function parseFit(buffer, filename){
+  // Parseur FIT binaire minimal — lit les records de données
+  const bytes=new Uint8Array(buffer);
+  const data={date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[]};
+
+  // Cherche les patterns FIT pour les données clés
+  // FIT = série de messages, on cherche les valeurs numériques connues
+  let totalDist=0, totalTime=0, hrSum=0, hrCount=0, hrMax=0, elevGain=0;
+  let startTs=0, endTs=0;
+  const kmSplits=[];
+  let kmDist=0, kmTime=0, kmHrSum=0, kmHrCount=0, kmElev=0;
+  let lastLat=null, lastLon=null, lastElev=null, lastTs=null;
+
+  // Lecture basique : chercher les enregistrements de type "record" (mesg_num=20)
+  // Format FIT simplifié : header 14 bytes, puis messages
+  try{
+    let pos=14; // skip header
+    const defMsgs={};
+
+    while(pos<bytes.length-2){
+      const recHdr=bytes[pos];
+      if(recHdr===0xFFFF||pos>=bytes.length)break;
+
+      const isCompressedTs=(recHdr&0x80)!==0;
+      const isDef=(recHdr&0x40)!==0;
+      const localMsgType=recHdr&0x0F;
+
+      if(isCompressedTs){
+        pos+=1;
+        continue;
+      }
+
+      if(isDef){
+        // Definition message
+        pos+=1; // skip header
+        pos+=1; // reserved
+        const arch=bytes[pos++];
+        const globalMsgNum=(arch===0)?(bytes[pos]|(bytes[pos+1]<<8)):(bytes[pos+1]|(bytes[pos]<<8));
+        pos+=2;
+        const nFields=bytes[pos++];
+        const fields=[];
+        for(let f=0;f<nFields;f++){
+          fields.push({num:bytes[pos],size:bytes[pos+1],type:bytes[pos+2]});
+          pos+=3;
+        }
+        defMsgs[localMsgType]={globalMsgNum,fields,arch};
+        // dev fields
+        const devFlagByte=recHdr;
+        if((recHdr&0x20)!==0){
+          const nDev=bytes[pos++];
+          for(let f=0;f<nDev;f++) pos+=3;
+        }
+      } else {
+        // Data message
+        const def=defMsgs[localMsgType];
+        if(!def){pos+=1;continue;}
+        pos+=1; // skip header byte
+        const msgStart=pos;
+        const msgSize=def.fields.reduce((a,f)=>a+f.size,0);
+
+        if(def.globalMsgNum===20){
+          // Record message — heart rate, distance, speed, altitude
+          let off=msgStart;
+          def.fields.forEach(f=>{
+            let val=0;
+            if(f.size===1) val=bytes[off];
+            else if(f.size===2) val=bytes[off]|(bytes[off+1]<<8);
+            else if(f.size===4) val=bytes[off]|(bytes[off+1]<<8)|(bytes[off+2]<<16)|(bytes[off+3]<<24);
+            off+=f.size;
+
+            if(f.num===3){// heart_rate
+              if(val>0&&val<250){hrSum+=val;hrCount++;if(val>hrMax)hrMax=val;kmHrSum+=val;kmHrCount++;}
+            }
+            if(f.num===5){// distance (cm -> m)
+              const distM=val/100;
+              if(distM>totalDist){
+                const delta=distM-totalDist;
+                kmDist+=delta;
+                totalDist=distM;
+              }
+            }
+            if(f.num===2){// altitude (mm -> m, offset 500m)
+              const altM=(val/5)-500;
+              if(lastElev!==null&&altM>lastElev) elevGain+=(altM-lastElev);
+              lastElev=altM;
+            }
+            if(f.num===253){// timestamp
+              if(startTs===0)startTs=val;
+              endTs=val;
+            }
+          });
+          // Check km split
+          if(kmDist>=1000){
+            const paceS=totalTime>0?(((endTs-startTs)-kmTime)/Math.max(1,kmDist/1000)):0;
+            kmSplits.push({
+              km:kmSplits.length+1,
+              allure:paceS>0?secToPace(Math.round(paceS)):'—',
+              denivele:Math.round(elevGain),
+              fc_moy:kmHrCount?Math.round(kmHrSum/kmHrCount):0
+            });
+            kmDist-=1000;
+            kmHrSum=0;kmHrCount=0;
+          }
+        }
+        if(def.globalMsgNum===19){
+          // Lap message — calories, distance
+          let off=msgStart;
+          def.fields.forEach(f=>{
+            let val=0;
+            if(f.size===1) val=bytes[off];
+            else if(f.size===2) val=bytes[off]|(bytes[off+1]<<8);
+            else if(f.size===4) val=bytes[off]|(bytes[off+1]<<8)|(bytes[off+2]<<16)|(bytes[off+3]<<24);
+            off+=f.size;
+            if(f.num===11) data.calories+=val; // calories
+          });
+        }
+        if(def.globalMsgNum===18){
+          // Session message
+          let off=msgStart;
+          def.fields.forEach(f=>{
+            let val=0;
+            if(f.size===1) val=bytes[off];
+            else if(f.size===2) val=bytes[off]|(bytes[off+1]<<8);
+            else if(f.size===4) val=bytes[off]|(bytes[off+1]<<8)|(bytes[off+2]<<16)|(bytes[off+3]<<24);
+            off+=f.size;
+            if(f.num===253){// start_time (FIT epoch = 631065600)
+              const jsTs=(val+631065600)*1000;
+              const d=new Date(jsTs);
+              data.date=d.toLocaleDateString('fr-FR');
+            }
+            if(f.num===9) totalDist=Math.max(totalDist,val/100); // total_distance
+            if(f.num===7) totalTime=Math.max(totalTime,val/1000); // total_elapsed_time
+          });
+        }
+        pos=msgStart+msgSize;
+      }
+    }
+  }catch(e){
+    // Fallback si parseur échoue — données partielles
+  }
+
+  // Calculer les métriques finales
+  if(endTs>startTs&&totalTime===0) totalTime=endTs-startTs;
+  data.distance_km=Math.round(totalDist/10)/100||0;
+  data.duree_min=Math.round(totalTime/60)||0;
+  data.fc_moy=hrCount?Math.round(hrSum/hrCount):0;
+  data.fc_max=hrMax||0;
+  data.denivele_plus=Math.round(elevGain)||0;
+  if(data.duree_min&&data.distance_km){
+    data.allure_moy=secToPace(Math.round((data.duree_min*60)/data.distance_km));
+  }
+  data.km_details=kmSplits.map(k=>({km:k.km,allure:k.allure,denivele:k.denivele,fc_moy:k.fc_moy}));
+
+  // Si le parseur FIT n'a pas donné assez de données, signaler
+  if(!data.distance_km&&!data.duree_min){
+    document.getElementById('fit-loading').style.display='none';
+    document.getElementById('fit-file-info').textContent='⚠️ Fichier FIT complexe — essaie d\'exporter en GPX depuis Strava';
+    toast('Format FIT non standard — essaie GPX');
+    return;
+  }
+
+  applyExtractedData(data, filename);
+}
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+let pendingGpsTrace=[];
+
+function applyExtractedData(data, filename){
+  document.getElementById('fit-loading').style.display='none';
+  // Sauvegarder la trace GPS pour l'enregistrement
+  pendingGpsTrace=data.gpsTrace||[];
+
+  if(data.date) document.getElementById('lg-date').value=data.date;
+  if(data.distance_km) document.getElementById('lg-dist').value=data.distance_km;
+  if(data.duree_min) document.getElementById('lg-dur').value=data.duree_min;
+  if(data.allure_moy) document.getElementById('lg-pace').value=data.allure_moy;
+  if(data.fc_moy) document.getElementById('lg-hr').value=data.fc_moy;
+  if(data.fc_max) document.getElementById('lg-hrmax').value=data.fc_max;
+  if(data.denivele_plus) document.getElementById('lg-d').value=data.denivele_plus;
+  const sportMap={'course':'plan','velo':'velo','natation':'natation-plan','autre':'autre'};
+  document.getElementById('lg-sport').value=sportMap[data.sport]||'plan';
+  onSportChange();
+
+  if(data.km_details&&data.km_details.length){
+    kmRows=data.km_details.map(k=>({
+      pace:k.allure||'',
+      dplus:k.denivele||'',
+      note:k.fc_moy?`FC: ${k.fc_moy} bpm`:''
+    }));
+    renderKmTable();
+  }
+
+  let s='✅ Fichier lu : '+filename+'\n\n';
+  if(data.date) s+=`📅 Date : ${data.date}\n`;
+  if(data.distance_km) s+=`📏 Distance : ${data.distance_km} km\n`;
+  if(data.duree_min) s+=`⏱️ Durée : ${data.duree_min} min\n`;
+  if(data.allure_moy) s+=`🏃 Allure : ${data.allure_moy}/km\n`;
+  if(data.fc_moy) s+=`❤️ FC moy : ${data.fc_moy} bpm\n`;
+  if(data.fc_max) s+=`❤️ FC max : ${data.fc_max} bpm\n`;
+  if(data.denivele_plus) s+=`⛰️ Dénivelé+ : ${data.denivele_plus} m\n`;
+  if(data.calories) s+=`🔥 Calories : ${data.calories} kcal\n`;
+  if(data.km_details&&data.km_details.length) s+=`📊 ${data.km_details.length} km détaillés avec FC\n`;
+  if(pendingGpsTrace.length) s+=`🗺️ ${pendingGpsTrace.length} points GPS — carte disponible après enregistrement\n`;
+  s+='\n👆 Vérifie les données puis clique Enregistrer.';
+
+  const res=document.getElementById('strava-result');
+  res.textContent=s;
+  res.style.display='block';
+  document.getElementById('fit-file-info').textContent=`✅ ${filename} — données extraites`;
+  toast('Fichier importé avec succès !');
+}
+
+// ── SCREENSHOT IMPORT (fallback) ──────────────────────────────────────────
 function handleStravaFile(input){
   const file=input.files[0];
   if(!file)return;
@@ -1084,104 +1563,34 @@ async function extractStravaData(){
   document.getElementById('strava-extract-btn').style.display='none';
   document.getElementById('strava-result').style.display='none';
 
-  const prompt=`Tu es un assistant qui extrait des données d'une capture d'écran d'application de running (Strava, Apple Watch, Garmin, etc.).
-
-Extrais TOUTES les données visibles et réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaires, avec cette structure exacte :
-{
-  "date": "JJ/MM/AAAA ou vide",
-  "distance_km": nombre ou null,
-  "duree_min": nombre ou null,
-  "allure_moy": "M:SS ou vide",
-  "fc_moy": nombre ou null,
-  "fc_max": nombre ou null,
-  "denivele_plus": nombre ou null,
-  "calories": nombre ou null,
-  "sport": "course/velo/natation/autre",
-  "km_details": [
-    {"km": 1, "allure": "M:SS", "denivele": nombre ou null},
-    ...
-  ],
-  "notes": "autres infos visibles"
-}
-
-Si une valeur n'est pas visible, mets null. Pour km_details, extrais chaque split/km visible. Pour l'allure, utilise le format M:SS (ex: 5:42).`;
+  const prompt=`Extrais TOUTES les données visibles de cette capture d'écran d'app de running et réponds UNIQUEMENT en JSON valide sans markdown :
+{"date":"JJ/MM/AAAA ou vide","distance_km":nombre ou null,"duree_min":nombre ou null,"allure_moy":"M:SS ou vide","fc_moy":nombre ou null,"fc_max":nombre ou null,"denivele_plus":nombre ou null,"calories":nombre ou null,"sport":"course/velo/natation/autre","km_details":[{"km":1,"allure":"M:SS","denivele":nombre ou null,"fc_moy":nombre ou null}],"notes":"autres infos"}`;
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1500,
-        messages:[{role:'user',content:[
-          {type:'image',source:{type:'base64',media_type:stravaImageType,data:stravaImageB64}},
-          {type:'text',text:prompt}
-        ]}]
-      })
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:stravaImageType,data:stravaImageB64}},
+        {type:'text',text:prompt}
+      ]}]})
     });
     const data=await res.json();
     document.getElementById('strava-loading').style.display='none';
-
     if(!data.content||!data.content[0]){toast('Erreur API');document.getElementById('strava-extract-btn').style.display='block';return}
-
-    let raw=data.content[0].text.trim();
-    // Nettoyer si JSON dans un bloc markdown
-    raw=raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-
+    let raw=data.content[0].text.trim().replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     let extracted;
-    try{extracted=JSON.parse(raw)}
-    catch(e){
+    try{extracted=JSON.parse(raw)}catch(e){
+      document.getElementById('strava-result').textContent='Impossible de parser. Réessaie avec une meilleure capture.';
       document.getElementById('strava-result').style.display='block';
-      document.getElementById('strava-result').textContent='Impossible de parser les données. Réessaie avec une meilleure capture.';
       document.getElementById('strava-extract-btn').style.display='block';
       return;
     }
-
-    // Remplir le formulaire
-    if(extracted.date)document.getElementById('lg-date').value=extracted.date;
-    if(extracted.distance_km)document.getElementById('lg-dist').value=extracted.distance_km;
-    if(extracted.duree_min)document.getElementById('lg-dur').value=extracted.duree_min;
-    if(extracted.allure_moy)document.getElementById('lg-pace').value=extracted.allure_moy;
-    if(extracted.fc_moy)document.getElementById('lg-hr').value=extracted.fc_moy;
-    if(extracted.fc_max)document.getElementById('lg-hrmax').value=extracted.fc_max;
-    if(extracted.denivele_plus)document.getElementById('lg-d').value=extracted.denivele_plus;
-    if(extracted.sport){
-      const sportMap={'course':'plan','velo':'velo','natation':'natation-plan','autre':'autre'};
-      const s=sportMap[extracted.sport]||'plan';
-      document.getElementById('lg-sport').value=s;
-      onSportChange();
-    }
-
-    // Remplir le détail km
-    if(extracted.km_details&&extracted.km_details.length){
-      kmRows=extracted.km_details.map(k=>({
-        pace:k.allure||'',
-        dplus:k.denivele||'',
-        note:''
-      }));
-      renderKmTable();
-    }
-
-    // Afficher le résumé
-    let summary='✅ Données extraites :\n';
-    if(extracted.distance_km)summary+=`• Distance : ${extracted.distance_km} km\n`;
-    if(extracted.duree_min)summary+=`• Durée : ${extracted.duree_min} min\n`;
-    if(extracted.allure_moy)summary+=`• Allure : ${extracted.allure_moy}/km\n`;
-    if(extracted.fc_moy)summary+=`• FC moy : ${extracted.fc_moy} bpm\n`;
-    if(extracted.fc_max)summary+=`• FC max : ${extracted.fc_max} bpm\n`;
-    if(extracted.denivele_plus)summary+=`• Dénivelé+ : ${extracted.denivele_plus} m\n`;
-    if(extracted.km_details&&extracted.km_details.length)summary+=`• ${extracted.km_details.length} km détaillés\n`;
-    if(extracted.notes)summary+=`• Notes : ${extracted.notes}`;
-    summary+='\n👆 Vérifie et complète les données si besoin, puis clique Enregistrer.';
-
-    document.getElementById('strava-result').textContent=summary;
-    document.getElementById('strava-result').style.display='block';
-    toast('Données extraites ! Vérifie le formulaire.');
-
+    applyExtractedData(extracted,'screenshot');
   }catch(e){
     document.getElementById('strava-loading').style.display='none';
     document.getElementById('strava-extract-btn').style.display='block';
-    toast('Erreur réseau — réessaie');
+    toast('Erreur réseau');
   }
 }
 
@@ -1189,6 +1598,7 @@ Si une valeur n'est pas visible, mets null. Pour km_details, extrais chaque spli
 renderPlan();
 populateWeekSelect();
 onSportChange();
+setImportMode('fit');
 </script>
 </body>
 </html>
