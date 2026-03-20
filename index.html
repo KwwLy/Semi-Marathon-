@@ -374,6 +374,26 @@ canvas{display:block;width:100%!important}
     </div>
   </div>
 
+  <!-- COACH IA -->
+  <div class="card" id="coach-card" style="display:none">
+    <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
+    <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
+    <!-- Ligne prédiction coach -->
+    <div id="coach-pred-row" style="display:none;align-items:center;gap:14px;background:var(--bg2);border-radius:var(--r);padding:12px 14px;margin-bottom:12px">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Prédiction Coach</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="coach-pred-time" style="font-size:28px;font-weight:700"></span>
+          <span id="coach-pred-arrow" style="font-size:30px;line-height:1"></span>
+        </div>
+        <div id="coach-pred-vs" style="font-size:11px;margin-top:3px"></div>
+      </div>
+    </div>
+    <!-- Analyse textuelle -->
+    <div id="coach-result" style="font-size:12px;line-height:1.75;color:var(--text);white-space:pre-wrap;display:none"></div>
+    <div id="coach-date" style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right"></div>
+  </div>
+
   <!-- RECORDS PERSONNELS -->
   <div class="card" id="pr-card" style="display:none">
     <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
@@ -754,7 +774,10 @@ function saveAndAnalyze(){
   toast('Séance enregistrée !');
   renderPlan();
   // Recalculer prédiction si c'est une séance de course
-  if(['plan','course-libre'].includes(sport)) updatePerfCards();
+  if(['plan','course-libre'].includes(sport)){
+    updatePerfCards();
+    runCoachAnalysis(sessionCopy); // analyse plan + prédiction en arrière-plan
+  }
   showCompare(sessionCopy,weekCopy);
   runAnalysis(sessionCopy,weekCopy);
 
@@ -873,6 +896,143 @@ function copyPrompt(){
   });
 }
 
+// ── COACH IA — analyse plan + prédiction ─────────────────────────────────
+async function runCoachAnalysis(lastSession){
+  const apiKey=settings.apiKey;
+  if(!apiKey)return; // silencieux si pas de clé
+
+  // Basculer sur le dashboard et montrer le loading
+  sw('stats');
+  const card=document.getElementById('coach-card');
+  card.style.display='block';
+  document.getElementById('coach-loading').style.display='flex';
+  document.getElementById('coach-result').style.display='none';
+  document.getElementById('coach-pred-row').style.display='none';
+
+  // Construire le contexte complet
+  const runSessions=sessions
+    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist&&s.dur)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
+
+  const vdotLast=lastSession?computeVDOT(lastSession.dist,lastSession.dur):null;
+  const predVDOT=vdotLast?semiTimeFromVDOT(vdotLast):null;
+
+  // Résumé des 5 dernières séances
+  const recentSummary=runSessions.slice(-5).map(s=>
+    `  - ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' ('+s.pace+'/km)':''}${s.dplus?' +'+s.dplus+'m':''}`
+  ).join('\n');
+
+  const prompt=`Tu es un coach running expert. Ton athlète prépare un semi-marathon le 4 octobre 2026.
+
+OBJECTIFS : A = 1h50 (5:13/km) · B = sub 2h00
+CONTRAINTES PLAN : maximum 2 séances de course par semaine, natation possible en complément.
+SÉANCES RESTANTES : plan sur 30 semaines démarré le 16 mars 2026.
+
+DERNIÈRE SÉANCE :
+- Date : ${lastSession?.date||'?'}
+- Distance : ${lastSession?.dist} km
+- Durée : ${lastSession?.dur} min
+- Allure : ${lastSession?.pace||'?'}/km
+- FC moy : ${lastSession?.hr||'?'} bpm · FC max : ${lastSession?.hrmax||'?'} bpm
+- Dénivelé : ${lastSession?.dplus||0} m
+${lastSession?.comment?'- Commentaire : '+lastSession.comment:''}
+
+5 DERNIÈRES SÉANCES :
+${recentSummary||'(aucune)'}
+
+TOTAL : ${runSessions.length} séances course · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés
+
+PRÉDICTION ALGORITHMIQUE (VDOT) : ${predVDOT?minsToHMS(predVDOT):'non calculable'} sur semi
+
+Réponds en JSON STRICT, sans texte avant ni après, avec exactement ce format :
+{
+  "prediction_time": "1h58:30",
+  "prediction_direction": "up",
+  "prediction_comment": "une phrase courte sur l'objectif",
+  "plan_adjustment_needed": true,
+  "plan_adjustment": "description concrète de l'ajustement suggéré ou null si aucun",
+  "analysis": "analyse complète en 4-5 phrases : forme actuelle, progression, adéquation au plan, conseils pour les prochaines séances"
+}
+
+Règles :
+- prediction_time : temps prédit au semi au format Xh??:?? basé sur ta propre analyse
+- prediction_direction : "up" si tu estimes que l'athlète peut atteindre ou dépasser l'objectif A (1h50), "down" sinon
+- plan_adjustment_needed : true seulement si un changement significatif est justifié
+- Reste dans la contrainte de 2 séances course/semaine max
+- Sois direct et concis`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    document.getElementById('coach-loading').style.display='none';
+
+    if(!data.content||!data.content[0]){toast('Erreur analyse coach');return;}
+
+    let json;
+    try{
+      const raw=data.content[0].text.replace(/```json|```/g,'').trim();
+      json=JSON.parse(raw);
+    }catch(e){
+      // Si JSON invalide, afficher le texte brut
+      document.getElementById('coach-result').textContent=data.content[0].text;
+      document.getElementById('coach-result').style.display='block';
+      return;
+    }
+
+    // Sauvegarder dans localStorage
+    const coachData={...json,savedAt:new Date().toISOString(),sessionId:lastSession?.id};
+    localStorage.setItem('smi_coach',JSON.stringify(coachData));
+
+    renderCoachCard(json);
+  }catch(e){
+    document.getElementById('coach-loading').style.display='none';
+    toast('Erreur réseau coach IA');
+  }
+}
+
+function renderCoachCard(data){
+  if(!data)return;
+  const card=document.getElementById('coach-card');
+  card.style.display='block';
+  document.getElementById('coach-loading').style.display='none';
+
+  // Ligne prédiction
+  const predRow=document.getElementById('coach-pred-row');
+  predRow.style.display='flex';
+  const isUp=data.prediction_direction==='up';
+  document.getElementById('coach-pred-time').textContent=data.prediction_time||'—';
+  document.getElementById('coach-pred-time').style.color=isUp?'#27AE60':'#C0392B';
+  document.getElementById('coach-pred-arrow').innerHTML=isUp
+    ?'<span style="color:#27AE60">▲</span>'
+    :'<span style="color:#C0392B">▼</span>';
+  document.getElementById('coach-pred-vs').textContent=(data.prediction_comment||'')+(data.plan_adjustment_needed?' · ⚙️ Ajustement plan suggéré':'');
+  document.getElementById('coach-pred-vs').style.color=isUp?'#27AE60':'#C0392B';
+
+  // Analyse textuelle
+  let txt='';
+  if(data.analysis) txt+=data.analysis;
+  if(data.plan_adjustment_needed&&data.plan_adjustment){
+    txt+='\n\n📋 Ajustement plan suggéré :\n'+data.plan_adjustment;
+  }
+  const resultEl=document.getElementById('coach-result');
+  resultEl.textContent=txt;
+  resultEl.style.display='block';
+
+  // Date
+  document.getElementById('coach-date').textContent='Analyse du '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+}
+
+// Charger l'analyse coach sauvegardée au démarrage
+function loadCoachCard(){
+  const saved=localStorage.getItem('smi_coach');
+  if(!saved)return;
+  try{renderCoachCard(JSON.parse(saved));}catch(e){}
+}
+
 // ── RATING ────────────────────────────────────────────────────────────────
 // ── POPULATE WEEK SELECT ──────────────────────────────────────────────────
 function populateWeekSelect(){
@@ -936,6 +1096,7 @@ function renderStats(){
 
   updatePerfCards();
   renderPersonalRecords();
+  loadCoachCard();
   renderCalendar();
   renderHistory();
 }
@@ -2024,6 +2185,8 @@ renderPlan();
 populateWeekSelect();
 onSportChange();
 setImportMode('fit');
+loadCoachCard();
+renderStats();
 </script>
 </body>
 </html>
