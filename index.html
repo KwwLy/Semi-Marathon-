@@ -377,26 +377,9 @@ canvas{display:block;width:100%!important}
   <!-- RECORDS PERSONNELS -->
   <div class="card" id="pr-card" style="display:none">
     <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Meilleure performance extraite de tes séances importées, par distance.</div>
-    <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px"></div>
-    <p style="font-size:10px;color:var(--text3);margin-top:8px">* Basé sur les séances enregistrées. Les temps sur distances inférieures à la distance réelle sont extrapolés via VDOT.</p>
+    <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
   </div>
-    <div class="card-title"><span class="bar"></span>Répartition des zones d'effort</div>
-    <div class="zone-chart" id="zone-chart"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="zone-legend"></div>
-  </div>
-  <div class="card" id="zone-card" style="display:none">
-    <div class="card-title"><span class="bar"></span>Répartition des zones d'effort</div>
-    <div class="zone-chart" id="zone-chart"></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="zone-legend"></div>
-  </div>
-  <div class="card" id="sport-card" style="display:none">
-    <div class="card-title"><span class="bar"></span>Sports pratiqués en parallèle</div>
-    <div class="sport-chips" id="sport-chips"></div>
-  </div>
-    <div class="card-title"><span class="bar"></span>Sports pratiqués en parallèle</div>
-    <div class="sport-chips" id="sport-chips"></div>
-  </div>
+
   <!-- CALENDRIER -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title"><span class="bar"></span>📅 Calendrier d'activité</div>
@@ -418,8 +401,10 @@ canvas{display:block;width:100%!important}
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;color:var(--text3)" id="cal-legend"></div>
   </div>
 
-  <div class="section-h" style="margin-top:8px">Historique des séances</div>
-  <div id="history-list"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:12px 14px 0;font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Historique des séances</div>
+    <div id="history-list" style="padding:0"></div>
+  </div>
 </div>
 
 <!-- SETTINGS -->
@@ -911,14 +896,36 @@ function renderStats(){
   const lastPace=planSessions.slice(-1)[0]?.pace||'—';
   const lastVO2=computeVO2max(planSessions.slice(-1)[0]);
 
+  // Indicateurs supplémentaires
+  const runSessions=sessions.filter(s=>['plan','course-libre'].includes(s.sport));
+  const totalRunKm=runSessions.reduce((a,s)=>a+(s.dist||0),0);
+  const totalRunMin=runSessions.reduce((a,s)=>a+(s.dur||0),0);
+  // Allure progression : comparer première et dernière séance avec allure
+  const paceSessions=runSessions.filter(s=>s.pace).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
+  const firstPaceSec=paceSessions.length?paceToSec(paceSessions[0].pace):0;
+  const lastPaceSec=paceSessions.length?paceToSec(paceSessions[paceSessions.length-1].pace):0;
+  const paceProgSec=firstPaceSec&&lastPaceSec?firstPaceSec-lastPaceSec:0; // positif = amélioration
+  // Cadence hebdo (semaines actives)
+  const dates=sessions.map(s=>parseDate(s.date)).filter(Boolean);
+  let weeksActive=0;
+  if(dates.length){
+    const oldest=Math.min(...dates.map(d=>d.getTime()));
+    const newest=Math.max(...dates.map(d=>d.getTime()));
+    const totalWeeks=Math.max(1,Math.ceil((newest-oldest)/(7*86400000))+1);
+    const weekSet=new Set(sessions.map(s=>{const d=parseDate(s.date);return d?`${d.getFullYear()}-${Math.floor((d-new Date(d.getFullYear(),0,1))/604800000)}`:''}));
+    weeksActive=weekSet.size;
+  }
+  // Séance la plus longue
+  const longestRun=runSessions.reduce((best,s)=>(!best||s.dist>best.dist)?s:best,null);
+
   document.getElementById('stats-grid').innerHTML=`
-    <div class="sc"><div class="sc-lbl">Séances totales</div><div class="sc-val">${allS.length}</div><div class="sc-sub">${planSessions.length} séances course</div></div>
-    <div class="sc"><div class="sc-lbl">Kilomètres</div><div class="sc-val">${totalKm.toFixed(1)}</div><div class="sc-sub">km parcourus</div></div>
-    <div class="sc"><div class="sc-lbl">Temps total</div><div class="sc-val">${Math.floor(totalMin/60)}h${String(totalMin%60).padStart(2,'0')}</div><div class="sc-sub">d'entraînement</div></div>
-    <div class="sc"><div class="sc-lbl">Calories estimées</div><div class="sc-val">${totalCal>0?Math.round(totalCal/1000)+'k':'—'}</div><div class="sc-sub">kcal brûlées</div></div>
-    <div class="sc"><div class="sc-lbl">Allure moy. réelle</div><div class="sc-val" style="font-size:20px">${avgPace}</div><div class="sc-sub">cible : ${settings.target||'5:13'}/km</div></div>
-    <div class="sc"><div class="sc-lbl">Dernière allure</div><div class="sc-val" style="font-size:20px">${lastPace}</div><div class="sc-sub">vs cible ${settings.target||'5:13'}</div></div>
-    <div class="sc"><div class="sc-lbl">VO2max estimée</div><div class="sc-val">${lastVO2?lastVO2.toFixed(1):'—'}</div><div class="sc-sub">ml/kg/min</div></div>
+    <div class="sc"><div class="sc-lbl">Séances totales</div><div class="sc-val">${allS.length}</div><div class="sc-sub">${runSessions.length} courses</div></div>
+    <div class="sc"><div class="sc-lbl">Km course</div><div class="sc-val">${totalRunKm.toFixed(0)}</div><div class="sc-sub">km parcourus</div></div>
+    <div class="sc"><div class="sc-lbl">Temps course</div><div class="sc-val">${Math.floor(totalRunMin/60)}h${String(totalRunMin%60).padStart(2,'0')}</div><div class="sc-sub">en mouvement</div></div>
+    <div class="sc"><div class="sc-lbl">Sortie la + longue</div><div class="sc-val" style="font-size:18px">${longestRun?longestRun.dist+'km':'—'}</div><div class="sc-sub">${longestRun?.date||''}</div></div>
+    <div class="sc"><div class="sc-lbl">Allure moyenne</div><div class="sc-val" style="font-size:20px">${avgPace}</div><div class="sc-sub">cible ${settings.target||'5:13'}/km</div></div>
+    <div class="sc"><div class="sc-lbl">Progression allure</div><div class="sc-val" style="font-size:18px;color:${paceProgSec>0?'var(--gr)':paceProgSec<0?'var(--re)':'var(--text)'}">${paceProgSec>0?'-'+secToPace(paceProgSec):paceProgSec<0?'+'+secToPace(-paceProgSec):'—'}</div><div class="sc-sub">depuis 1ère séance</div></div>
+    <div class="sc"><div class="sc-lbl">Semaines actives</div><div class="sc-val">${weeksActive}</div><div class="sc-sub">semaines avec activité</div></div>
     <div class="sc"><div class="sc-lbl">Dénivelé total</div><div class="sc-val">${allS.reduce((a,s)=>a+(s.dplus||0),0)}</div><div class="sc-sub">mètres cumulés</div></div>
   `;
 
@@ -928,8 +935,6 @@ function renderStats(){
   document.getElementById('prog-sub').textContent=`${sessions.filter(s=>s.week).length} séance${sessions.filter(s=>s.week).length>1?'s':''} du plan enregistrée${sessions.filter(s=>s.week).length>1?'s':''}`;
 
   updatePerfCards();
-  renderZoneChart();
-  renderSportChips();
   renderPersonalRecords();
   renderCalendar();
   renderHistory();
@@ -942,27 +947,40 @@ function renderStats(){
 
 function computeVDOT(distKm, timeMin){
   if(!distKm||!timeMin||distKm<1)return null;
-  const distM=distKm*1000;
-  const timeSec=timeMin*60;
-  // Vitesse en m/min
-  const v=distM/timeSec*60;
-  // VO2 à cette vitesse (Jack Daniels)
+  const v=(distKm*1000)/(timeMin*60)*60; // m/min
   const vo2=-4.6*v+0.182258*v*v+0.000104*v*v*v;
   if(vo2<=0)return null;
-  // % VO2max utilisé selon la durée
+  // % VO2max selon durée (Jack Daniels)
   let pct;
-  if(timeMin<=5) pct=1.0;
-  else if(timeMin<=8) pct=0.98;
-  else if(timeMin<=12) pct=0.975;
-  else if(timeMin<=20) pct=0.97;
-  else if(timeMin<=30) pct=0.96;
-  else if(timeMin<=45) pct=0.95;
-  else if(timeMin<=60) pct=0.94;
-  else if(timeMin<=90) pct=0.93;
-  else if(timeMin<=120) pct=0.92;
+  if(timeMin<=5)pct=1.0;
+  else if(timeMin<=8)pct=0.98;
+  else if(timeMin<=12)pct=0.975;
+  else if(timeMin<=20)pct=0.97;
+  else if(timeMin<=30)pct=0.96;
+  else if(timeMin<=45)pct=0.95;
+  else if(timeMin<=60)pct=0.94;
+  else if(timeMin<=90)pct=0.93;
+  else if(timeMin<=120)pct=0.92;
   else pct=0.91;
-  const vdot=vo2/pct;
-  return Math.max(20,Math.min(85,vdot)); // borner entre 20 et 85
+  // Pas de borne max sur le VDOT — laisser le calcul libre
+  return Math.max(15, vo2/pct);
+}
+
+function semiTimeFromVDOT(vdot){
+  if(!vdot||vdot<15)return null;
+  // Vitesse de course au semi = vitesse pour vo2 = vdot × 0.94
+  const target=vdot*0.94;
+  // Dichotomie sur v (m/min)
+  let lo=60,hi=500;
+  for(let i=0;i<80;i++){
+    const mid=(lo+hi)/2;
+    const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
+    if(vo2<target)lo=mid;else hi=mid;
+  }
+  const v=(lo+hi)/2;
+  if(v<=0)return null;
+  const timeMin=21097/v;
+  return Math.max(75,Math.min(300,timeMin));
 }
 
 function predictSemiTime(session){
@@ -971,30 +989,12 @@ function predictSemiTime(session){
   if(!vdot||vdot<15)return null;
   const pred=semiTimeFromVDOT(vdot);
   if(!pred)return null;
-  // Pour distances < 10km : pondération vers 125 min (2h05) — valeur raisonnable
-  // pour un coureur de niveau intermédiaire en début de préparation
+  // Distances < 10km : pondérer légèrement vers 125 min car fatigue longue durée non représentée
   if(session.dist<10){
-    const weight=Math.min(1,session.dist/10);
-    return pred*weight+125*(1-weight);
+    const w=session.dist/10;
+    return pred*w+125*(1-w);
   }
   return pred;
-}
-
-function semiTimeFromVDOT(vdot){
-  if(!vdot)return null;
-  const distM=21097;
-  const target=vdot*0.94;
-  let lo=80,hi=450;
-  for(let i=0;i<60;i++){
-    const mid=(lo+hi)/2;
-    const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
-    if(vo2<target)lo=mid;else hi=mid;
-  }
-  const v=(lo+hi)/2;
-  if(v<=0)return null;
-  const timeMin=distM/v;
-  // Borne réaliste : 85 min (1h25) à 240 min (4h00)
-  return Math.max(85,Math.min(240,timeMin));
 }
 
 function computeVO2max(session){
@@ -1218,11 +1218,8 @@ function openSessionFromCal(id){
 // ── RECORDS PERSONNELS ────────────────────────────────────────────────────
 function renderPersonalRecords(){
   const card=document.getElementById('pr-card');
-  const runSessions=sessions
-    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>=1&&s.dur>0)
-    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
-
-  if(!runSessions.length){card.style.display='none';return}
+  const runs=sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>=1&&s.dur>0);
+  if(!runs.length){card.style.display='none';return}
   card.style.display='block';
 
   const targets=[
@@ -1230,77 +1227,74 @@ function renderPersonalRecords(){
     {dist:10,  label:'10 km'},
     {dist:15,  label:'15 km'},
     {dist:20,  label:'20 km'},
-    {dist:21.1,label:'Semi'}
+    {dist:21.1,label:'Semi'},
   ];
 
-  // Pour chaque distance cible, on cherche la meilleure performance
-  // Stratégie :
-  //  - Si la séance couvre exactement la distance (±5%) → temps réel direct
-  //  - Sinon → extrapolation via VDOT depuis les séances ≥ 60% de la cible
-  const records=targets.map(t=>{
-    let best=null; // {timeMin, pace, date, real}
+  function riegelTime(dReal,tReal,dTarget){return tReal*Math.pow(dTarget/dReal,1.06);}
+  function fmtTime(mins){
+    const h=Math.floor(mins/60),m=Math.floor(mins%60),s=Math.round((mins%1)*60);
+    return h>0?`${h}h${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}`:`${m}'${String(s).padStart(2,'0')}`;
+  }
+  function fmtPace(mins,dist){
+    const p=mins/dist;
+    return`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}/km`;
+  }
 
-    // 1. Séances couvrant la distance réelle (dist >= target ×0.95)
-    const direct=runSessions.filter(s=>s.dist>=t.dist*0.95);
-    direct.forEach(s=>{
-      // Temps estimé pour exactement t.dist via Riegel depuis la durée réelle
-      const estTime=s.dur*Math.pow(t.dist/s.dist,1.06);
-      if(!best||estTime<best.timeMin){
-        best={timeMin:estTime,date:s.date,real:s.dist>=t.dist*0.95&&s.dist<=t.dist*1.05};
+  const records=targets.map(t=>{
+    let best=null;
+
+    runs.forEach(s=>{
+      // ── Source 1 : séance entière ≥ distance cible → Riegel
+      if(s.dist>=t.dist){
+        const est=riegelTime(s.dist,s.dur,t.dist);
+        if(!best||est<best.t) best={t:est,date:s.date,src:'course'};
+      }
+
+      // ── Source 2 : données km par km — meilleur segment cumulé
+      if(s.kmRows&&s.kmRows.length>=1){
+        // Convertir allures en temps par km (en minutes)
+        const kmT=s.kmRows.map(r=>{
+          if(!r.pace)return null;
+          const p=r.pace.split(':');
+          return p.length===2?parseInt(p[0])+parseInt(p[1])/60:null;
+        });
+        const fullKm=Math.floor(t.dist);
+        const frac=t.dist-fullKm;
+        // Fenêtre glissante sur fullKm km consécutifs
+        for(let i=0;i<=kmT.length-fullKm;i++){
+          let seg=0,ok=true;
+          for(let j=i;j<i+fullKm;j++){if(kmT[j]==null){ok=false;break;}seg+=kmT[j];}
+          if(!ok)continue;
+          if(frac>0&&i+fullKm<kmT.length&&kmT[i+fullKm]!=null) seg+=kmT[i+fullKm]*frac;
+          if(!best||seg<best.t) best={t:seg,date:s.date,src:'segment'};
+        }
+        // Si on a assez de km pour couvrir sans fraction
+        if(frac===0){
+          for(let i=0;i<=kmT.length-fullKm;i++){
+            let seg=0,ok=true;
+            for(let j=i;j<i+fullKm;j++){if(kmT[j]==null){ok=false;break;}seg+=kmT[j];}
+            if(!ok)continue;
+            if(!best||seg<best.t) best={t:seg,date:s.date,src:'segment'};
+          }
+        }
       }
     });
 
-    // 2. Si pas de séance directe, extrapolation VDOT pour les séances < target
-    if(!best){
-      const shorter=runSessions.filter(s=>s.dist>=t.dist*0.5&&s.dist<t.dist*0.95);
-      shorter.forEach(s=>{
-        const vdot=computeVDOT(s.dist,s.dur);
-        if(!vdot)return;
-        const predTime=semiTimeFromVDOT(vdot) * (t.dist/21.1); // proportionnel
-        // Réajuster depuis le VDOT directement pour la distance cible
-        const target94=vdot*0.94;
-        let lo=80,hi=450;
-        for(let i=0;i<60;i++){
-          const mid=(lo+hi)/2;
-          const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
-          if(vo2<target94)lo=mid;else hi=mid;
-        }
-        const v=(lo+hi)/2;
-        const estTime=v>0?(t.dist*1000/v):null;
-        if(estTime&&(!best||estTime<best.timeMin)){
-          best={timeMin:estTime,date:s.date,real:false};
-        }
-      });
-    }
-
     if(!best)return{...t,best:null};
-
-    const pace=best.timeMin/t.dist; // min/km
-    const paceStr=Math.floor(pace)+':'+(Math.round((pace%1)*60)<10?'0':'')+Math.round((pace%1)*60);
-    const h=Math.floor(best.timeMin/60);
-    const m=Math.floor(best.timeMin%60);
-    const s=Math.round((best.timeMin%1)*60);
-    const timeStr=h>0?`${h}h${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
-    return{...t,best:{timeStr,paceStr,date:best.date,real:best.real}};
+    return{...t,best:{timeStr:fmtTime(best.t),paceStr:fmtPace(best.t,t.dist),date:best.date,src:best.src}};
   });
 
-  document.getElementById('pr-grid').innerHTML=records.map(r=>{
-    if(!r.best)return`
-      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center;opacity:.5">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">${r.label}</div>
-        <div style="font-size:13px;color:var(--text3)">—</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:3px">Pas encore de données</div>
-      </div>`;
-    return`
-      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center;position:relative">
-        ${!r.best.real?'<div style="position:absolute;top:5px;right:6px;font-size:9px;color:var(--text3);background:var(--bg3);border-radius:3px;padding:1px 4px">estimé</div>':''}
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">${r.label}</div>
-        <div style="font-size:18px;font-weight:700;color:var(--or);line-height:1.2">${r.best.timeStr}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:3px;font-weight:500">${r.best.paceStr}/km</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:3px">${r.best.date||''}</div>
-      </div>`;
-  }).join('');
+  document.getElementById('pr-grid').innerHTML=records.map(r=>`
+    <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">${r.label}</div>
+      ${r.best?`
+        <div style="font-size:19px;font-weight:700;color:var(--or);line-height:1.1">${r.best.timeStr}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px;font-weight:500">${r.best.paceStr}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">${r.best.date||''}${r.best.src==='segment'?' · segment':''}</div>
+      `:`<div style="font-size:13px;color:var(--text3);padding:8px 0">—</div>`}
+    </div>`).join('');
 }
+
 
 function renderZoneChart(){
   const zones={Z1:0,Z2:0,Z3:0,Z4:0,Z5:0};
