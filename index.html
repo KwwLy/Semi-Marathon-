@@ -829,11 +829,27 @@ function saveAndAnalyze(){
 function showCompare(s,week){
   if(!week||!['plan','course-libre'].includes(s.sport)){document.getElementById('compare-section').style.display='none';return}
   document.getElementById('compare-section').style.display='block';
-  const distOk=s.dist&&week.dist?Math.abs(s.dist-week.dist)/week.dist<0.1:'—';
-  const durOk=s.dur&&week.dur?Math.abs(s.dur-week.dur)/week.dur<0.15:'—';
-  const planPaceMin=secToPace(week.dur&&week.dist?Math.round((week.dur*60)/week.dist):0);
 
-  function cls(ok){return ok===true?'comp-ok':ok===false?'comp-bad':''}
+  // Récupérer les données du bon slot (S1 ou S2)
+  const slot=s.slot||'s1';
+  const planSeance=week[slot]; // ex: week.s1 ou week.s2
+  // Extraire dist/dur depuis les steps du plan (champ "Durée / distance" si présent)
+  let planDist=week.dist||null, planDur=week.dur||null;
+  if(planSeance){
+    const durStep=planSeance.steps.find(st=>st[0]==='Durée / distance'||st[0]==='Durée');
+    if(durStep){
+      const m=durStep[1].match(/~?(\d+)h(\d+)|~?(\d+)\s*min/);
+      if(m){
+        if(m[1]&&m[2]) planDur=parseInt(m[1])*60+parseInt(m[2]);
+        else if(m[3]) planDur=parseInt(m[3]);
+      }
+      const d=durStep[1].match(/(\d+[\.,]?\d*)\s*km/);
+      if(d) planDist=parseFloat(d[1].replace(',','.'));
+    }
+  }
+
+  const planPaceMin=planDur&&planDist?secToPace(Math.round((planDur*60)/planDist)):'—';
+
   function fmt(val,plan,unit,tol){
     if(!val||!plan)return`<span class="comp-warn">${val||'—'} ${unit}</span>`;
     const ok=Math.abs(val-plan)/plan<tol;
@@ -842,18 +858,19 @@ function showCompare(s,week){
 
   document.getElementById('comp-grid').innerHTML=`
     <div class="comp-col">
-      <div class="comp-head" style="color:var(--bl)">📋 Plan prévu</div>
-      <div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${week.dist} km</span></div>
-      <div class="comp-row"><span class="comp-k">Durée est.</span><span class="comp-v">~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</span></div>
-      <div class="comp-row"><span class="comp-k">Allure cible</span><span class="comp-v">${planPaceMin}/km</span></div>
-      <div class="comp-row"><span class="comp-k">Zone</span><span class="comp-v">${(week.badges||[]).join(', ')}</span></div>
+      <div class="comp-head" style="color:var(--bl)">📋 Plan prévu (${slot.toUpperCase()})</div>
+      <div class="comp-row"><span class="comp-k">Séance</span><span class="comp-v" style="font-size:11px">${planSeance?planSeance.title:'—'}</span></div>
+      ${planDist?`<div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${planDist} km</span></div>`:''}
+      ${planDur?`<div class="comp-row"><span class="comp-k">Durée est.</span><span class="comp-v">~${Math.floor(planDur/60)}h${String(planDur%60).padStart(2,'0')}</span></div>`:''}
+      <div class="comp-row"><span class="comp-k">Allure cible</span><span class="comp-v">${planPaceMin}${planPaceMin!=='—'?'/km':''}</span></div>
+      <div class="comp-row"><span class="comp-k">Zones</span><span class="comp-v">${(week.badges||[]).join(', ')}</span></div>
     </div>
     <div class="comp-col">
       <div class="comp-head" style="color:var(--or)">✅ Réalisé</div>
-      <div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${fmt(s.dist,week.dist,'km',0.1)}</span></div>
-      <div class="comp-row"><span class="comp-k">Durée</span><span class="comp-v">${fmt(s.dur,week.dur,'min',0.15)}</span></div>
+      <div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${fmt(s.dist,planDist,'km',0.1)}</span></div>
+      <div class="comp-row"><span class="comp-k">Durée</span><span class="comp-v">${fmt(s.dur,planDur,'min',0.15)}</span></div>
       <div class="comp-row"><span class="comp-k">Allure réelle</span><span class="comp-v">${s.pace?s.pace+'/km':'—'}</span></div>
-      <div class="comp-row"><span class="comp-k">Ressenti</span><span class="comp-v">${s.rating?'★'.repeat(s.rating)+'☆'.repeat(5-s.rating):'—'}</span></div>
+      <div class="comp-row"><span class="comp-k">FC moy</span><span class="comp-v">${s.hr?s.hr+' bpm':'—'}</span></div>
     </div>`;
 }
 
@@ -902,6 +919,8 @@ async function runAnalysis(s,week){
 
 function buildPrompt(s,week){
   const distCalc=s.dist&&s.dur?(s.dur/s.dist).toFixed(2):'';
+  const slot=s.slot||'s1';
+  const planSeance=week?week[slot]:null;
   let msg=`Tu es mon coach running. Analyse ma séance d'entraînement dans le cadre de ma préparation au semi-marathon du 4 octobre 2026 (objectif : 1h50, soit 5:13/km).\n\n`;
   msg+=`SÉANCE RÉALISÉE :\n`;
   msg+=`- Sport : ${SPORT_LABELS[s.sport]||s.sport}\n`;
@@ -913,17 +932,16 @@ function buildPrompt(s,week){
   if(s.hr)msg+=`- FC moy : ${s.hr} bpm\n`;
   if(s.hrmax)msg+=`- FC max : ${s.hrmax} bpm\n`;
   if(s.paceok)msg+=`- Respect allures : ${s.paceok}\n`;
-  if(s.rating)msg+=`- Ressenti : ${s.rating}/5\n`;
   if(s.calEst)msg+=`- Calories estimées : ${s.calEst} kcal\n`;
   if(s.comment)msg+=`- Commentaire : ${s.comment}\n`;
   if(s.kmRows&&s.kmRows.length){
     msg+=`\nDÉTAIL KM PAR KM :\n`;
     s.kmRows.forEach((r,i)=>msg+=`  km ${i+1} : allure ${r.pace||'?'}/km, D+ ${r.dplus||0}m${r.note?' ('+r.note+')':''}\n`);
   }
-  if(week){
-    msg+=`\nSÉANCE PRÉVUE AU PLAN (S${s.week}) :\n`;
-    msg+=`- ${week.s1.title}\n`;
-    week.s1.steps.forEach(st=>msg+=`  · ${st[0]}: ${st[1]}\n`);
+  if(planSeance){
+    msg+=`\nSÉANCE PRÉVUE AU PLAN (S${s.week} — ${slot.toUpperCase()}) :\n`;
+    msg+=`- ${planSeance.title}\n`;
+    planSeance.steps.forEach(st=>msg+=`  · ${st[0]}: ${st[1]}\n`);
   }
   msg+=`\nAnalyse demandée :\n1. La séance était-elle pertinente par rapport au plan et à l'objectif 1h50 ?\n2. L'effort était-il adapté (ni trop facile, ni trop intense) ?\n3. Points positifs de la séance\n4. Points d'amélioration\n5. Conseils concrets pour la prochaine séance\n6. Suis-je sur la bonne trajectoire pour faire 1h50 le 4 octobre ?`;
   return msg;
@@ -1129,10 +1147,16 @@ function renderStats(){
     <div class="sc"><div class="sc-lbl">Dénivelé total</div><div class="sc-val">${allS.reduce((a,s)=>a+(s.dplus||0),0)}</div><div class="sc-sub">mètres cumulés</div></div>
   `;
 
-  const pct=Math.min(100,Math.round(sessions.filter(s=>s.week).length/30*100));
+  // Avancement : compter les séances du plan enregistrées (max 60 : 30 semaines × S1 + S2)
+  const planDone=sessions.filter(s=>['plan','natation-plan'].includes(s.sport)&&s.week&&s.slot);
+  // Compter les slots uniques (semaine+slot) pour éviter les doublons si re-soumission
+  const planSlotsDone=new Set(planDone.map(s=>`${s.week}-${s.slot}`));
+  const nDone=planSlotsDone.size;
+  const totalSlots=60; // 30 semaines × 2 séances
+  const pct=Math.min(100,Math.round(nDone/totalSlots*100));
   document.getElementById('prog-pct').textContent=pct+'%';
   document.getElementById('prog-bar').style.width=pct+'%';
-  document.getElementById('prog-sub').textContent=`${sessions.filter(s=>s.week).length} séance${sessions.filter(s=>s.week).length>1?'s':''} du plan enregistrée${sessions.filter(s=>s.week).length>1?'s':''}`;
+  document.getElementById('prog-sub').textContent=`${nDone} séance${nDone>1?'s':''} du plan enregistrée${nDone>1?'s':''} sur ${totalSlots} (30 semaines × S1+S2)`;
 
   updatePerfCards();
   renderPersonalRecords();
