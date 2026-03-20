@@ -351,9 +351,9 @@ canvas{display:block;width:100%!important}
   <div class="chart-wrap" id="pred-wrap" style="display:none">
     <div class="chart-title">🎯 Prédiction temps semi-marathon</div>
     <div id="pred-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div style="display:flex;align-items:stretch">
-      <canvas id="predYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
-      <div class="chart-scroll" style="flex:1"><canvas id="predChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch;gap:0">
+      <canvas id="predYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
+      <div class="chart-scroll" id="pred-scroll" style="flex:1"><canvas id="predChart"></canvas></div>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="pred-method"></p>
   </div>
@@ -361,25 +361,25 @@ canvas{display:block;width:100%!important}
   <div class="chart-wrap" id="vo2-wrap" style="display:none">
     <div class="chart-title">🫁 Estimation VO2max</div>
     <div id="vo2-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div style="display:flex;align-items:stretch">
-      <canvas id="vo2YAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
-      <div class="chart-scroll" style="flex:1"><canvas id="vo2Chart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch;gap:0">
+      <canvas id="vo2YAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
+      <div class="chart-scroll" id="vo2-scroll" style="flex:1"><canvas id="vo2Chart"></canvas></div>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="vo2-method"></p>
   </div>
 
   <div class="chart-wrap" id="pace-chart-wrap" style="display:none">
     <div class="chart-title">📈 Évolution de l'allure moyenne (/km)</div>
-    <div style="display:flex;align-items:stretch">
-      <canvas id="paceYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
-      <div class="chart-scroll" style="flex:1"><canvas id="paceChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch;gap:0">
+      <canvas id="paceYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
+      <div class="chart-scroll" id="pace-scroll" style="flex:1"><canvas id="paceChart"></canvas></div>
     </div>
   </div>
   <div class="chart-wrap" id="load-chart-wrap" style="display:none">
     <div class="chart-title">💪 Charge d'entraînement hebdomadaire (km)</div>
-    <div style="display:flex;align-items:stretch">
-      <canvas id="loadYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
-      <div class="chart-scroll" style="flex:1"><canvas id="loadChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch;gap:0">
+      <canvas id="loadYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
+      <div class="chart-scroll" id="load-scroll" style="flex:1"><canvas id="loadChart"></canvas></div>
     </div>
   </div>
   <div class="card" id="zone-card" style="display:none">
@@ -1286,23 +1286,34 @@ function chartWidth(n){return Math.max(300,n*55)}
 const chartInsts={};
 
 function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
-  const {yId, dataId, wrapperId} = ids;
+  const {yId, dataId} = ids;
 
   // Détruire les anciens
   if(chartInsts[yId]) chartInsts[yId].destroy();
   if(chartInsts[dataId]) chartInsts[dataId].destroy();
+
+  const H=160; // hauteur fixe en pixels pour tous les charts
 
   // Largeur dynamique du canvas data
   const cw=chartWidth(labels.length);
   const dataCanvas=document.getElementById(dataId);
   dataCanvas.style.width=cw+'px';
   dataCanvas.style.minWidth=cw+'px';
+  dataCanvas.style.height=H+'px';
+  dataCanvas.height=H;
 
-  const sharedYScale={...yOpts, position:'left', grid:{color:'rgba(128,128,128,0.1)'}};
-
-  // Chart axe Y uniquement (canvas fixe 52px)
+  // Canvas axe Y : largeur calculée dynamiquement selon le contenu
   const yCanvas=document.getElementById(yId);
-  yCanvas.height=dataCanvas.height||140;
+  yCanvas.style.height=H+'px';
+  yCanvas.height=H;
+  // Largeur du canvas Y : on prend 68px pour avoir de la place pour les labels
+  yCanvas.style.width='68px';
+  yCanvas.style.minWidth='68px';
+  yCanvas.width=68;
+
+  const sharedYScale={...yOpts,position:'left',grid:{color:'rgba(128,128,128,0.1)'}};
+
+  // Chart axe Y uniquement (canvas fixe)
   chartInsts[yId]=new Chart(yCanvas.getContext('2d'),{
     type,
     data:{labels,datasets:datasets.map(d=>({...d,data:d.data.map(()=>null)}))},
@@ -1311,10 +1322,10 @@ function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
       animation:false,
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       scales:{
-        y:{...sharedYScale,ticks:{...yOpts.ticks,font:{size:10}},border:{display:false}},
+        y:{...sharedYScale,ticks:{...yOpts.ticks,font:{size:10},padding:4},border:{display:true}},
         x:{display:false}
       },
-      layout:{padding:{right:0}}
+      layout:{padding:{top:8,bottom:24,left:0,right:0}}
     }
   });
 
@@ -1331,13 +1342,10 @@ function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
       scales:{
         y:{display:false,min:yOpts.min,max:yOpts.max,reverse:yOpts.reverse||false},
         x:{...xOpts,ticks:{font:{size:10},maxRotation:45},grid:{display:false}}
-      }
+      },
+      layout:{padding:{top:8,bottom:0,left:0,right:8}}
     }
   });
-
-  // Scroll à droite
-  const wrap=document.getElementById(wrapperId);
-  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
 }
 
 function renderPaceChart(){
@@ -1348,9 +1356,9 @@ function renderPaceChart(){
   const labels=sorted.map(s=>weekLabel(s.date));
   const paces=sorted.map(s=>Math.round(paceToSec(s.pace)/60*100)/100);
   const target=paceToSec(settings.target||'5:13')/60;
-  const wrap=document.querySelector('#pace-chart-wrap .chart-scroll');
+  const wrap=document.getElementById('pace-scroll');
   makeScrollChart(
-    {yId:'paceYAxis',dataId:'paceChart',wrapperId:null},
+    {yId:'paceYAxis',dataId:'paceChart'},
     'line',labels,
     [
       {label:'Allure réelle',data:paces,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.3,fill:true},
@@ -1369,9 +1377,9 @@ function renderLoadChart(){
   const labels=groups.map(g=>g.label);
   const kms=groups.map(g=>Math.round(g.sessions.reduce((a,s)=>a+(s.dist||0),0)*10)/10);
   const planKms=groups.map(g=>Math.round(g.sessions.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0)*10)/10);
-  const wrap=document.querySelector('#load-chart-wrap .chart-scroll');
+  const wrap=document.getElementById('load-scroll');
   makeScrollChart(
-    {yId:'loadYAxis',dataId:'loadChart',wrapperId:null},
+    {yId:'loadYAxis',dataId:'loadChart'},
     'bar',labels,
     [
       {label:'Tous sports (km)',data:kms,backgroundColor:'rgba(232,80,10,0.35)',borderRadius:4},
@@ -1414,9 +1422,9 @@ function renderPredChart(planSessions){
       <div style="font-size:22px;font-weight:700;color:${trendColor}">${trendIcon} ${Math.abs(trend).toFixed(1)}%</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">${trend<0?'amélioration':trend>2?'dégradation':'stable'}</div>
     </div>`;
-  const wrap=document.querySelector('#pred-wrap .chart-scroll');
+  const wrap=document.getElementById('pred-scroll');
   makeScrollChart(
-    {yId:'predYAxis',dataId:'predChart',wrapperId:null},
+    {yId:'predYAxis',dataId:'predChart'},
     'line',labels,
     [
       {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
@@ -1465,9 +1473,9 @@ function renderVO2Chart(planSessions){
       <div style="font-size:22px;font-weight:700;color:var(--bl)">~50</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min requis</div>
     </div>`;
-  const wrap=document.querySelector('#vo2-wrap .chart-scroll');
+  const wrap=document.getElementById('vo2-scroll');
   makeScrollChart(
-    {yId:'vo2YAxis',dataId:'vo2Chart',wrapperId:null},
+    {yId:'vo2YAxis',dataId:'vo2Chart'},
     'line',labels,
     [
       {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
@@ -1581,11 +1589,10 @@ function renderHistory(){
     return`<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
         <div class="hi-l">
-          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week?'<b>S'+s.week+'</b>':''}</div>
+          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+'</b>':''}</div>
           <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
         </div>
         <div class="hi-r">
-          <div class="hi-stars">${stars}</div>
           <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
           <span id="chev-hist-${s.id}" style="font-size:10px;color:var(--text3);transition:transform .2s;display:inline-block">▼</span>
         </div>
@@ -1766,9 +1773,13 @@ function updateSport(id){
   if(!sel)return;
   const idx=sessions.findIndex(s=>s.id===id);
   if(idx<0)return;
-  sessions[idx].sport=sel.value;
+  const newSport=sel.value;
+  const isPlanSport=['plan','natation-plan'].includes(newSport);
+  sessions[idx].sport=newSport;
+  // Si le nouveau sport n'est pas du plan, on retire le lien avec la semaine
+  if(!isPlanSport) sessions[idx].week=null;
   localStorage.setItem('smi_s',JSON.stringify(sessions));
-  renderStats();
+  renderStats(); // re-render dashboard + calendrier + historique
   renderPlan();
   toast('Type mis à jour ✓');
   // Rouvrir le détail après re-render
