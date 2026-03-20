@@ -153,7 +153,10 @@ textarea{resize:vertical;min-height:60px}
 /* CHART */
 .chart-wrap{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);padding:13px;margin-bottom:12px;box-shadow:var(--sh)}
 .chart-title{font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text)}
-.chart-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.chart-outer{display:flex;align-items:stretch;position:relative}
+.chart-yaxis{flex-shrink:0;width:58px;min-width:58px;display:flex;flex-direction:column;justify-content:space-between;padding:8px 4px 28px 0;box-sizing:border-box}
+.chart-yaxis span{font-size:10px;color:var(--text3);text-align:right;display:block;line-height:1;white-space:nowrap}
+.chart-scroll{overflow-x:auto;overflow-y:hidden;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:2px}
 .chart-scroll::-webkit-scrollbar{height:4px}
 .chart-scroll::-webkit-scrollbar-track{background:var(--bg3);border-radius:2px}
 .chart-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
@@ -351,9 +354,9 @@ canvas{display:block;width:100%!important}
   <div class="chart-wrap" id="pred-wrap" style="display:none">
     <div class="chart-title">🎯 Prédiction temps semi-marathon</div>
     <div id="pred-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div style="display:flex;align-items:stretch;gap:0">
-      <canvas id="predYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
-      <div class="chart-scroll" id="pred-scroll" style="flex:1"><canvas id="predChart"></canvas></div>
+    <div class="chart-outer" id="pred-outer">
+      <div class="chart-yaxis" id="pred-yaxis"></div>
+      <div class="chart-scroll" id="pred-scroll"><canvas id="predChart" height="160"></canvas></div>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="pred-method"></p>
   </div>
@@ -361,25 +364,26 @@ canvas{display:block;width:100%!important}
   <div class="chart-wrap" id="vo2-wrap" style="display:none">
     <div class="chart-title">🫁 Estimation VO2max</div>
     <div id="vo2-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div style="display:flex;align-items:stretch;gap:0">
-      <canvas id="vo2YAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
-      <div class="chart-scroll" id="vo2-scroll" style="flex:1"><canvas id="vo2Chart"></canvas></div>
+    <div class="chart-outer" id="vo2-outer">
+      <div class="chart-yaxis" id="vo2-yaxis"></div>
+      <div class="chart-scroll" id="vo2-scroll"><canvas id="vo2Chart" height="160"></canvas></div>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="vo2-method"></p>
   </div>
 
   <div class="chart-wrap" id="pace-chart-wrap" style="display:none">
     <div class="chart-title">📈 Évolution de l'allure moyenne (/km)</div>
-    <div style="display:flex;align-items:stretch;gap:0">
-      <canvas id="paceYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
-      <div class="chart-scroll" id="pace-scroll" style="flex:1"><canvas id="paceChart"></canvas></div>
+    <div class="chart-outer" id="pace-outer">
+      <div class="chart-yaxis" id="pace-yaxis"></div>
+      <div class="chart-scroll" id="pace-scroll"><canvas id="paceChart" height="160"></canvas></div>
     </div>
   </div>
+
   <div class="chart-wrap" id="load-chart-wrap" style="display:none">
     <div class="chart-title">💪 Charge d'entraînement hebdomadaire (km)</div>
-    <div style="display:flex;align-items:stretch;gap:0">
-      <canvas id="loadYAxis" style="flex-shrink:0;width:68px;min-width:68px"></canvas>
-      <div class="chart-scroll" id="load-scroll" style="flex:1"><canvas id="loadChart"></canvas></div>
+    <div class="chart-outer" id="load-outer">
+      <div class="chart-yaxis" id="load-yaxis"></div>
+      <div class="chart-scroll" id="load-scroll"><canvas id="loadChart" height="160"></canvas></div>
     </div>
   </div>
   <div class="card" id="zone-card" style="display:none">
@@ -960,15 +964,27 @@ function computeVDOT(distKm, timeMin){
   return Math.max(20,Math.min(85,vdot)); // borner entre 20 et 85
 }
 
+function predictSemiTime(session){
+  if(!session||!session.dist||!session.dur||session.dist<3)return null;
+  const vdot=computeVDOT(session.dist,session.dur);
+  if(!vdot||vdot<15)return null;
+  const pred=semiTimeFromVDOT(vdot);
+  if(!pred)return null;
+  // Pour distances < 10km : pondération vers 125 min (2h05) — valeur raisonnable
+  // pour un coureur de niveau intermédiaire en début de préparation
+  if(session.dist<10){
+    const weight=Math.min(1,session.dist/10);
+    return pred*weight+125*(1-weight);
+  }
+  return pred;
+}
+
 function semiTimeFromVDOT(vdot){
   if(!vdot)return null;
   const distM=21097;
-  // Chercher la vitesse (m/min) telle que VO2 à cette vitesse = vdot*0.94 (intensité semi ~94%)
-  // VO2 = -4.6v + 0.182258v² + 0.000104v³ = vdot*0.94
   const target=vdot*0.94;
-  // Résolution numérique par dichotomie
-  let lo=100,hi=400;
-  for(let i=0;i<50;i++){
+  let lo=80,hi=450;
+  for(let i=0;i<60;i++){
     const mid=(lo+hi)/2;
     const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
     if(vo2<target)lo=mid;else hi=mid;
@@ -976,23 +992,8 @@ function semiTimeFromVDOT(vdot){
   const v=(lo+hi)/2;
   if(v<=0)return null;
   const timeMin=distM/v;
-  // Borner entre 1h30 (90 min) et 3h00 (180 min) — plage réaliste
-  return Math.max(90,Math.min(180,timeMin));
-}
-
-function predictSemiTime(session){
-  if(!session||!session.dist||!session.dur||session.dist<3)return null;
-  const vdot=computeVDOT(session.dist,session.dur);
-  if(!vdot)return null;
-  const pred=semiTimeFromVDOT(vdot);
-  if(!pred)return null;
-  // Pondération : si la distance < 10km, on est moins confiant → on rapproche vers 2h00
-  // car les courtes distances sous-estiment souvent la fatigue sur 21km
-  if(session.dist<10){
-    const weight=session.dist/10; // 0.3 pour 3km, 0.9 pour 9km
-    return pred*weight+120*(1-weight);
-  }
-  return pred;
+  // Borne réaliste : 85 min (1h25) à 240 min (4h00)
+  return Math.max(85,Math.min(240,timeMin));
 }
 
 function computeVO2max(session){
@@ -1279,73 +1280,71 @@ function groupByWeek(sArr){
 // Calcule la largeur de canvas selon le nombre de points (min 300px, 55px par point)
 function chartWidth(n){return Math.max(300,n*55)}
 
-// ── CHART HELPER — axe Y fixe + données scrollables ──────────────────────
-// On crée 2 charts Chart.js :
-//  1. yAxisChart : affiché dans le canvas fixe, contient UNIQUEMENT l'axe Y (pas de données visibles)
-//  2. dataChart  : affiché dans le canvas scrollable, contient les données + axe X, axe Y masqué
+// ── CHART HELPER — axe Y en HTML fixe + canvas scrollable ────────────────
+// On utilise UN SEUL Chart.js avec l'axe Y désactivé.
+// L'axe Y est rendu en HTML pur dans une div fixe à gauche.
 const chartInsts={};
 
 function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
-  const {yId, dataId} = ids;
+  const {dataId, yAxisId, scrollId} = ids;
 
-  // Détruire les anciens
-  if(chartInsts[yId]) chartInsts[yId].destroy();
   if(chartInsts[dataId]) chartInsts[dataId].destroy();
 
-  const H=160; // hauteur fixe en pixels pour tous les charts
-
-  // Largeur dynamique du canvas data
+  const H=160;
   const cw=chartWidth(labels.length);
-  const dataCanvas=document.getElementById(dataId);
-  dataCanvas.style.width=cw+'px';
-  dataCanvas.style.minWidth=cw+'px';
-  dataCanvas.style.height=H+'px';
-  dataCanvas.height=H;
+  const canvas=document.getElementById(dataId);
+  canvas.style.width=cw+'px';
+  canvas.style.minWidth=cw+'px';
+  canvas.style.height=H+'px';
+  canvas.height=H;
+  canvas.width=cw;
 
-  // Canvas axe Y : largeur calculée dynamiquement selon le contenu
-  const yCanvas=document.getElementById(yId);
-  yCanvas.style.height=H+'px';
-  yCanvas.height=H;
-  // Largeur du canvas Y : on prend 68px pour avoir de la place pour les labels
-  yCanvas.style.width='68px';
-  yCanvas.style.minWidth='68px';
-  yCanvas.width=68;
+  // Construire les ticks de l'axe Y
+  const yMin=yOpts.min??0;
+  const yMax=yOpts.max??100;
+  const reverse=yOpts.reverse||false;
+  const tickFn=yOpts.ticks?.callback||((v)=>v);
+  // Générer 5 ticks réguliers
+  const tickCount=5;
+  const tickStep=(yMax-yMin)/(tickCount-1);
+  let ticks=[];
+  for(let i=0;i<tickCount;i++) ticks.push(yMin+i*tickStep);
+  if(reverse) ticks=ticks.reverse();
+  // Remplir la div axe Y
+  const yAxisEl=document.getElementById(yAxisId);
+  if(yAxisEl){
+    yAxisEl.innerHTML=ticks.map(v=>`<span>${tickFn(v)}</span>`).join('');
+  }
 
-  const sharedYScale={...yOpts,position:'left',grid:{color:'rgba(128,128,128,0.1)'}};
-
-  // Chart axe Y uniquement (canvas fixe)
-  chartInsts[yId]=new Chart(yCanvas.getContext('2d'),{
-    type,
-    data:{labels,datasets:datasets.map(d=>({...d,data:d.data.map(()=>null)}))},
-    options:{
-      responsive:false,maintainAspectRatio:false,
-      animation:false,
-      plugins:{legend:{display:false},tooltip:{enabled:false}},
-      scales:{
-        y:{...sharedYScale,ticks:{...yOpts.ticks,font:{size:10},padding:4},border:{display:true}},
-        x:{display:false}
-      },
-      layout:{padding:{top:8,bottom:24,left:0,right:0}}
-    }
-  });
-
-  // Chart données (canvas scrollable, Y masqué)
-  chartInsts[dataId]=new Chart(dataCanvas.getContext('2d'),{
+  chartInsts[dataId]=new Chart(canvas.getContext('2d'),{
     type,
     data:{labels,datasets},
     options:{
-      responsive:false,maintainAspectRatio:false,
+      responsive:false,
+      maintainAspectRatio:false,
+      animation:{duration:300},
       plugins:{
         legend:{labels:{font:{size:11},boxWidth:12}},
         ...(yOpts.tooltipCallbacks?{tooltip:{callbacks:yOpts.tooltipCallbacks}}:{})
       },
       scales:{
-        y:{display:false,min:yOpts.min,max:yOpts.max,reverse:yOpts.reverse||false},
-        x:{...xOpts,ticks:{font:{size:10},maxRotation:45},grid:{display:false}}
+        y:{
+          display:false,
+          min:yMin,max:yMax,
+          reverse
+        },
+        x:{
+          ticks:{font:{size:10},maxRotation:45},
+          grid:{color:'rgba(128,128,128,0.08)'}
+        }
       },
-      layout:{padding:{top:8,bottom:0,left:0,right:8}}
+      layout:{padding:{top:8,right:8,bottom:0,left:0}}
     }
   });
+
+  // Scroll vers la droite (données récentes)
+  const scrollEl=document.getElementById(scrollId);
+  if(scrollEl) setTimeout(()=>{scrollEl.scrollLeft=scrollEl.scrollWidth;},80);
 }
 
 function renderPaceChart(){
@@ -1356,9 +1355,8 @@ function renderPaceChart(){
   const labels=sorted.map(s=>weekLabel(s.date));
   const paces=sorted.map(s=>Math.round(paceToSec(s.pace)/60*100)/100);
   const target=paceToSec(settings.target||'5:13')/60;
-  const wrap=document.getElementById('pace-scroll');
   makeScrollChart(
-    {yId:'paceYAxis',dataId:'paceChart'},
+    {dataId:'paceChart',yAxisId:'pace-yaxis',scrollId:'pace-scroll'},
     'line',labels,
     [
       {label:'Allure réelle',data:paces,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.3,fill:true},
@@ -1367,7 +1365,6 @@ function renderPaceChart(){
     {reverse:true,min:Math.max(4,Math.min(...paces)-0.5),max:Math.max(...paces)+0.5,ticks:{callback:v=>secToPace(Math.round(v*60))}},
     {}
   );
-  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
 }
 
 function renderLoadChart(){
@@ -1377,9 +1374,8 @@ function renderLoadChart(){
   const labels=groups.map(g=>g.label);
   const kms=groups.map(g=>Math.round(g.sessions.reduce((a,s)=>a+(s.dist||0),0)*10)/10);
   const planKms=groups.map(g=>Math.round(g.sessions.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0)*10)/10);
-  const wrap=document.getElementById('load-scroll');
   makeScrollChart(
-    {yId:'loadYAxis',dataId:'loadChart'},
+    {dataId:'loadChart',yAxisId:'load-yaxis',scrollId:'load-scroll'},
     'bar',labels,
     [
       {label:'Tous sports (km)',data:kms,backgroundColor:'rgba(232,80,10,0.35)',borderRadius:4},
@@ -1388,7 +1384,6 @@ function renderLoadChart(){
     {min:0,max:Math.max(...kms)+5,ticks:{callback:v=>v+' km'}},
     {}
   );
-  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
 }
 
 function renderPredChart(planSessions){
@@ -1422,9 +1417,8 @@ function renderPredChart(planSessions){
       <div style="font-size:22px;font-weight:700;color:${trendColor}">${trendIcon} ${Math.abs(trend).toFixed(1)}%</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">${trend<0?'amélioration':trend>2?'dégradation':'stable'}</div>
     </div>`;
-  const wrap=document.getElementById('pred-scroll');
   makeScrollChart(
-    {yId:'predYAxis',dataId:'predChart'},
+    {dataId:'predChart',yAxisId:'pred-yaxis',scrollId:'pred-scroll'},
     'line',labels,
     [
       {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
@@ -1434,7 +1428,6 @@ function renderPredChart(planSessions){
     {min:Math.max(90,Math.min(...validPreds)-5),max:Math.min(200,Math.max(...validPreds)+10),ticks:{callback:v=>minsToHMS(v)},tooltipCallbacks:{label:v=>v.raw?`${v.dataset.label} : ${minsToHMS(v.raw)}`:''}},
     {}
   );
-  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
   document.getElementById('pred-method').textContent='Méthode VDOT (Jack Daniels). Plus fiable sur séances ≥ 10 km. Légende : S[semaine]/[mois]/[année]';
 }
 
@@ -1473,9 +1466,8 @@ function renderVO2Chart(planSessions){
       <div style="font-size:22px;font-weight:700;color:var(--bl)">~50</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min requis</div>
     </div>`;
-  const wrap=document.getElementById('vo2-scroll');
   makeScrollChart(
-    {yId:'vo2YAxis',dataId:'vo2Chart'},
+    {dataId:'vo2Chart',yAxisId:'vo2-yaxis',scrollId:'vo2-scroll'},
     'line',labels,
     [
       {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
@@ -1485,7 +1477,6 @@ function renderVO2Chart(planSessions){
     {min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{callback:v=>v+' ml/kg/min'}},
     {}
   );
-  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
   document.getElementById('vo2-method').textContent='VDOT (Jack Daniels) ou FC max/repos (Uth-Sørensen). Valeur indicative. Légende : S[semaine]/[mois]/[année]';
 }
 
