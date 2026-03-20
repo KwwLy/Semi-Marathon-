@@ -214,7 +214,15 @@ canvas{display:block;width:100%!important}
     </div>
     <div id="plan-week-row" class="field">
       <label class="lbl">Semaine du plan</label>
-      <select id="lg-week"></select>
+      <select id="lg-week" onchange="onWeekChange()"></select>
+    </div>
+    <div id="plan-slot-row" class="field" style="display:none">
+      <label class="lbl">Séance</label>
+      <select id="lg-slot" onchange="onWeekChange()">
+        <option value="s1">Séance 1</option>
+        <option value="s2">Séance 2</option>
+      </select>
+      <div id="plan-slot-title" style="font-size:11px;color:var(--or);margin-top:5px;font-weight:500"></div>
     </div>
     <div class="g2">
       <div class="field"><label class="lbl">Date</label><input type="text" id="lg-date" placeholder="ex: 16/03/2026"></div>
@@ -616,7 +624,8 @@ function renderPlan(){
           <div class="wright">
             ${(w.badges||[]).map(badgeHtml).join('')}
             ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
-            ${done.includes(w.n)?'<span class="badge bdn">✓</span>':''}
+            ${sessions.filter(s=>s.week===w.n&&s.slot==='s1'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn">✓S1</span>':''}
+            ${sessions.filter(s=>s.week===w.n&&s.slot==='s2'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn" style="background:#27AE60">✓S2</span>':''}
             <span class="chev" id="chev-${w.n}">▼</span>
           </div>
         </div>
@@ -625,7 +634,8 @@ function renderPlan(){
             <div class="sb"><div class="st" style="color:${ph.color}">${w.s1.title}</div>${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
             <div class="sb"><div class="st" style="color:#27AE60">${w.s2.title}</div>${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
           </div>
-          <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n})">✏️ Saisir cette séance</button>
+          <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
+          <button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s2')">✏️ Saisir S2</button>
         </div>
       </div>`;
     });
@@ -639,7 +649,15 @@ function toggleW(n){
   const o=d.classList.toggle('open');
   if(c)c.style.transform=o?'rotate(180deg)':'';
 }
-function prefill(n){document.getElementById('lg-week').value=n;sw('log');window.scrollTo(0,0)}
+function prefill(n,slot='s1'){
+  sw('log');
+  window.scrollTo(0,0);
+  document.getElementById('lg-sport').value='plan';
+  onSportChange();
+  document.getElementById('lg-week').value=n;
+  if(document.getElementById('lg-slot'))document.getElementById('lg-slot').value=slot;
+  onWeekChange();
+}
 
 // ── KM ROWS ───────────────────────────────────────────────────────────────
 function addKmRow(pace='',dplus='',note=''){
@@ -663,13 +681,30 @@ function onSportChange(){
   const v=document.getElementById('lg-sport').value;
   const isPlan=v==='plan'||v==='natation-plan';
   const isRun=['plan','course-libre'].includes(v);
-  const isNat=v.includes('natation');
   const isRunOrCycleOrSwim=['plan','course-libre','velo','natation-plan','natation-libre'].includes(v);
   document.getElementById('plan-week-row').style.display=isPlan?'block':'none';
+  document.getElementById('plan-slot-row').style.display=isPlan?'block':'none';
   document.getElementById('running-fields').style.display=isRunOrCycleOrSwim?'block':'none';
   document.getElementById('other-sport-fields').style.display=isRunOrCycleOrSwim?'none':'block';
   document.getElementById('km-detail-card').style.display=isRun?'block':'none';
   if(!isRunOrCycleOrSwim)updateCalEst();
+  if(isPlan)onWeekChange();
+}
+
+function onWeekChange(){
+  const wn=parseInt(document.getElementById('lg-week').value);
+  const slot=document.getElementById('lg-slot')?.value||'s1';
+  if(!wn)return;
+  const week=getWeek(wn);
+  if(!week)return;
+  const s=week[slot];
+  const titleEl=document.getElementById('plan-slot-title');
+  if(titleEl)titleEl.textContent=s?'→ '+s.title:'';
+  // Vérifier si cette séance existe déjà
+  const existing=sessions.find(x=>x.week===wn&&x.slot===slot&&['plan','natation-plan'].includes(x.sport));
+  if(existing&&titleEl){
+    titleEl.textContent+=' · ✅ déjà enregistrée ('+existing.date+')';
+  }
 }
 function updateCalEst(){
   const sport=document.getElementById('lg-sport').value;
@@ -693,6 +728,8 @@ document.getElementById('lg-dur')?.addEventListener('input',()=>{
 function resetForm(){
   document.getElementById('lg-sport').value='plan';
   document.getElementById('lg-week').value=todayWeek();
+  const slotEl=document.getElementById('lg-slot');
+  if(slotEl)slotEl.value='s1';
   document.getElementById('lg-date').value='';
   document.getElementById('lg-dur').value='';
   document.getElementById('lg-dist').value='';
@@ -736,6 +773,7 @@ function saveAndAnalyze(){
   const sport=document.getElementById('lg-sport').value;
   const isPlan=['plan','natation-plan'].includes(sport);
   const wn=isPlan?parseInt(document.getElementById('lg-week').value):null;
+  const slot=isPlan?(document.getElementById('lg-slot')?.value||'s1'):null;
   const week=wn?getWeek(wn):null;
   const dist=parseFloat(document.getElementById('lg-dist').value)||0;
   const dur=parseInt(document.getElementById('lg-dur').value)||0;
@@ -757,13 +795,15 @@ function saveAndAnalyze(){
   if(dist&&dur){const a=dur/dist;compPace=Math.floor(a)+':'+(Math.round((a%1)*60)<10?'0':'')+Math.round((a%1)*60)}
 
   const session={
-    id:Date.now(),sport,week:wn,date,dist,dur,dplus:d,hr,hrmax,
+    id:Date.now(),sport,week:wn,slot,date,dist,dur,dplus:d,hr,hrmax,
     pace:pace||compPace,paceok,comment,
     kmRows:[...kmRows],intensity,calEst,
     gpsTrace:pendingGpsTrace.length?[...pendingGpsTrace]:[],
     savedAt:new Date().toISOString()
   };
-  if(wn)sessions=sessions.filter(s=>s.week!==wn||s.sport!=='plan');
+  // Ne supprimer que la session du même week ET du même slot (S1 ou S2)
+  // pour ne pas écraser l'autre séance de la semaine
+  if(wn&&slot) sessions=sessions.filter(s=>!(s.week===wn&&s.slot===slot&&['plan','natation-plan'].includes(s.sport)));
   sessions.push(session);
   localStorage.setItem('smi_s',JSON.stringify(sessions));
 
@@ -1557,7 +1597,7 @@ function renderHistory(){
     return`<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
         <div class="hi-l">
-          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+'</b>':''}</div>
+          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+(s.slot?'-'+s.slot.toUpperCase():'')+'</b>':''}</div>
           <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
         </div>
         <div class="hi-r">
