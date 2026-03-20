@@ -350,41 +350,40 @@ canvas{display:block;width:100%!important}
     <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
   </div>
 
-  <!-- PREDICTION SEMI -->
-  <div class="chart-wrap" id="pred-wrap" style="display:none">
-    <div class="chart-title">🎯 Prédiction temps semi-marathon</div>
-    <div id="pred-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div class="chart-outer" id="pred-outer">
-      <div class="chart-yaxis" id="pred-yaxis"></div>
-      <div class="chart-scroll" id="pred-scroll"><canvas id="predChart" height="160"></canvas></div>
+  <!-- PRÉDICTION + VO2MAX — cartes simples -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px" id="perf-cards">
+    <div class="card" id="pred-card" style="display:none">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">🎯 Prédiction semi</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="pred-time" style="font-size:26px;font-weight:700;color:var(--or)">—</div>
+        <div id="pred-arrow" style="font-size:28px;line-height:1"></div>
+      </div>
+      <div id="pred-vs" style="font-size:11px;color:var(--text2);margin-top:4px"></div>
+      <div id="pred-prev" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5" id="pred-method"></div>
     </div>
-    <p style="font-size:11px;color:var(--text3);margin-top:6px" id="pred-method"></p>
-  </div>
-
-  <div class="chart-wrap" id="vo2-wrap" style="display:none">
-    <div class="chart-title">🫁 Estimation VO2max</div>
-    <div id="vo2-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div class="chart-outer" id="vo2-outer">
-      <div class="chart-yaxis" id="vo2-yaxis"></div>
-      <div class="chart-scroll" id="vo2-scroll"><canvas id="vo2Chart" height="160"></canvas></div>
-    </div>
-    <p style="font-size:11px;color:var(--text3);margin-top:6px" id="vo2-method"></p>
-  </div>
-
-  <div class="chart-wrap" id="pace-chart-wrap" style="display:none">
-    <div class="chart-title">📈 Évolution de l'allure moyenne (/km)</div>
-    <div class="chart-outer" id="pace-outer">
-      <div class="chart-yaxis" id="pace-yaxis"></div>
-      <div class="chart-scroll" id="pace-scroll"><canvas id="paceChart" height="160"></canvas></div>
+    <div class="card" id="vo2-card" style="display:none">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">🫁 VO2max estimée</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="vo2-val" style="font-size:26px;font-weight:700"></div>
+        <div id="vo2-arrow" style="font-size:28px;line-height:1"></div>
+      </div>
+      <div id="vo2-cat" style="font-size:11px;color:var(--text2);margin-top:4px"></div>
+      <div id="vo2-prev" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">Cible 1h50 : ~50 ml/kg/min</div>
     </div>
   </div>
 
-  <div class="chart-wrap" id="load-chart-wrap" style="display:none">
-    <div class="chart-title">💪 Charge d'entraînement hebdomadaire (km)</div>
-    <div class="chart-outer" id="load-outer">
-      <div class="chart-yaxis" id="load-yaxis"></div>
-      <div class="chart-scroll" id="load-scroll"><canvas id="loadChart" height="160"></canvas></div>
-    </div>
+  <!-- RECORDS PERSONNELS -->
+  <div class="card" id="pr-card" style="display:none">
+    <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Meilleure performance extraite de tes séances importées, par distance.</div>
+    <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px"></div>
+    <p style="font-size:10px;color:var(--text3);margin-top:8px">* Basé sur les séances enregistrées. Les temps sur distances inférieures à la distance réelle sont extrapolés via VDOT.</p>
+  </div>
+    <div class="card-title"><span class="bar"></span>Répartition des zones d'effort</div>
+    <div class="zone-chart" id="zone-chart"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="zone-legend"></div>
   </div>
   <div class="card" id="zone-card" style="display:none">
     <div class="card-title"><span class="bar"></span>Répartition des zones d'effort</div>
@@ -392,6 +391,9 @@ canvas{display:block;width:100%!important}
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="zone-legend"></div>
   </div>
   <div class="card" id="sport-card" style="display:none">
+    <div class="card-title"><span class="bar"></span>Sports pratiqués en parallèle</div>
+    <div class="sport-chips" id="sport-chips"></div>
+  </div>
     <div class="card-title"><span class="bar"></span>Sports pratiqués en parallèle</div>
     <div class="sport-chips" id="sport-chips"></div>
   </div>
@@ -448,7 +450,6 @@ canvas{display:block;width:100%!important}
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 // ── DATA ─────────────────────────────────────────────────────────────────
 const PLAN=[{phase:'Phase 1 — Maintien & Transition',color:'#2980B9',weeks:[
@@ -565,7 +566,7 @@ const SPORT_CLASSES={'plan':'s-run','natation-plan':'s-nat','course-libre':'s-ru
 let sessions=JSON.parse(localStorage.getItem('smi_s')||'[]');
 let kmRows=[];
 let settings=JSON.parse(localStorage.getItem('smi_cfg')||'{"weight":75,"target":"5:13","apiKey":""}');
-let paceChartInst=null,loadChartInst=null;
+
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
@@ -767,6 +768,8 @@ function saveAndAnalyze(){
 
   toast('Séance enregistrée !');
   renderPlan();
+  // Recalculer prédiction si c'est une séance de course
+  if(['plan','course-libre'].includes(sport)) updatePerfCards();
   showCompare(sessionCopy,weekCopy);
   runAnalysis(sessionCopy,weekCopy);
 
@@ -924,12 +927,10 @@ function renderStats(){
   document.getElementById('prog-bar').style.width=pct+'%';
   document.getElementById('prog-sub').textContent=`${sessions.filter(s=>s.week).length} séance${sessions.filter(s=>s.week).length>1?'s':''} du plan enregistrée${sessions.filter(s=>s.week).length>1?'s':''}`;
 
-  renderPredChart(planSessions);
-  renderVO2Chart(planSessions);
-  renderPaceChart();
-  renderLoadChart();
+  updatePerfCards();
   renderZoneChart();
   renderSportChips();
+  renderPersonalRecords();
   renderCalendar();
   renderHistory();
 }
@@ -1019,102 +1020,74 @@ function minsToHMS(mins){
   return`${h}h${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-let predChartInst=null,vo2ChartInst=null;
 
-function renderPredChart(planSessions){
-  const data=planSessions.filter(s=>s.dist>=5&&s.pace);
-  if(data.length<1){document.getElementById('pred-wrap').style.display='none';return}
-  document.getElementById('pred-wrap').style.display='block';
 
-  const labels=data.map(s=>s.date||('S'+s.week));
-  const preds=data.map(s=>predictSemiTime(s));
-  const validPreds=preds.filter(Boolean);
-  if(!validPreds.length){document.getElementById('pred-wrap').style.display='none';return}
+// ── CARTES PRÉDICTION + VO2MAX ────────────────────────────────────────────
+function updatePerfCards(){
+  const runSessions=sessions
+    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>=3&&s.dur)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
 
-  const target=110; // 1h50 en minutes
-  const last=validPreds[validPreds.length-1];
-  const first=validPreds[0];
-  const trend=validPreds.length>1?((last-first)/first*100):0;
+  if(!runSessions.length){
+    document.getElementById('pred-card').style.display='none';
+    document.getElementById('vo2-card').style.display='none';
+    return;
+  }
 
-  // Mise à jour des cartes de prédiction
-  const trendColor=trend<0?'var(--gr)':trend>2?'var(--re)':'var(--am)';
-  const trendIcon=trend<0?'📉':(trend>2?'📈':'➡️');
-  document.getElementById('pred-current').innerHTML=`
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Prédiction actuelle</div>
-      <div style="font-size:22px;font-weight:700;color:var(--or)">${minsToHMS(last)}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">objectif : 1h50:00</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Écart objectif</div>
-      <div style="font-size:22px;font-weight:700;color:${last<=110?'var(--gr)':'var(--re)'}">${last<=110?'✅ OK':'+'+(last-110).toFixed(0)+' min'}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${last<=110?'objectif atteignable':'à combler'}</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Tendance</div>
-      <div style="font-size:22px;font-weight:700;color:${trendColor}">${trendIcon} ${Math.abs(trend).toFixed(1)}%</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${trend<0?'amélioration':trend>2?'dégradation':'stable'}</div>
-    </div>`;
+  // ── Prédiction ──
+  const preds=runSessions.map(s=>({s,p:predictSemiTime(s)})).filter(x=>x.p);
+  if(preds.length){
+    document.getElementById('pred-card').style.display='block';
+    const last=preds[preds.length-1].p;
+    const prev=preds.length>1?preds[preds.length-2].p:null;
+    const diff=prev?last-prev:0;
+    const arrow=!prev?'➡️':diff<-0.5?'<span style="color:#27AE60;font-size:22px">▲</span>':diff>0.5?'<span style="color:#C0392B;font-size:22px">▼</span>':'<span style="color:var(--am);font-size:20px">➡</span>';
+    const gap=last-110; // écart vs 1h50
+    document.getElementById('pred-time').textContent=minsToHMS(last);
+    document.getElementById('pred-time').style.color=last<=110?'#27AE60':last<=118?'var(--am)':'var(--or)';
+    document.getElementById('pred-arrow').innerHTML=arrow;
+    document.getElementById('pred-vs').textContent=gap<=0?'✅ Objectif 1h50 atteignable !':'Écart : +'+(gap).toFixed(0)+' min vs objectif 1h50';
+    document.getElementById('pred-vs').style.color=gap<=0?'#27AE60':gap<=8?'var(--am)':'var(--re)';
+    if(prev){
+      const diffStr=diff<0?'⬆ '+Math.abs(diff).toFixed(1)+' min de mieux':'⬇ '+diff.toFixed(1)+' min de moins';
+      document.getElementById('pred-prev').textContent='vs séance précédente : '+diffStr;
+    } else {
+      document.getElementById('pred-prev').textContent='Basé sur '+preds[preds.length-1].s.dist+' km · '+preds[preds.length-1].s.dur+' min';
+    }
+    document.getElementById('pred-method').textContent='Méthode VDOT (Jack Daniels). Plus fiable sur ≥ 10 km.';
+  } else {
+    document.getElementById('pred-card').style.display='none';
+  }
 
-  const ctx=document.getElementById('predChart').getContext('2d');
-  if(predChartInst)predChartInst.destroy();
-  predChartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
-    {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-    {label:'Objectif 1h58',data:Array(labels.length).fill(118),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-  ]},options:{responsive:true,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:v=>`${v.dataset.label} : ${minsToHMS(v.raw)}`}}},scales:{y:{reverse:false,min:Math.max(90,Math.min(...validPreds)-10),max:Math.min(...validPreds)+20,ticks:{callback:v=>minsToHMS(v),font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
-
-  document.getElementById('pred-method').textContent='Méthodes : formule de Riegel (extrapolation), allure récente × distance, VO2max (Jack Daniels). Plus tu accumules de séances, plus la prédiction est fiable.';
-}
-
-function renderVO2Chart(planSessions){
-  const data=planSessions.filter(s=>(s.dist>=3&&s.pace)||s.hrmax);
-  if(data.length<1){document.getElementById('vo2-wrap').style.display='none';return}
-  const vo2s=data.map(s=>computeVO2max(s));
-  const valid=vo2s.map((v,i)=>({v,s:data[i]})).filter(x=>x.v&&x.v>20&&x.v<80);
-  if(!valid.length){document.getElementById('vo2-wrap').style.display='none';return}
-  document.getElementById('vo2-wrap').style.display='block';
-
-  const labels=valid.map(x=>x.s.date||('S'+x.s.week));
-  const vals=valid.map(x=>Math.round(x.v*10)/10);
-  const last=vals[vals.length-1];
-  const first=vals[0];
-  const trend=vals.length>1?last-first:0;
-
-  // Catégorie VO2max (homme adulte ~40 ans)
-  let cat='',catColor='var(--text2)';
-  if(last>=55){cat='Excellent';catColor='var(--gr)';}
-  else if(last>=48){cat='Très bon';catColor='#27AE60';}
-  else if(last>=42){cat='Bon';catColor='var(--am)';}
-  else if(last>=35){cat='Moyen';catColor='var(--or)';}
-  else{cat='À améliorer';catColor='var(--re)';}
-
-  document.getElementById('vo2-current').innerHTML=`
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">VO2max estimée</div>
-      <div style="font-size:28px;font-weight:700;color:${catColor}">${last}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min — ${cat}</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Progression</div>
-      <div style="font-size:22px;font-weight:700;color:${trend>=0?'var(--gr)':'var(--re)'}">${trend>=0?'+':''}${trend.toFixed(1)}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">depuis la 1ère mesure</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">VO2max pour 1h50</div>
-      <div style="font-size:22px;font-weight:700;color:var(--bl)">~50</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min requis</div>
-    </div>`;
-
-  const ctx=document.getElementById('vo2Chart').getContext('2d');
-  if(vo2ChartInst)vo2ChartInst.destroy();
-  vo2ChartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
-    {label:'Cible 1h50 (~50)',data:Array(labels.length).fill(50),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-    {label:'Excellent (>55)',data:Array(labels.length).fill(55),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-  ]},options:{responsive:true,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:v=>`${v.dataset.label} : ${typeof v.raw==='number'?v.raw+' ml/kg/min':v.raw}`}}},scales:{y:{min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
-
-  document.getElementById('vo2-method').textContent='Estimation basée sur : allure + durée (formule Jack Daniels VDOT) et/ou FC max/repos (formule Uth-Sørensen). Valeur indicative — une mesure en laboratoire reste plus précise.';
+  // ── VO2max ──
+  const vo2s=runSessions.map(s=>({s,v:computeVO2max(s)})).filter(x=>x.v&&x.v>25&&x.v<80);
+  if(vo2s.length){
+    document.getElementById('vo2-card').style.display='block';
+    const last=Math.round(vo2s[vo2s.length-1].v*10)/10;
+    const prev=vo2s.length>1?Math.round(vo2s[vo2s.length-2].v*10)/10:null;
+    const diff=prev?last-prev:0;
+    const arrow=!prev?'➡️':diff>0.3?'<span style="color:#27AE60;font-size:22px">▲</span>':diff<-0.3?'<span style="color:#C0392B;font-size:22px">▼</span>':'<span style="color:var(--am);font-size:20px">➡</span>';
+    let cat='',catColor='var(--text)';
+    if(last>=55){cat='Excellent';catColor='#27AE60';}
+    else if(last>=48){cat='Très bon';catColor='#27AE60';}
+    else if(last>=42){cat='Bon';catColor='var(--am)';}
+    else if(last>=35){cat='Moyen';catColor='var(--or)';}
+    else{cat='À améliorer';catColor='var(--re)';}
+    document.getElementById('vo2-val').textContent=last+' ml/kg/min';
+    document.getElementById('vo2-val').style.color=catColor;
+    document.getElementById('vo2-val').style.fontSize='18px';
+    document.getElementById('vo2-arrow').innerHTML=arrow;
+    document.getElementById('vo2-cat').textContent='Niveau : '+cat+(last>=50?' · ✅ Cible atteinte':' · Cible : 50 ml/kg/min');
+    document.getElementById('vo2-cat').style.color=last>=50?'#27AE60':catColor;
+    if(prev){
+      document.getElementById('vo2-prev').textContent='vs séance précédente : '+(diff>=0?'+':'')+diff.toFixed(1)+' ml/kg/min';
+      document.getElementById('vo2-prev').style.color=diff>=0?'#27AE60':'var(--re)';
+    } else {
+      document.getElementById('vo2-prev').textContent='';
+    }
+  } else {
+    document.getElementById('vo2-card').style.display='none';
+  }
 }
 
 // ── CALENDRIER ────────────────────────────────────────────────────────────
@@ -1242,242 +1215,91 @@ function openSessionFromCal(id){
 }
 
 // ── HELPERS SEMAINE ────────────────────────────────────────────────────────
-function getISOWeek(d){
-  const date=new Date(d.getTime());
-  date.setHours(0,0,0,0);
-  date.setDate(date.getDate()+3-(date.getDay()+6)%7);
-  const week1=new Date(date.getFullYear(),0,4);
-  return 1+Math.round(((date.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);
-}
-function weekLabel(dateStr){
-  const d=parseDate(dateStr);
-  if(!d)return'?';
-  const wk=getISOWeek(d);
-  const mm=String(d.getMonth()+1).padStart(2,'0');
-  const yy=String(d.getFullYear()).slice(-2);
-  return`S${wk}/${mm}/${yy}`;
-}
-function weekSortKey(dateStr){
-  const d=parseDate(dateStr);
-  if(!d)return'0';
-  return`${d.getFullYear()}${String(getISOWeek(d)).padStart(2,'0')}`;
-}
+// ── RECORDS PERSONNELS ────────────────────────────────────────────────────
+function renderPersonalRecords(){
+  const card=document.getElementById('pr-card');
+  const runSessions=sessions
+    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>=1&&s.dur>0)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
 
-// Regroupe les séances par semaine ISO, retourne [{label, sessions:[]}] trié chronologiquement
-function groupByWeek(sArr){
-  const map={};
-  sArr.forEach(s=>{
-    const d=parseDate(s.date);
-    if(!d)return;
-    const key=weekSortKey(s.date);
-    const lbl=weekLabel(s.date);
-    if(!map[key])map[key]={label:lbl,sortKey:key,sessions:[]};
-    map[key].sessions.push(s);
-  });
-  return Object.values(map).sort((a,b)=>a.sortKey.localeCompare(b.sortKey));
-}
+  if(!runSessions.length){card.style.display='none';return}
+  card.style.display='block';
 
-// Calcule la largeur de canvas selon le nombre de points (min 300px, 55px par point)
-function chartWidth(n){return Math.max(300,n*55)}
+  const targets=[
+    {dist:5,   label:'5 km'},
+    {dist:10,  label:'10 km'},
+    {dist:15,  label:'15 km'},
+    {dist:20,  label:'20 km'},
+    {dist:21.1,label:'Semi'}
+  ];
 
-// ── CHART HELPER — axe Y en HTML fixe + canvas scrollable ────────────────
-// On utilise UN SEUL Chart.js avec l'axe Y désactivé.
-// L'axe Y est rendu en HTML pur dans une div fixe à gauche.
-const chartInsts={};
+  // Pour chaque distance cible, on cherche la meilleure performance
+  // Stratégie :
+  //  - Si la séance couvre exactement la distance (±5%) → temps réel direct
+  //  - Sinon → extrapolation via VDOT depuis les séances ≥ 60% de la cible
+  const records=targets.map(t=>{
+    let best=null; // {timeMin, pace, date, real}
 
-function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
-  const {dataId, yAxisId, scrollId} = ids;
+    // 1. Séances couvrant la distance réelle (dist >= target ×0.95)
+    const direct=runSessions.filter(s=>s.dist>=t.dist*0.95);
+    direct.forEach(s=>{
+      // Temps estimé pour exactement t.dist via Riegel depuis la durée réelle
+      const estTime=s.dur*Math.pow(t.dist/s.dist,1.06);
+      if(!best||estTime<best.timeMin){
+        best={timeMin:estTime,date:s.date,real:s.dist>=t.dist*0.95&&s.dist<=t.dist*1.05};
+      }
+    });
 
-  if(chartInsts[dataId]) chartInsts[dataId].destroy();
-
-  const H=160;
-  const cw=chartWidth(labels.length);
-  const canvas=document.getElementById(dataId);
-  canvas.style.width=cw+'px';
-  canvas.style.minWidth=cw+'px';
-  canvas.style.height=H+'px';
-  canvas.height=H;
-  canvas.width=cw;
-
-  // Construire les ticks de l'axe Y
-  const yMin=yOpts.min??0;
-  const yMax=yOpts.max??100;
-  const reverse=yOpts.reverse||false;
-  const tickFn=yOpts.ticks?.callback||((v)=>v);
-  // Générer 5 ticks réguliers
-  const tickCount=5;
-  const tickStep=(yMax-yMin)/(tickCount-1);
-  let ticks=[];
-  for(let i=0;i<tickCount;i++) ticks.push(yMin+i*tickStep);
-  if(reverse) ticks=ticks.reverse();
-  // Remplir la div axe Y
-  const yAxisEl=document.getElementById(yAxisId);
-  if(yAxisEl){
-    yAxisEl.innerHTML=ticks.map(v=>`<span>${tickFn(v)}</span>`).join('');
-  }
-
-  chartInsts[dataId]=new Chart(canvas.getContext('2d'),{
-    type,
-    data:{labels,datasets},
-    options:{
-      responsive:false,
-      maintainAspectRatio:false,
-      animation:{duration:300},
-      plugins:{
-        legend:{labels:{font:{size:11},boxWidth:12}},
-        ...(yOpts.tooltipCallbacks?{tooltip:{callbacks:yOpts.tooltipCallbacks}}:{})
-      },
-      scales:{
-        y:{
-          display:false,
-          min:yMin,max:yMax,
-          reverse
-        },
-        x:{
-          ticks:{font:{size:10},maxRotation:45},
-          grid:{color:'rgba(128,128,128,0.08)'}
+    // 2. Si pas de séance directe, extrapolation VDOT pour les séances < target
+    if(!best){
+      const shorter=runSessions.filter(s=>s.dist>=t.dist*0.5&&s.dist<t.dist*0.95);
+      shorter.forEach(s=>{
+        const vdot=computeVDOT(s.dist,s.dur);
+        if(!vdot)return;
+        const predTime=semiTimeFromVDOT(vdot) * (t.dist/21.1); // proportionnel
+        // Réajuster depuis le VDOT directement pour la distance cible
+        const target94=vdot*0.94;
+        let lo=80,hi=450;
+        for(let i=0;i<60;i++){
+          const mid=(lo+hi)/2;
+          const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
+          if(vo2<target94)lo=mid;else hi=mid;
         }
-      },
-      layout:{padding:{top:8,right:8,bottom:0,left:0}}
+        const v=(lo+hi)/2;
+        const estTime=v>0?(t.dist*1000/v):null;
+        if(estTime&&(!best||estTime<best.timeMin)){
+          best={timeMin:estTime,date:s.date,real:false};
+        }
+      });
     }
+
+    if(!best)return{...t,best:null};
+
+    const pace=best.timeMin/t.dist; // min/km
+    const paceStr=Math.floor(pace)+':'+(Math.round((pace%1)*60)<10?'0':'')+Math.round((pace%1)*60);
+    const h=Math.floor(best.timeMin/60);
+    const m=Math.floor(best.timeMin%60);
+    const s=Math.round((best.timeMin%1)*60);
+    const timeStr=h>0?`${h}h${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+    return{...t,best:{timeStr,paceStr,date:best.date,real:best.real}};
   });
 
-  // Scroll vers la droite (données récentes)
-  const scrollEl=document.getElementById(scrollId);
-  if(scrollEl) setTimeout(()=>{scrollEl.scrollLeft=scrollEl.scrollWidth;},80);
-}
-
-function renderPaceChart(){
-  const data=sessions.filter(s=>s.pace&&['plan','course-libre'].includes(s.sport));
-  if(!data.length){document.getElementById('pace-chart-wrap').style.display='none';return}
-  document.getElementById('pace-chart-wrap').style.display='block';
-  const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
-  const labels=sorted.map(s=>weekLabel(s.date));
-  const paces=sorted.map(s=>Math.round(paceToSec(s.pace)/60*100)/100);
-  const target=paceToSec(settings.target||'5:13')/60;
-  makeScrollChart(
-    {dataId:'paceChart',yAxisId:'pace-yaxis',scrollId:'pace-scroll'},
-    'line',labels,
-    [
-      {label:'Allure réelle',data:paces,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.3,fill:true},
-      {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[5,3],pointRadius:0}
-    ],
-    {reverse:true,min:Math.max(4,Math.min(...paces)-0.5),max:Math.max(...paces)+0.5,ticks:{callback:v=>secToPace(Math.round(v*60))}},
-    {}
-  );
-}
-
-function renderLoadChart(){
-  const groups=groupByWeek(sessions.filter(s=>s.dist));
-  if(!groups.length){document.getElementById('load-chart-wrap').style.display='none';return}
-  document.getElementById('load-chart-wrap').style.display='block';
-  const labels=groups.map(g=>g.label);
-  const kms=groups.map(g=>Math.round(g.sessions.reduce((a,s)=>a+(s.dist||0),0)*10)/10);
-  const planKms=groups.map(g=>Math.round(g.sessions.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0)*10)/10);
-  makeScrollChart(
-    {dataId:'loadChart',yAxisId:'load-yaxis',scrollId:'load-scroll'},
-    'bar',labels,
-    [
-      {label:'Tous sports (km)',data:kms,backgroundColor:'rgba(232,80,10,0.35)',borderRadius:4},
-      {label:'Course à pied (km)',data:planKms,backgroundColor:'rgba(232,80,10,0.8)',borderRadius:4}
-    ],
-    {min:0,max:Math.max(...kms)+5,ticks:{callback:v=>v+' km'}},
-    {}
-  );
-}
-
-function renderPredChart(planSessions){
-  const data=planSessions.filter(s=>s.dist>=5&&s.dur);
-  if(data.length<1){document.getElementById('pred-wrap').style.display='none';return}
-  document.getElementById('pred-wrap').style.display='block';
-  const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
-  const labels=sorted.map(s=>weekLabel(s.date));
-  const preds=sorted.map(s=>{const p=predictSemiTime(s);return p?Math.round(p*100)/100:null;});
-  const validPreds=preds.filter(Boolean);
-  if(!validPreds.length){document.getElementById('pred-wrap').style.display='none';return}
-  const target=110;
-  const last=validPreds[validPreds.length-1];
-  const first=validPreds[0];
-  const trend=validPreds.length>1?((last-first)/first*100):0;
-  const trendColor=trend<0?'var(--gr)':trend>2?'var(--re)':'var(--am)';
-  const trendIcon=trend<0?'📉':(trend>2?'📈':'➡️');
-  document.getElementById('pred-current').innerHTML=`
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Prédiction actuelle</div>
-      <div style="font-size:22px;font-weight:700;color:var(--or)">${minsToHMS(last)}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">objectif : 1h50:00</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Écart objectif</div>
-      <div style="font-size:22px;font-weight:700;color:${last<=110?'var(--gr)':'var(--re)'}">${last<=110?'✅ OK':'+'+(last-110).toFixed(0)+' min'}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${last<=110?'objectif atteignable':'à combler'}</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Tendance</div>
-      <div style="font-size:22px;font-weight:700;color:${trendColor}">${trendIcon} ${Math.abs(trend).toFixed(1)}%</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${trend<0?'amélioration':trend>2?'dégradation':'stable'}</div>
-    </div>`;
-  makeScrollChart(
-    {dataId:'predChart',yAxisId:'pred-yaxis',scrollId:'pred-scroll'},
-    'line',labels,
-    [
-      {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
-      {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-      {label:'Objectif 1h58',data:Array(labels.length).fill(118),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-    ],
-    {min:Math.max(90,Math.min(...validPreds)-5),max:Math.min(200,Math.max(...validPreds)+10),ticks:{callback:v=>minsToHMS(v)},tooltipCallbacks:{label:v=>v.raw?`${v.dataset.label} : ${minsToHMS(v.raw)}`:''}},
-    {}
-  );
-  document.getElementById('pred-method').textContent='Méthode VDOT (Jack Daniels). Plus fiable sur séances ≥ 10 km. Légende : S[semaine]/[mois]/[année]';
-}
-
-function renderVO2Chart(planSessions){
-  const data=planSessions.filter(s=>(s.dist>=3&&s.dur)||s.hrmax);
-  if(!data.length){document.getElementById('vo2-wrap').style.display='none';return}
-  const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
-  const vo2s=sorted.map(s=>computeVO2max(s));
-  const valid=vo2s.map((v,i)=>({v,s:sorted[i]})).filter(x=>x.v&&x.v>25&&x.v<80);
-  if(!valid.length){document.getElementById('vo2-wrap').style.display='none';return}
-  document.getElementById('vo2-wrap').style.display='block';
-  const labels=valid.map(x=>weekLabel(x.s.date));
-  const vals=valid.map(x=>Math.round(x.v*10)/10);
-  const last=vals[vals.length-1];
-  const first=vals[0];
-  const trend=vals.length>1?last-first:0;
-  let cat='',catColor='var(--text2)';
-  if(last>=55){cat='Excellent';catColor='var(--gr)';}
-  else if(last>=48){cat='Très bon';catColor='#27AE60';}
-  else if(last>=42){cat='Bon';catColor='var(--am)';}
-  else if(last>=35){cat='Moyen';catColor='var(--or)';}
-  else{cat='À améliorer';catColor='var(--re)';}
-  document.getElementById('vo2-current').innerHTML=`
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">VO2max estimée</div>
-      <div style="font-size:28px;font-weight:700;color:${catColor}">${last}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min — ${cat}</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Progression</div>
-      <div style="font-size:22px;font-weight:700;color:${trend>=0?'var(--gr)':'var(--re)'}">${trend>=0?'+':''}${trend.toFixed(1)}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">depuis 1ère mesure</div>
-    </div>
-    <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Cible 1h50</div>
-      <div style="font-size:22px;font-weight:700;color:var(--bl)">~50</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min requis</div>
-    </div>`;
-  makeScrollChart(
-    {dataId:'vo2Chart',yAxisId:'vo2-yaxis',scrollId:'vo2-scroll'},
-    'line',labels,
-    [
-      {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
-      {label:'Cible 1h50 (~50)',data:Array(labels.length).fill(50),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-      {label:'Excellent (>55)',data:Array(labels.length).fill(55),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-    ],
-    {min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{callback:v=>v+' ml/kg/min'}},
-    {}
-  );
-  document.getElementById('vo2-method').textContent='VDOT (Jack Daniels) ou FC max/repos (Uth-Sørensen). Valeur indicative. Légende : S[semaine]/[mois]/[année]';
+  document.getElementById('pr-grid').innerHTML=records.map(r=>{
+    if(!r.best)return`
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center;opacity:.5">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">${r.label}</div>
+        <div style="font-size:13px;color:var(--text3)">—</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Pas encore de données</div>
+      </div>`;
+    return`
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center;position:relative">
+        ${!r.best.real?'<div style="position:absolute;top:5px;right:6px;font-size:9px;color:var(--text3);background:var(--bg3);border-radius:3px;padding:1px 4px">estimé</div>':''}
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">${r.label}</div>
+        <div style="font-size:18px;font-weight:700;color:var(--or);line-height:1.2">${r.best.timeStr}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px;font-weight:500">${r.best.paceStr}/km</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">${r.best.date||''}</div>
+      </div>`;
+  }).join('');
 }
 
 function renderZoneChart(){
