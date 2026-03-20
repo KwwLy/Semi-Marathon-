@@ -376,6 +376,27 @@ canvas{display:block;width:100%!important}
     <div class="card-title"><span class="bar"></span>Sports pratiqués en parallèle</div>
     <div class="sport-chips" id="sport-chips"></div>
   </div>
+  <!-- CALENDRIER -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><span class="bar"></span>📅 Calendrier d'activité</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" onclick="calPrev()">‹</button>
+      <span id="cal-month-title" style="font-size:13px;font-weight:600;color:var(--text)"></span>
+      <button class="btn btn-ghost btn-sm" onclick="calNext()">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">L</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">M</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">M</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">J</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">V</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">S</div>
+      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">D</div>
+    </div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;color:var(--text3)" id="cal-legend"></div>
+  </div>
+
   <div class="section-h" style="margin-top:8px">Historique des séances</div>
   <div id="history-list"></div>
 </div>
@@ -890,80 +911,87 @@ function renderStats(){
   renderLoadChart();
   renderZoneChart();
   renderSportChips();
+  renderCalendar();
   renderHistory();
 }
 
-// ── PRÉDICTION SEMI ────────────────────────────────────────────────────────
-// Méthode 1 : formule de Riegel (T2 = T1 × (D2/D1)^1.06)
-// Méthode 2 : allure récente × 21.1 km avec facteur de fatigue
-// Méthode 3 : VO2max → Jack Daniels VDOT
+// ── PRÉDICTION SEMI — méthode VDOT Jack Daniels ────────────────────────────
+// Principe : on calcule le VDOT depuis la séance réelle (allure + distance),
+// puis on prédit le temps semi depuis ce VDOT. Valide pour distances ≥ 5 km.
+// Pour les courtes distances on applique un plafond réaliste basé sur l'historique.
+
+function computeVDOT(distKm, timeMin){
+  if(!distKm||!timeMin||distKm<1)return null;
+  const distM=distKm*1000;
+  const timeSec=timeMin*60;
+  // Vitesse en m/min
+  const v=distM/timeSec*60;
+  // VO2 à cette vitesse (Jack Daniels)
+  const vo2=-4.6*v+0.182258*v*v+0.000104*v*v*v;
+  if(vo2<=0)return null;
+  // % VO2max utilisé selon la durée
+  let pct;
+  if(timeMin<=5) pct=1.0;
+  else if(timeMin<=8) pct=0.98;
+  else if(timeMin<=12) pct=0.975;
+  else if(timeMin<=20) pct=0.97;
+  else if(timeMin<=30) pct=0.96;
+  else if(timeMin<=45) pct=0.95;
+  else if(timeMin<=60) pct=0.94;
+  else if(timeMin<=90) pct=0.93;
+  else if(timeMin<=120) pct=0.92;
+  else pct=0.91;
+  const vdot=vo2/pct;
+  return Math.max(20,Math.min(85,vdot)); // borner entre 20 et 85
+}
+
+function semiTimeFromVDOT(vdot){
+  if(!vdot)return null;
+  const distM=21097;
+  // Chercher la vitesse (m/min) telle que VO2 à cette vitesse = vdot*0.94 (intensité semi ~94%)
+  // VO2 = -4.6v + 0.182258v² + 0.000104v³ = vdot*0.94
+  const target=vdot*0.94;
+  // Résolution numérique par dichotomie
+  let lo=100,hi=400;
+  for(let i=0;i<50;i++){
+    const mid=(lo+hi)/2;
+    const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
+    if(vo2<target)lo=mid;else hi=mid;
+  }
+  const v=(lo+hi)/2;
+  if(v<=0)return null;
+  const timeMin=distM/v;
+  // Borner entre 1h30 (90 min) et 3h00 (180 min) — plage réaliste
+  return Math.max(90,Math.min(180,timeMin));
+}
+
 function predictSemiTime(session){
-  if(!session||!session.dist||!session.dur)return null;
-  const results=[];
-
-  // Méthode Riegel : extrapoler depuis la distance réelle
-  if(session.dist>=5){
-    const t1Min=session.dur;
-    const d1=session.dist;
-    const d2=21.1;
-    const t2=t1Min*Math.pow(d2/d1,1.06);
-    results.push(t2);
+  if(!session||!session.dist||!session.dur||session.dist<3)return null;
+  const vdot=computeVDOT(session.dist,session.dur);
+  if(!vdot)return null;
+  const pred=semiTimeFromVDOT(vdot);
+  if(!pred)return null;
+  // Pondération : si la distance < 10km, on est moins confiant → on rapproche vers 2h00
+  // car les courtes distances sous-estiment souvent la fatigue sur 21km
+  if(session.dist<10){
+    const weight=session.dist/10; // 0.3 pour 3km, 0.9 pour 9km
+    return pred*weight+120*(1-weight);
   }
-
-  // Méthode allure + facteur fatigue (Pete Riegel adapté)
-  if(session.pace){
-    const paceSec=paceToSec(session.pace);
-    // Facteur de dégradation selon la distance : plus on est loin de 21km, plus on applique une correction
-    const ratio=session.dist/21.1;
-    let factor=1;
-    if(ratio<0.5) factor=1.08; // courses courtes : on dégrade plus
-    else if(ratio<0.8) factor=1.04;
-    else factor=1.02;
-    const predMin=(paceSec*21.1/60)*factor;
-    results.push(predMin);
-  }
-
-  // Méthode VO2max (Jack Daniels)
-  const vo2=computeVO2max(session);
-  if(vo2){
-    // Formule Jack Daniels : temps en min pour 21.1km
-    // VO2 requis = 0.000104×v³ + 0.182258×v² − 4.6×v + 0.000447×v³ (v en m/min)
-    // On cherche la vitesse pour vo2*0.97 (intensité semi ~97% VO2max)
-    const targetVO2=vo2*0.97;
-    // Approx : vitesse (m/min) = (-4.6 + sqrt(4.6² + 4×0.182258×targetVO2)) / (2×0.182258)  (simplification quadratique)
-    const v=(-4.6+Math.sqrt(4.6*4.6+4*0.182258*targetVO2))/(2*0.182258);
-    if(v>0){const predMin=(21100/v);results.push(predMin);}
-  }
-
-  if(!results.length)return null;
-  // Moyenne pondérée : plus de poids aux séances proches de 21km
-  return results.reduce((a,b)=>a+b,0)/results.length;
+  return pred;
 }
 
 function computeVO2max(session){
   if(!session)return null;
-  // Méthode 1 : FC (formule Uth-Sørensen-Overgaard-Pedersen si FC dispo)
-  // VO2max = 15 × (FCmax/FCrest)  — nécessite FCrest qu'on estime à 55
-  if(session.hrmax&&session.hr){
-    const fcRest=55; // estimation
-    return 15*(session.hrmax/fcRest);
+  // Priorité 1 : FC (formule Uth-Sørensen, plus fiable si FC dispo)
+  if(session.hrmax&&session.hr&&session.hr>40){
+    const fcRest=Math.min(session.hr,65); // utilise FC moy comme proxy repos si raisonnable
+    const val=15*(session.hrmax/fcRest);
+    if(val>25&&val<75)return Math.round(val*10)/10;
   }
-  // Méthode 2 : Allure + distance (formule Jack Daniels VO2max)
-  // Pour une course à allure v (m/min) : VO2 = 0.000104×v³ + 0.182258×v² − 4.6×v + ε
-  if(session.pace&&session.dist>=3){
-    const paceSec=paceToSec(session.pace);
-    if(!paceSec)return null;
-    const v=1000/paceSec*60; // m/min
-    // % VO2max selon la durée (Jack Daniels)
-    const dur=session.dur||session.dist*(paceSec/60);
-    let pct=0.97; // >30 min : ~97%
-    if(dur<10) pct=0.975;
-    else if(dur<20) pct=0.97;
-    else if(dur<30) pct=0.96;
-    else if(dur<60) pct=0.94;
-    else pct=0.92;
-    const vo2atPace=(-4.6*v+0.182258*v*v+0.000104*v*v*v);
-    return vo2atPace/pct;
+  // Priorité 2 : VDOT depuis allure + distance (Jack Daniels)
+  if(session.dist>=3&&session.dur){
+    const vdot=computeVDOT(session.dist,session.dur);
+    return vdot?Math.round(vdot*10)/10:null;
   }
   return null;
 }
@@ -1071,6 +1099,130 @@ function renderVO2Chart(planSessions){
   ]},options:{responsive:true,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:v=>`${v.dataset.label} : ${typeof v.raw==='number'?v.raw+' ml/kg/min':v.raw}`}}},scales:{y:{min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
 
   document.getElementById('vo2-method').textContent='Estimation basée sur : allure + durée (formule Jack Daniels VDOT) et/ou FC max/repos (formule Uth-Sørensen). Valeur indicative — une mesure en laboratoire reste plus précise.';
+}
+
+// ── CALENDRIER ────────────────────────────────────────────────────────────
+const SPORT_ICONS={
+  'plan':'🏃','course-libre':'🏃','natation-plan':'🏊','natation-libre':'🏊',
+  'velo':'🚴','padel':'🎾','krav':'🥋','autre':'⚡'
+};
+const SPORT_COLORS={
+  'plan':'#E8500A','course-libre':'#E8500A','natation-plan':'#2980B9','natation-libre':'#2980B9',
+  'velo':'#16A085','padel':'#8E44AD','krav':'#C0392B','autre':'#888'
+};
+
+let calYear=new Date().getFullYear();
+let calMonth=new Date().getMonth();
+
+function calPrev(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
+function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
+
+function parseDate(str){
+  if(!str)return null;
+  // Formats : JJ/MM/AAAA ou AAAA-MM-JJ
+  const m1=str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m1)return new Date(parseInt(m1[3]),parseInt(m1[2])-1,parseInt(m1[1]));
+  const m2=str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m2)return new Date(parseInt(m2[1]),parseInt(m2[2])-1,parseInt(m2[3]));
+  return null;
+}
+
+function renderCalendar(){
+  const title=new Date(calYear,calMonth,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  document.getElementById('cal-month-title').textContent=title.charAt(0).toUpperCase()+title.slice(1);
+
+  // Indexer les sessions par date JJ/MM/AAAA
+  const byDate={};
+  sessions.forEach(s=>{
+    const d=parseDate(s.date);
+    if(!d)return;
+    const key=`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if(!byDate[key])byDate[key]=[];
+    byDate[key].push(s);
+  });
+
+  const firstDay=new Date(calYear,calMonth,1);
+  // Lundi = 0 en France
+  let startDow=firstDay.getDay()-1;
+  if(startDow<0)startDow=6;
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date();
+
+  let html='';
+  // Cases vides avant le 1er
+  for(let i=0;i<startDow;i++)html+=`<div></div>`;
+
+  for(let d=1;d<=daysInMonth;d++){
+    const key=`${calYear}-${calMonth}-${d}`;
+    const daySessions=byDate[key]||[];
+    const isToday=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;
+    const hasPlan=daySessions.some(s=>s.week);
+
+    let bg='var(--bg2)';
+    let border=isToday?'2px solid var(--or)':'1px solid var(--border)';
+    let dayColor=isToday?'var(--or)':'var(--text3)';
+
+    // Icônes des sports du jour (max 2 affichées)
+    const icons=daySessions.slice(0,2).map(s=>{
+      const icon=SPORT_ICONS[s.sport]||'⚡';
+      const col=SPORT_COLORS[s.sport]||'#888';
+      return`<span title="${SPORT_LABELS[s.sport]||s.sport}" style="font-size:13px;cursor:pointer" onclick="event.stopPropagation();openSessionFromCal('${s.id}')">${icon}</span>`;
+    }).join('');
+
+    const extraCount=daySessions.length>2?`<span style="font-size:9px;color:var(--text3)">+${daySessions.length-2}</span>`:'';
+
+    html+=`<div onclick="openCalDay('${key}')" style="background:${bg};border:${border};border-radius:6px;padding:3px 2px;min-height:44px;cursor:${daySessions.length?'pointer':'default'};position:relative;transition:background .15s" onmouseover="if(${daySessions.length})this.style.background='var(--bg3)'" onmouseout="this.style.background='${bg}'">
+      <div style="font-size:10px;font-weight:600;color:${dayColor};text-align:center;margin-bottom:2px">${d}</div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px">${icons}${extraCount}</div>
+      ${hasPlan?'<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:var(--or);border-radius:50%"></div>':''}
+    </div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML=html;
+
+  // Légende
+  const sportsUsed=[...new Set(sessions.map(s=>s.sport))];
+  document.getElementById('cal-legend').innerHTML=sportsUsed.map(sp=>`
+    <span style="display:flex;align-items:center;gap:3px">${SPORT_ICONS[sp]||'⚡'} ${SPORT_LABELS[sp]||sp}</span>
+  `).join('') + '<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;background:var(--or);border-radius:50%;display:inline-block"></span>Séance du plan</span>';
+}
+
+function openCalDay(key){
+  // Ouvrir la liste des séances du jour si plusieurs
+  const [y,m,d]=key.split('-').map(Number);
+  const daySessions=sessions.filter(s=>{
+    const sd=parseDate(s.date);
+    return sd&&sd.getFullYear()===y&&sd.getMonth()===m&&sd.getDate()===d;
+  });
+  if(daySessions.length===1){
+    openSessionFromCal(daySessions[0].id);
+  } else if(daySessions.length>1){
+    // Aller dans l'historique et ouvrir la première
+    sw('stats');
+    setTimeout(()=>{
+      daySessions.forEach(s=>{
+        const el=document.getElementById('hist-detail-'+s.id);
+        if(el){el.style.display='block';const c=document.getElementById('chev-hist-'+s.id);if(c)c.style.transform='rotate(180deg)';}
+        setTimeout(()=>renderMap(s.id),100);
+      });
+      // Scroller vers l'historique
+      document.getElementById('history-list').scrollIntoView({behavior:'smooth'});
+    },100);
+  }
+}
+
+function openSessionFromCal(id){
+  const sid=parseInt(id);
+  sw('stats');
+  setTimeout(()=>{
+    const el=document.getElementById('hist-detail-'+sid);
+    if(el){
+      el.style.display='block';
+      const c=document.getElementById('chev-hist-'+sid);
+      if(c)c.style.transform='rotate(180deg)';
+      setTimeout(()=>{renderMap(sid);el.scrollIntoView({behavior:'smooth',block:'center'});},100);
+    }
+  },150);
 }
 
 function renderPaceChart(){
