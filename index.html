@@ -351,25 +351,36 @@ canvas{display:block;width:100%!important}
   <div class="chart-wrap" id="pred-wrap" style="display:none">
     <div class="chart-title">🎯 Prédiction temps semi-marathon</div>
     <div id="pred-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div class="chart-scroll"><canvas id="predChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch">
+      <canvas id="predYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
+      <div class="chart-scroll" style="flex:1"><canvas id="predChart" height="140"></canvas></div>
+    </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="pred-method"></p>
   </div>
 
-  <!-- VO2MAX -->
   <div class="chart-wrap" id="vo2-wrap" style="display:none">
     <div class="chart-title">🫁 Estimation VO2max</div>
     <div id="vo2-current" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-    <div class="chart-scroll"><canvas id="vo2Chart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch">
+      <canvas id="vo2YAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
+      <div class="chart-scroll" style="flex:1"><canvas id="vo2Chart" height="140"></canvas></div>
+    </div>
     <p style="font-size:11px;color:var(--text3);margin-top:6px" id="vo2-method"></p>
   </div>
 
   <div class="chart-wrap" id="pace-chart-wrap" style="display:none">
     <div class="chart-title">📈 Évolution de l'allure moyenne (/km)</div>
-    <div class="chart-scroll"><canvas id="paceChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch">
+      <canvas id="paceYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
+      <div class="chart-scroll" style="flex:1"><canvas id="paceChart" height="140"></canvas></div>
+    </div>
   </div>
   <div class="chart-wrap" id="load-chart-wrap" style="display:none">
     <div class="chart-title">💪 Charge d'entraînement hebdomadaire (km)</div>
-    <div class="chart-scroll"><canvas id="loadChart" height="140"></canvas></div>
+    <div style="display:flex;align-items:stretch">
+      <canvas id="loadYAxis" style="flex-shrink:0;width:52px!important;min-width:52px"></canvas>
+      <div class="chart-scroll" style="flex:1"><canvas id="loadChart" height="140"></canvas></div>
+    </div>
   </div>
   <div class="card" id="zone-card" style="display:none">
     <div class="card-title"><span class="bar"></span>Répartition des zones d'effort</div>
@@ -1268,76 +1279,125 @@ function groupByWeek(sArr){
 // Calcule la largeur de canvas selon le nombre de points (min 300px, 55px par point)
 function chartWidth(n){return Math.max(300,n*55)}
 
+// ── CHART HELPER — axe Y fixe + données scrollables ──────────────────────
+// On crée 2 charts Chart.js :
+//  1. yAxisChart : affiché dans le canvas fixe, contient UNIQUEMENT l'axe Y (pas de données visibles)
+//  2. dataChart  : affiché dans le canvas scrollable, contient les données + axe X, axe Y masqué
+const chartInsts={};
+
+function makeScrollChart(ids, type, labels, datasets, yOpts, xOpts){
+  const {yId, dataId, wrapperId} = ids;
+
+  // Détruire les anciens
+  if(chartInsts[yId]) chartInsts[yId].destroy();
+  if(chartInsts[dataId]) chartInsts[dataId].destroy();
+
+  // Largeur dynamique du canvas data
+  const cw=chartWidth(labels.length);
+  const dataCanvas=document.getElementById(dataId);
+  dataCanvas.style.width=cw+'px';
+  dataCanvas.style.minWidth=cw+'px';
+
+  const sharedYScale={...yOpts, position:'left', grid:{color:'rgba(128,128,128,0.1)'}};
+
+  // Chart axe Y uniquement (canvas fixe 52px)
+  const yCanvas=document.getElementById(yId);
+  yCanvas.height=dataCanvas.height||140;
+  chartInsts[yId]=new Chart(yCanvas.getContext('2d'),{
+    type,
+    data:{labels,datasets:datasets.map(d=>({...d,data:d.data.map(()=>null)}))},
+    options:{
+      responsive:false,maintainAspectRatio:false,
+      animation:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{
+        y:{...sharedYScale,ticks:{...yOpts.ticks,font:{size:10}},border:{display:false}},
+        x:{display:false}
+      },
+      layout:{padding:{right:0}}
+    }
+  });
+
+  // Chart données (canvas scrollable, Y masqué)
+  chartInsts[dataId]=new Chart(dataCanvas.getContext('2d'),{
+    type,
+    data:{labels,datasets},
+    options:{
+      responsive:false,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{font:{size:11},boxWidth:12}},
+        ...(yOpts.tooltipCallbacks?{tooltip:{callbacks:yOpts.tooltipCallbacks}}:{})
+      },
+      scales:{
+        y:{display:false,min:yOpts.min,max:yOpts.max,reverse:yOpts.reverse||false},
+        x:{...xOpts,ticks:{font:{size:10},maxRotation:45},grid:{display:false}}
+      }
+    }
+  });
+
+  // Scroll à droite
+  const wrap=document.getElementById(wrapperId);
+  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
+}
+
 function renderPaceChart(){
   const data=sessions.filter(s=>s.pace&&['plan','course-libre'].includes(s.sport));
   if(!data.length){document.getElementById('pace-chart-wrap').style.display='none';return}
   document.getElementById('pace-chart-wrap').style.display='block';
-
-  // Trier chronologiquement
   const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
   const labels=sorted.map(s=>weekLabel(s.date));
   const paces=sorted.map(s=>Math.round(paceToSec(s.pace)/60*100)/100);
   const target=paceToSec(settings.target||'5:13')/60;
-
   const wrap=document.querySelector('#pace-chart-wrap .chart-scroll');
-  wrap.style.width='100%';
-  const cw=chartWidth(labels.length);
-  document.getElementById('paceChart').style.width=cw+'px';
-  document.getElementById('paceChart').style.minWidth=cw+'px';
-
-  const ctx=document.getElementById('paceChart').getContext('2d');
-  if(paceChartInst)paceChartInst.destroy();
-  paceChartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'Allure réelle',data:paces,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.3,fill:true},
-    {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[5,3],pointRadius:0}
-  ]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{y:{reverse:true,ticks:{callback:v=>secToPace(Math.round(v*60)),font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10},maxRotation:45},grid:{display:false}}}}});
-  // Scroll à droite (plus récent)
-  setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
+  makeScrollChart(
+    {yId:'paceYAxis',dataId:'paceChart',wrapperId:null},
+    'line',labels,
+    [
+      {label:'Allure réelle',data:paces,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.3,fill:true},
+      {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[5,3],pointRadius:0}
+    ],
+    {reverse:true,min:Math.max(4,Math.min(...paces)-0.5),max:Math.max(...paces)+0.5,ticks:{callback:v=>secToPace(Math.round(v*60))}},
+    {}
+  );
+  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
 }
 
 function renderLoadChart(){
-  // Regrouper par semaine, toutes séances
   const groups=groupByWeek(sessions.filter(s=>s.dist));
   if(!groups.length){document.getElementById('load-chart-wrap').style.display='none';return}
   document.getElementById('load-chart-wrap').style.display='block';
-
   const labels=groups.map(g=>g.label);
   const kms=groups.map(g=>Math.round(g.sessions.reduce((a,s)=>a+(s.dist||0),0)*10)/10);
   const planKms=groups.map(g=>Math.round(g.sessions.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0)*10)/10);
-
   const wrap=document.querySelector('#load-chart-wrap .chart-scroll');
-  const cw=chartWidth(labels.length);
-  document.getElementById('loadChart').style.width=cw+'px';
-  document.getElementById('loadChart').style.minWidth=cw+'px';
-
-  const ctx=document.getElementById('loadChart').getContext('2d');
-  if(loadChartInst)loadChartInst.destroy();
-  loadChartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'Tous sports (km)',data:kms,backgroundColor:'rgba(232,80,10,0.35)',borderRadius:4},
-    {label:'Course à pied (km)',data:planKms,backgroundColor:'rgba(232,80,10,0.8)',borderRadius:4}
-  ]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10},maxRotation:45},grid:{display:false}}}}});
-  setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
+  makeScrollChart(
+    {yId:'loadYAxis',dataId:'loadChart',wrapperId:null},
+    'bar',labels,
+    [
+      {label:'Tous sports (km)',data:kms,backgroundColor:'rgba(232,80,10,0.35)',borderRadius:4},
+      {label:'Course à pied (km)',data:planKms,backgroundColor:'rgba(232,80,10,0.8)',borderRadius:4}
+    ],
+    {min:0,max:Math.max(...kms)+5,ticks:{callback:v=>v+' km'}},
+    {}
+  );
+  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
 }
 
 function renderPredChart(planSessions){
   const data=planSessions.filter(s=>s.dist>=5&&s.dur);
   if(data.length<1){document.getElementById('pred-wrap').style.display='none';return}
   document.getElementById('pred-wrap').style.display='block';
-
-  // Trier chronologiquement
   const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
   const labels=sorted.map(s=>weekLabel(s.date));
-  const preds=sorted.map(s=>predictSemiTime(s)?Math.round(predictSemiTime(s)*100)/100:null);
+  const preds=sorted.map(s=>{const p=predictSemiTime(s);return p?Math.round(p*100)/100:null;});
   const validPreds=preds.filter(Boolean);
   if(!validPreds.length){document.getElementById('pred-wrap').style.display='none';return}
-
   const target=110;
   const last=validPreds[validPreds.length-1];
   const first=validPreds[0];
   const trend=validPreds.length>1?((last-first)/first*100):0;
   const trendColor=trend<0?'var(--gr)':trend>2?'var(--re)':'var(--am)';
   const trendIcon=trend<0?'📉':(trend>2?'📈':'➡️');
-
   document.getElementById('pred-current').innerHTML=`
     <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
       <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Prédiction actuelle</div>
@@ -1354,46 +1414,41 @@ function renderPredChart(planSessions){
       <div style="font-size:22px;font-weight:700;color:${trendColor}">${trendIcon} ${Math.abs(trend).toFixed(1)}%</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">${trend<0?'amélioration':trend>2?'dégradation':'stable'}</div>
     </div>`;
-
   const wrap=document.querySelector('#pred-wrap .chart-scroll');
-  const cw=chartWidth(labels.length);
-  document.getElementById('predChart').style.width=cw+'px';
-  document.getElementById('predChart').style.minWidth=cw+'px';
-
-  const ctx=document.getElementById('predChart').getContext('2d');
-  if(predChartInst)predChartInst.destroy();
-  predChartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
-    {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-    {label:'Objectif 1h58',data:Array(labels.length).fill(118),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-  ]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:v=>v.raw?`${v.dataset.label} : ${minsToHMS(v.raw)}`:''}}},scales:{y:{min:Math.max(90,Math.min(...validPreds)-5),max:Math.min(200,Math.max(...validPreds)+8),ticks:{callback:v=>minsToHMS(v),font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10},maxRotation:45},grid:{display:false}}}}});
-  setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
-  document.getElementById('pred-method').textContent='Méthode VDOT (Jack Daniels) : calculé depuis ta vitesse réelle et la durée. Plus fiable sur séances ≥ 10 km. Légende : S[semaine]/[mois]/[année]';
+  makeScrollChart(
+    {yId:'predYAxis',dataId:'predChart',wrapperId:null},
+    'line',labels,
+    [
+      {label:'Prédiction semi',data:preds,borderColor:'#E8500A',backgroundColor:'rgba(232,80,10,0.1)',borderWidth:2,pointBackgroundColor:'#E8500A',tension:.4,fill:true,spanGaps:true},
+      {label:'Objectif 1h50',data:Array(labels.length).fill(target),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
+      {label:'Objectif 1h58',data:Array(labels.length).fill(118),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
+    ],
+    {min:Math.max(90,Math.min(...validPreds)-5),max:Math.min(200,Math.max(...validPreds)+10),ticks:{callback:v=>minsToHMS(v)},tooltipCallbacks:{label:v=>v.raw?`${v.dataset.label} : ${minsToHMS(v.raw)}`:''}},
+    {}
+  );
+  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
+  document.getElementById('pred-method').textContent='Méthode VDOT (Jack Daniels). Plus fiable sur séances ≥ 10 km. Légende : S[semaine]/[mois]/[année]';
 }
 
 function renderVO2Chart(planSessions){
   const data=planSessions.filter(s=>(s.dist>=3&&s.dur)||s.hrmax);
   if(!data.length){document.getElementById('vo2-wrap').style.display='none';return}
-
   const sorted=data.sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
   const vo2s=sorted.map(s=>computeVO2max(s));
   const valid=vo2s.map((v,i)=>({v,s:sorted[i]})).filter(x=>x.v&&x.v>25&&x.v<80);
   if(!valid.length){document.getElementById('vo2-wrap').style.display='none';return}
   document.getElementById('vo2-wrap').style.display='block';
-
   const labels=valid.map(x=>weekLabel(x.s.date));
   const vals=valid.map(x=>Math.round(x.v*10)/10);
   const last=vals[vals.length-1];
   const first=vals[0];
   const trend=vals.length>1?last-first:0;
-
   let cat='',catColor='var(--text2)';
   if(last>=55){cat='Excellent';catColor='var(--gr)';}
   else if(last>=48){cat='Très bon';catColor='#27AE60';}
   else if(last>=42){cat='Bon';catColor='var(--am)';}
   else if(last>=35){cat='Moyen';catColor='var(--or)';}
   else{cat='À améliorer';catColor='var(--re)';}
-
   document.getElementById('vo2-current').innerHTML=`
     <div style="background:var(--bg2);border-radius:var(--r);padding:9px 14px;flex:1">
       <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">VO2max estimée</div>
@@ -1410,20 +1465,19 @@ function renderVO2Chart(planSessions){
       <div style="font-size:22px;font-weight:700;color:var(--bl)">~50</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">ml/kg/min requis</div>
     </div>`;
-
   const wrap=document.querySelector('#vo2-wrap .chart-scroll');
-  const cw=chartWidth(labels.length);
-  document.getElementById('vo2Chart').style.width=cw+'px';
-  document.getElementById('vo2Chart').style.minWidth=cw+'px';
-
-  const ctx=document.getElementById('vo2Chart').getContext('2d');
-  if(vo2ChartInst)vo2ChartInst.destroy();
-  vo2ChartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
-    {label:'Cible 1h50 (~50)',data:Array(labels.length).fill(50),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
-    {label:'Excellent (>55)',data:Array(labels.length).fill(55),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
-  ]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:v=>`${v.dataset.label}${typeof v.raw==='number'?' : '+v.raw+' ml/kg/min':''}`}}},scales:{y:{min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10},maxRotation:45},grid:{display:false}}}}});
-  setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
+  makeScrollChart(
+    {yId:'vo2YAxis',dataId:'vo2Chart',wrapperId:null},
+    'line',labels,
+    [
+      {label:'VO2max estimée',data:vals,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,0.1)',borderWidth:2,pointBackgroundColor:'#8E44AD',tension:.4,fill:true},
+      {label:'Cible 1h50 (~50)',data:Array(labels.length).fill(50),borderColor:'#27AE60',borderWidth:1.5,borderDash:[6,3],pointRadius:0},
+      {label:'Excellent (>55)',data:Array(labels.length).fill(55),borderColor:'#2980B9',borderWidth:1,borderDash:[3,3],pointRadius:0},
+    ],
+    {min:Math.max(20,Math.min(...vals)-5),max:Math.max(...vals)+8,ticks:{callback:v=>v+' ml/kg/min'}},
+    {}
+  );
+  if(wrap) setTimeout(()=>{wrap.scrollLeft=wrap.scrollWidth;},50);
   document.getElementById('vo2-method').textContent='VDOT (Jack Daniels) ou FC max/repos (Uth-Sørensen). Valeur indicative. Légende : S[semaine]/[mois]/[année]';
 }
 
@@ -1553,7 +1607,21 @@ function renderHistory(){
         ${kmHtml}
         ${analysisHtml}
         ${aiLoadHtml}
-        <div style="margin-top:10px;text-align:right">
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap">Type :</label>
+            <select id="edit-sport-${s.id}" onchange="event.stopPropagation()" onclick="event.stopPropagation()" style="font-size:12px;padding:4px 7px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+              <option value="plan" ${s.sport==='plan'?'selected':''}>Course (plan)</option>
+              <option value="course-libre" ${s.sport==='course-libre'?'selected':''}>Course libre</option>
+              <option value="natation-plan" ${s.sport==='natation-plan'?'selected':''}>Natation (plan)</option>
+              <option value="natation-libre" ${s.sport==='natation-libre'?'selected':''}>Natation libre</option>
+              <option value="velo" ${s.sport==='velo'?'selected':''}>Vélo</option>
+              <option value="padel" ${s.sport==='padel'?'selected':''}>Padel</option>
+              <option value="krav" ${s.sport==='krav'?'selected':''}>Krav Maga</option>
+              <option value="autre" ${s.sport==='autre'?'selected':''}>Autre sport</option>
+            </select>
+            <button class="btn btn-or btn-sm" onclick="event.stopPropagation();updateSport(${s.id})">✓ Ok</button>
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delSession(${s.id})">🗑️ Supprimer</button>
         </div>
       </div>
@@ -1691,6 +1759,24 @@ async function analyzeFromHistory(id){
     if(btn)btn.style.display='block';
     toast('Erreur réseau');
   }
+}
+
+function updateSport(id){
+  const sel=document.getElementById('edit-sport-'+id);
+  if(!sel)return;
+  const idx=sessions.findIndex(s=>s.id===id);
+  if(idx<0)return;
+  sessions[idx].sport=sel.value;
+  localStorage.setItem('smi_s',JSON.stringify(sessions));
+  renderStats();
+  renderPlan();
+  toast('Type mis à jour ✓');
+  // Rouvrir le détail après re-render
+  setTimeout(()=>{
+    const d=document.getElementById('hist-detail-'+id);
+    const c=document.getElementById('chev-hist-'+id);
+    if(d){d.style.display='block';if(c)c.style.transform='rotate(180deg)';}
+  },50);
 }
 
 function delSession(id){sessions=sessions.filter(s=>s.id!==id);localStorage.setItem('smi_s',JSON.stringify(sessions));renderStats();renderPlan();toast('Séance supprimée')}
