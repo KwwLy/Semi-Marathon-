@@ -353,7 +353,7 @@ canvas{display:block;width:100%!important}
     <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
     <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
     <!-- Métriques : prédiction + VO2max côte à côte -->
-    <div id="coach-metrics-row" style="display:none;display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div id="coach-metrics-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🎯 Prédiction semi</div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -723,10 +723,6 @@ function resetForm(){
   renderKmTable();
   document.getElementById('calories-estimate').style.display='none';
   document.getElementById('compare-section').style.display='none';
-  document.getElementById('ai-result').classList.remove('show');
-  document.getElementById('ai-loading').classList.remove('show');
-  document.getElementById('copy-prompt-area').style.display='none';
-  document.getElementById('prompt-text').value='';
   // Reset photo Strava
   stravaImageB64='';
   stravaImageType='';
@@ -934,7 +930,8 @@ async function runCoachAnalysis(lastSession){
   btn.disabled=true;btn.textContent='⏳ Analyse en cours…';
   document.getElementById('coach-loading').style.display='flex';
   document.getElementById('coach-result').style.display='none';
-  document.getElementById('coach-pred-row').style.display='none';
+  const metricsRow=document.getElementById('coach-metrics-row');
+  if(metricsRow)metricsRow.style.display='none';
 
   // Toutes les séances de course triées chronologiquement
   const runSessions=sessions
