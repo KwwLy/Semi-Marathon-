@@ -473,6 +473,28 @@ canvas{display:block;width:100%!important}
     </div>
   </div>
   <div class="card">
+    <div class="card-title"><span class="bar"></span>🟠 Connexion Strava</div>
+    <div id="strava-auth-section">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte ton compte Strava pour importer automatiquement tes activités sans exporter de fichiers GPX.</p>
+      <div id="strava-logged-out">
+        <button class="btn btn-full" style="background:#FC4C02;color:#fff" onclick="stravaConnect()">🟠 Se connecter avec Strava</button>
+      </div>
+      <div id="strava-logged-in" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <img id="strava-avatar" src="" style="width:36px;height:36px;border-radius:50%;display:none">
+          <div>
+            <div id="strava-athlete-name" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+            <div style="font-size:11px;color:var(--text3)">Strava connecté</div>
+          </div>
+        </div>
+        <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="stravaSync()">🔄 Importer les nouvelles activités</button>
+        <button class="btn btn-ghost btn-full" onclick="stravaDisconnect()">Se déconnecter de Strava</button>
+      </div>
+      <div id="strava-sync-status" style="font-size:11px;color:var(--text3);margin-top:8px;display:none"></div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title"><span class="bar"></span>Clé API Anthropic (pour analyse directe)</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Ta clé API permet d'analyser les séances directement dans l'app sans copier-coller. Elle est stockée uniquement dans ton navigateur (localStorage) et n'est jamais envoyée ailleurs qu'à l'API Anthropic.</p>
     <div class="api-key-row">
@@ -2611,7 +2633,216 @@ function parseFitBulk(buffer){
   };
 }
 
-function exportData(){
+// ── STRAVA INTEGRATION ────────────────────────────────────────────────────
+const STRAVA_CLIENT_ID = '215485';
+const STRAVA_REDIRECT = 'https://kwwly.github.io/Semi-Marathon-/';
+const STRAVA_SCOPE = 'read,activity:read_all';
+
+function stravaConnect(){
+  // OAuth2 PKCE flow
+  const state = Math.random().toString(36).slice(2);
+  localStorage.setItem('strava_state', state);
+  const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT)}&response_type=code&scope=${STRAVA_SCOPE}&state=${state}&approval_prompt=auto`;
+  window.location.href = url;
+}
+
+function stravaDisconnect(){
+  localStorage.removeItem('strava_token');
+  localStorage.removeItem('strava_refresh');
+  localStorage.removeItem('strava_athlete');
+  localStorage.removeItem('strava_last_sync');
+  stravaUpdateUI();
+  toast('Strava déconnecté');
+}
+
+function stravaUpdateUI(){
+  const token = localStorage.getItem('strava_token');
+  const athlete = JSON.parse(localStorage.getItem('strava_athlete')||'null');
+  if(token && athlete){
+    document.getElementById('strava-logged-out').style.display='none';
+    document.getElementById('strava-logged-in').style.display='block';
+    document.getElementById('strava-athlete-name').textContent = athlete.firstname+' '+athlete.lastname;
+    if(athlete.profile){
+      const av=document.getElementById('strava-avatar');
+      av.src=athlete.profile; av.style.display='block';
+    }
+  } else {
+    document.getElementById('strava-logged-out').style.display='block';
+    document.getElementById('strava-logged-in').style.display='none';
+  }
+}
+
+async function stravaExchangeCode(code){
+  // Échange le code contre un token via le proxy Strava
+  // On utilise le client secret stocké localement (jamais dans le code)
+  const secret = localStorage.getItem('strava_secret') || '702e380348481d5340fccf5206524b440b389a77';
+  try {
+    const resp = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        client_id: STRAVA_CLIENT_ID,
+        client_secret: secret,
+        code,
+        grant_type: 'authorization_code'
+      })
+    });
+    const data = await resp.json();
+    if(data.access_token){
+      localStorage.setItem('strava_token', data.access_token);
+      localStorage.setItem('strava_refresh', data.refresh_token);
+      localStorage.setItem('strava_expires', String(data.expires_at));
+      if(data.athlete) localStorage.setItem('strava_athlete', JSON.stringify(data.athlete));
+      // Initialiser la date de sync à maintenant — ne pas importer l'historique
+      if(!localStorage.getItem('strava_last_sync')){
+        localStorage.setItem('strava_last_sync', String(Math.floor(Date.now()/1000)));
+      }
+      stravaUpdateUI();
+      toast('✅ Strava connecté ! Clique "Importer" pour récupérer les nouvelles activités.');
+    } else {
+      toast('Erreur Strava : '+(data.message||'inconnue'));
+    }
+  } catch(e){ toast('Erreur connexion Strava : '+e.message); }
+}
+
+async function stravaRefreshToken(){
+  const refresh = localStorage.getItem('strava_refresh');
+  const secret = localStorage.getItem('strava_secret') || '702e380348481d5340fccf5206524b440b389a77';
+  if(!refresh) return false;
+  try {
+    const resp = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        client_id: STRAVA_CLIENT_ID,
+        client_secret: secret,
+        refresh_token: refresh,
+        grant_type: 'refresh_token'
+      })
+    });
+    const data = await resp.json();
+    if(data.access_token){
+      localStorage.setItem('strava_token', data.access_token);
+      localStorage.setItem('strava_refresh', data.refresh_token);
+      localStorage.setItem('strava_expires', String(data.expires_at));
+      return true;
+    }
+  } catch(e){}
+  return false;
+}
+
+async function stravaGetToken(){
+  const token = localStorage.getItem('strava_token');
+  const expires = parseInt(localStorage.getItem('strava_expires')||'0');
+  if(!token) return null;
+  // Rafraîchir si expiré
+  if(Date.now()/1000 > expires - 300){
+    const ok = await stravaRefreshToken();
+    if(!ok) return null;
+  }
+  return localStorage.getItem('strava_token');
+}
+
+async function stravaSync(){
+  const token = await stravaGetToken();
+  if(!token){ toast('Reconnecte-toi à Strava'); return; }
+
+  const statusEl = document.getElementById('strava-sync-status');
+  if(statusEl){ statusEl.textContent='🔄 Récupération des activités…'; statusEl.style.display='block'; }
+
+  try {
+    // Récupérer les activités depuis la dernière sync (ou depuis aujourd'hui si première fois)
+    const lastSync = parseInt(localStorage.getItem('strava_last_sync')||'0');
+    const after = lastSync || Math.floor(Date.now()/1000);
+    const resp = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=50`, {
+      headers: { 'Authorization': 'Bearer '+token }
+    });
+    const activities = await resp.json();
+    if(!Array.isArray(activities)){ toast('Erreur Strava API'); return; }
+
+    let imported = 0, duplicates = 0;
+    for(const act of activities){
+      // Filtrer : course à pied, vélo, natation seulement
+      const sportMap = {
+        'Run':'course-libre', 'TrailRun':'course-libre',
+        'Ride':'velo', 'VirtualRide':'velo',
+        'Swim':'natation-libre'
+      };
+      const sport = sportMap[act.type];
+      if(!sport) continue;
+
+      // Convertir la date
+      const date = new Date(act.start_date_local);
+      const dateStr = date.toLocaleDateString('fr-FR');
+
+      // Détecter doublon
+      const isDup = sessions.some(s => {
+        if(s.date !== dateStr) return false;
+        return Math.abs((s.dist||0) - (act.distance/1000)) < 0.5;
+      });
+      if(isDup){ duplicates++; continue; }
+
+      // Construire la séance
+      const session = {
+        id: Date.now() + Math.random(),
+        sport,
+        date: dateStr,
+        dist: Math.round(act.distance/10)/100,
+        dur: Math.round(act.moving_time/60),
+        dplus: act.total_elevation_gain||0,
+        pace: act.moving_time>0&&act.distance>0 ? secToPace(Math.round(act.moving_time/(act.distance/1000))) : '',
+        hr: act.average_heartrate||0,
+        hrmax: act.max_heartrate||0,
+        comment: act.name||'',
+        kmDetails: [],
+        gpsTrace: [],
+        week: 0,
+        slot: 's1',
+        stravaId: act.id
+      };
+      sessions.push(session);
+      imported++;
+    }
+
+    // Trier par date
+    sessions.sort((a,b)=>{
+      const da=parseDate(a.date),db=parseDate(b.date);
+      return da&&db?da-db:0;
+    });
+
+    localStorage.setItem('smi_s', JSON.stringify(sessions));
+    localStorage.setItem('strava_last_sync', String(Math.floor(Date.now()/1000)));
+    renderPlan(); renderStats();
+
+    const msg = imported>0
+      ? `✅ ${imported} activité(s) importée(s)${duplicates?' · '+duplicates+' doublon(s) ignoré(s)':''}`
+      : duplicates>0 ? `✓ Tout est à jour (${duplicates} doublon(s))` : '✓ Aucune nouvelle activité';
+    if(statusEl){ statusEl.textContent=msg; }
+    toast(msg);
+
+  } catch(e){
+    if(statusEl){ statusEl.textContent='❌ Erreur : '+e.message; }
+    toast('Erreur Strava : '+e.message);
+  }
+}
+
+// Gérer le retour OAuth Strava (code dans l'URL)
+(function stravaHandleCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const savedState = localStorage.getItem('strava_state');
+  if(code && state && state === savedState){
+    localStorage.removeItem('strava_state');
+    // Nettoyer l'URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    // Échanger le code
+    stravaExchangeCode(code);
+  }
+})();
+
+// Init UI Strava au démarrage
+stravaUpdateUI();
   const data={
     sessions,
     planOverrides,
