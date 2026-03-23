@@ -328,24 +328,13 @@ canvas{display:block;width:100%!important}
     <div class="field"><label class="lbl">Commentaire libre</label>
       <textarea id="lg-comment" placeholder="Douleurs, météo, fatigue, sensations, nutrition…"></textarea>
     </div>
-    <button class="btn btn-or btn-full" onclick="saveAndAnalyze()">💾 Enregistrer et analyser avec Claude</button>
+    <button class="btn btn-or btn-full" onclick="saveAndAnalyze()">💾 Enregistrer la séance</button>
   </div>
 
   <!-- COMPARE -->
   <div id="compare-section" style="display:none" class="card">
     <div class="card-title"><span class="bar"></span>Comparaison plan vs réel</div>
     <div class="comp-grid" id="comp-grid"></div>
-  </div>
-
-  <!-- AI ANALYSIS -->
-  <div class="ai-box">
-    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">🤖 <b>Analyse Claude</b> — Clé API dans Réglages pour activer l'analyse directe.</p>
-    <div class="ai-loading" id="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
-    <div class="ai-result" id="ai-result"></div>
-    <div id="copy-prompt-area" style="display:none;margin-top:8px">
-      <textarea id="prompt-text" style="min-height:120px;font-size:11px;" readonly></textarea>
-      <button onclick="copyPrompt()" class="btn btn-dk btn-full btn-sm" style="margin-top:6px">📋 Copier pour Claude</button>
-    </div>
   </div>
 </div>
 
@@ -383,13 +372,14 @@ canvas{display:block;width:100%!important}
   </div>
 
   <!-- COACH IA -->
-  <div class="card" id="coach-card" style="display:none">
+  <div class="card" id="coach-card">
     <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
+    <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
     <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
     <!-- Ligne prédiction coach -->
     <div id="coach-pred-row" style="display:none;align-items:center;gap:14px;background:var(--bg2);border-radius:var(--r);padding:12px 14px;margin-bottom:12px">
       <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Prédiction Coach</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Prédiction Coach IA</div>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="coach-pred-time" style="font-size:28px;font-weight:700"></span>
           <span id="coach-pred-arrow" style="font-size:30px;line-height:1"></span>
@@ -811,17 +801,10 @@ function saveAndAnalyze(){
   const sessionCopy={...session,kmRows:[...session.kmRows]};
   const weekCopy=week;
 
-  toast('Séance enregistrée !');
+  toast('Séance enregistrée ✓');
   renderPlan();
-  // Recalculer prédiction si c'est une séance de course
-  if(['plan','course-libre'].includes(sport)){
-    updatePerfCards();
-    runCoachAnalysis(sessionCopy); // analyse plan + prédiction en arrière-plan
-  }
+  if(['plan','course-libre'].includes(sport)) updatePerfCards();
   showCompare(sessionCopy,weekCopy);
-  runAnalysis(sessionCopy,weekCopy);
-
-  // Reset le formulaire après enregistrement
   resetForm();
 }
 
@@ -874,46 +857,43 @@ function showCompare(s,week){
     </div>`;
 }
 
-// ── AI ANALYSIS ───────────────────────────────────────────────────────────
+// ── AI ANALYSIS (depuis historique) ──────────────────────────────────────
 async function runAnalysis(s,week){
   const apiKey=settings.apiKey||localStorage.getItem('smi_key')||'';
   const prompt=buildPrompt(s,week);
-  document.getElementById('prompt-text').value=prompt;
-  document.getElementById('copy-prompt-area').style.display='block';
-  document.getElementById('ai-result').classList.remove('show');
+  if(!apiKey){toast('⚠️ Clé API manquante dans Réglages');return;}
 
-  if(!apiKey){
-    document.getElementById('copy-prompt-area').style.display='block';
-    return;
-  }
-
-  document.getElementById('ai-loading').classList.add('show');
-  document.getElementById('copy-prompt-area').style.display='none';
+  const loadEl=document.getElementById('ai-hist-load-'+s.id);
+  const btn=document.getElementById('ai-hist-btn-'+s.id);
+  if(loadEl)loadEl.style.display='flex';
+  if(btn)btn.style.display='none';
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
-    document.getElementById('ai-loading').classList.remove('show');
+    if(loadEl)loadEl.style.display='none';
     if(data.content&&data.content[0]){
-      const result=document.getElementById('ai-result');
-      result.textContent=data.content[0].text;
-      result.classList.add('show');
+      const idx=sessions.findIndex(x=>x.id===s.id);
+      if(idx>=0){sessions[idx].claudeAnalysis=data.content[0].text;localStorage.setItem('smi_s',JSON.stringify(sessions));}
+      renderHistory();
+      setTimeout(()=>{
+        const d=document.getElementById('hist-detail-'+s.id);
+        const c=document.getElementById('chev-hist-'+s.id);
+        if(d){d.style.display='block';if(c)c.style.transform='rotate(180deg)';}
+        setTimeout(()=>renderMap(s.id),50);
+      },50);
     }else{
-      document.getElementById('copy-prompt-area').style.display='block';
-      toast('Clé API invalide ou erreur réseau');
+      if(btn)btn.style.display='block';
+      toast('Erreur API');
     }
   }catch(e){
-    document.getElementById('ai-loading').classList.remove('show');
-    document.getElementById('copy-prompt-area').style.display='block';
-    toast('Erreur API — utilise le texte à copier');
+    if(loadEl)loadEl.style.display='none';
+    if(btn)btn.style.display='block';
+    toast('Erreur réseau');
   }
 }
 
@@ -957,76 +937,109 @@ function copyPrompt(){
 // ── COACH IA — analyse plan + prédiction ─────────────────────────────────
 async function runCoachAnalysis(lastSession){
   const apiKey=settings.apiKey;
-  if(!apiKey)return; // silencieux si pas de clé
+  if(!apiKey){toast('⚠️ Ajoute ta clé API dans Réglages !');return;}
 
-  // Basculer sur le dashboard et montrer le loading
-  sw('stats');
   const card=document.getElementById('coach-card');
-  card.style.display='block';
+  const btn=document.getElementById('coach-analyze-btn');
+  btn.disabled=true;btn.textContent='⏳ Analyse en cours…';
   document.getElementById('coach-loading').style.display='flex';
   document.getElementById('coach-result').style.display='none';
   document.getElementById('coach-pred-row').style.display='none';
 
-  // Construire le contexte complet
+  // Toutes les séances de course triées chronologiquement
   const runSessions=sessions
-    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist&&s.dur)
+    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
     .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
 
-  const vdotLast=lastSession?computeVDOT(lastSession.dist,lastSession.dur):null;
-  const predVDOT=vdotLast?semiTimeFromVDOT(vdotLast):null;
+  if(!runSessions.length){
+    toast('Aucune séance de course enregistrée.');
+    btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
+    document.getElementById('coach-loading').style.display='none';
+    return;
+  }
 
-  // Résumé des 5 dernières séances
-  const recentSummary=runSessions.slice(-5).map(s=>
-    `  - ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' ('+s.pace+'/km)':''}${s.dplus?' +'+s.dplus+'m':''}`
+  // ── Prédictions algorithmiques multiples ──
+  // On utilise les séances ≥ 10 km pour être fiable
+  const longRuns=runSessions.filter(s=>s.dist>=10);
+  const refSession=longRuns.length?longRuns[longRuns.length-1]:runSessions[runSessions.length-1];
+
+  // 1. VDOT Jack Daniels
+  const vdot=computeVDOT(refSession.dist,refSession.dur);
+  const predVDOT=vdot?semiTimeFromVDOT(vdot):null;
+
+  // 2. Formule de Riegel (T2 = T1 × (D2/D1)^1.06) — directement depuis la séance la plus longue
+  const longestRun=runSessions.reduce((b,s)=>s.dist>b.dist?s:b,runSessions[0]);
+  const predRiegel=longestRun.dist>=5?longestRun.dur*Math.pow(21.1/longestRun.dist,1.06):null;
+
+  // 3. Cameron (modèle de déclin non linéaire) : t2 = t1 × exp(a×(1/d1 - 1/d2)) avec a=13.49681
+  const a=13.49681;
+  const predCameron=longestRun.dist>=5?longestRun.dur*Math.exp(a*(1/longestRun.dist-1/21.1)):null;
+
+  // 4. Allure récente × 21.1 km avec facteur fatigue 1.04 (correction longue distance)
+  const lastPaceSec=refSession.pace?paceToSec(refSession.pace):refSession.dist>0?(refSession.dur/refSession.dist*60):0;
+  const predPace=lastPaceSec>0?(lastPaceSec*21.1/60)*1.04:null;
+
+  // Synthèse : médiane des prédictions valides
+  const preds=[predVDOT,predRiegel,predCameron,predPace].filter(p=>p&&p>75&&p<300);
+  const sorted=[...preds].sort((a,b)=>a-b);
+  const medianPred=sorted.length?sorted[Math.floor(sorted.length/2)]:null;
+
+  // Résumé de toutes les séances
+  const allSummary=runSessions.map(s=>
+    `  ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.dplus?' D+'+s.dplus+'m':''}${s.hr?' FC'+s.hr:''}${s.comment?' "'+s.comment+'"':''}`
   ).join('\n');
 
-  const prompt=`Tu es un coach running expert. Ton athlète prépare un semi-marathon le 4 octobre 2026.
+  // Semaines restantes avant la course
+  const raceDate=new Date('2026-10-04');
+  const today=new Date();
+  const weeksLeft=Math.max(0,Math.round((raceDate-today)/(7*86400000)));
 
-OBJECTIFS : A = 1h50 (5:13/km) · B = sub 2h00
-CONTRAINTES PLAN : maximum 2 séances de course par semaine, natation possible en complément.
-SÉANCES RESTANTES : plan sur 30 semaines démarré le 16 mars 2026.
+  const prompt=`Tu es un coach running expert et bienveillant. Analyse la préparation de cet athlète pour un semi-marathon.
 
-DERNIÈRE SÉANCE :
-- Date : ${lastSession?.date||'?'}
-- Distance : ${lastSession?.dist} km
-- Durée : ${lastSession?.dur} min
-- Allure : ${lastSession?.pace||'?'}/km
-- FC moy : ${lastSession?.hr||'?'} bpm · FC max : ${lastSession?.hrmax||'?'} bpm
-- Dénivelé : ${lastSession?.dplus||0} m
-${lastSession?.comment?'- Commentaire : '+lastSession.comment:''}
+COURSE CIBLE : Semi-marathon le 4 octobre 2026 (${weeksLeft} semaines restantes)
+OBJECTIF A : 1h50 (5:13/km) · OBJECTIF B : sub 2h00 (5:41/km)
+CONTRAINTES : max 2 séances course/semaine · natation possible en complément
 
-5 DERNIÈRES SÉANCES :
-${recentSummary||'(aucune)'}
+PROFIL ATHLÈTE : Coureur intermédiaire. A déjà couru 20 km en 1h58 (5:54/km). S'entraîne régulièrement depuis plusieurs mois.
 
-TOTAL : ${runSessions.length} séances course · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés
+TOUTES LES SÉANCES (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
+${allSummary}
 
-PRÉDICTION ALGORITHMIQUE (VDOT) : ${predVDOT?minsToHMS(predVDOT):'non calculable'} sur semi
+PRÉDICTIONS ALGORITHMIQUES :
+- VDOT (Jack Daniels) : ${predVDOT?minsToHMS(predVDOT):'—'}
+- Riegel depuis ${longestRun.dist}km en ${longestRun.dur}min : ${predRiegel?minsToHMS(predRiegel):'—'}
+- Cameron (modèle non linéaire) : ${predCameron?minsToHMS(predCameron):'—'}
+- Allure récente × distance : ${predPace?minsToHMS(predPace):'—'}
+- Médiane des modèles : ${medianPred?minsToHMS(medianPred):'—'}
 
-Réponds en JSON STRICT, sans texte avant ni après, avec exactement ce format :
+IMPORTANT : Ces algorithmes tendent à sous-estimer pour les coureurs réguliers. Strava utilise des modèles similaires à Cameron/Riegel. Tiens compte de la progression visible dans les données, de la régularité de l'entraînement, et du potentiel restant avec ${weeksLeft} semaines d'entraînement structuré.
+
+Réponds en JSON STRICT, sans texte avant ni après :
 {
-  "prediction_time": "1h58:30",
+  "prediction_time": "1h58:00",
   "prediction_direction": "up",
-  "prediction_comment": "une phrase courte sur l'objectif",
-  "plan_adjustment_needed": true,
-  "plan_adjustment": "description concrète de l'ajustement suggéré ou null si aucun",
-  "analysis": "analyse complète en 4-5 phrases : forme actuelle, progression, adéquation au plan, conseils pour les prochaines séances"
+  "prediction_comment": "phrase courte sur la trajectoire vers l'objectif",
+  "plan_adjustment_needed": false,
+  "plan_adjustment": null,
+  "analysis": "analyse en 5-6 phrases : progression constatée, points forts, axe de travail principal, probabilité d'atteindre 1h50 vs sub-2h, conseil clé pour les prochaines semaines"
 }
 
-Règles :
-- prediction_time : temps prédit au semi au format Xh??:?? basé sur ta propre analyse
-- prediction_direction : "up" si tu estimes que l'athlète peut atteindre ou dépasser l'objectif A (1h50), "down" sinon
-- plan_adjustment_needed : true seulement si un changement significatif est justifié
-- Reste dans la contrainte de 2 séances course/semaine max
-- Sois direct et concis`;
+Règles strictes :
+- prediction_time : ta propre estimation réaliste et optimiste si les données le justifient
+- prediction_direction : "up" si sub-2h atteignable ET progression vers 1h50 possible, "down" si sub-2h incertain
+- Sois réaliste mais bienveillant — valorise les efforts et la progression
+- Ne sois PAS pessimiste par défaut : si l'athlète progresse, dis-le clairement
+- plan_adjustment : si tu suggères un changement, sois concret (ex: "Ajouter une sortie longue de 18km en Z2 à la semaine 8")`;
 
   try{
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
     document.getElementById('coach-loading').style.display='none';
+    btn.disabled=false;btn.textContent='🔍 Relancer l\'analyse';
 
     if(!data.content||!data.content[0]){toast('Erreur analyse coach');return;}
 
@@ -1035,19 +1048,17 @@ Règles :
       const raw=data.content[0].text.replace(/```json|```/g,'').trim();
       json=JSON.parse(raw);
     }catch(e){
-      // Si JSON invalide, afficher le texte brut
       document.getElementById('coach-result').textContent=data.content[0].text;
       document.getElementById('coach-result').style.display='block';
       return;
     }
 
-    // Sauvegarder dans localStorage
-    const coachData={...json,savedAt:new Date().toISOString(),sessionId:lastSession?.id};
+    const coachData={...json,savedAt:new Date().toISOString()};
     localStorage.setItem('smi_coach',JSON.stringify(coachData));
-
     renderCoachCard(json);
   }catch(e){
     document.getElementById('coach-loading').style.display='none';
+    btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
     toast('Erreur réseau coach IA');
   }
 }
@@ -1600,9 +1611,10 @@ function renderHistory(){
       <div style="margin-top:10px">
         <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div>
         <div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button>
       </div>`:`
       <div style="margin-top:10px">
-        <button class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button>
+        <button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button>
       </div>`;
     const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
 
@@ -1762,42 +1774,17 @@ function renderMap(id){
   map.fitBounds(L.latLngBounds(pts),{padding:[15,15]});
 }
 
-async function analyzeFromHistory(id){
+function analyzeFromHistory(id){
   const s=sessions.find(x=>x.id===id);
   if(!s)return;
-  const apiKey=settings.apiKey||'';
-  if(!apiKey){toast('⚠️ Ajoute ta clé API dans Réglages !');return}
   const week=s.week?getWeek(s.week):null;
-  const loadEl=document.getElementById('ai-hist-load-'+id);
-  if(loadEl)loadEl.style.display='flex';
-  // Masquer le bouton analyser
-  const btn=loadEl?.previousElementSibling;
-  if(btn)btn.style.display='none';
+  runAnalysis(s,week);
+}
 
-  const prompt=buildPrompt(s,week);
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await res.json();
-    if(loadEl)loadEl.style.display='none';
-    if(data.content&&data.content[0]){
-      // Sauvegarder l'analyse dans la session
-      const idx=sessions.findIndex(x=>x.id===id);
-      if(idx>=0){sessions[idx].claudeAnalysis=data.content[0].text;localStorage.setItem('smi_s',JSON.stringify(sessions));}
-      renderHistory();
-      // Rouvrir le détail
-      const d=document.getElementById('hist-detail-'+id);
-      const c=document.getElementById('chev-hist-'+id);
-      if(d){d.style.display='block';if(c)c.style.transform='rotate(180deg)';}
-    }else{toast('Erreur API');if(btn)btn.style.display='block';}
-  }catch(e){
-    if(loadEl)loadEl.style.display='none';
-    if(btn)btn.style.display='block';
-    toast('Erreur réseau');
-  }
+function resetAndReanalyze(id){
+  const idx=sessions.findIndex(x=>x.id===id);
+  if(idx>=0){delete sessions[idx].claudeAnalysis;localStorage.setItem('smi_s',JSON.stringify(sessions));}
+  analyzeFromHistory(id);
 }
 
 function updateSport(id){
