@@ -3283,8 +3283,12 @@ try {
     const code = document.getElementById('fb-token-input')?.value?.trim();
     if(!code || code.length !== 6){ toast('Code invalide'); return; }
     const msgEl = document.getElementById('fb-token-msg');
+    if(msgEl){ msgEl.textContent = '⏳ Vérification…'; msgEl.style.display='block'; msgEl.style.color='var(--or)'; }
+    console.log('fbUseToken: code=', code, 'fbDb=', !!fbDb);
     try {
+      console.log('Tentative lecture token...');
       const snap = await fbDb.collection('tokens').doc(code).get();
+      console.log('Lecture OK, exists=', snap.exists);
       if(!snap.exists){
         if(msgEl){ msgEl.textContent = '❌ Code invalide ou expiré'; msgEl.style.display='block'; }
         return;
@@ -3317,7 +3321,8 @@ try {
         toast('✅ Données synchronisées depuis ' + data.email);
       }
     } catch(e){ 
-      if(msgEl){ msgEl.textContent = '❌ Erreur : '+e.message; msgEl.style.display='block'; }
+      console.error('fbUseToken error:', e.code, e.message);
+      if(msgEl){ msgEl.textContent = '❌ '+e.code+' : '+e.message; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
     }
   };
 
