@@ -2401,7 +2401,8 @@ async function bulkImport(input){
           return sameDate && similarDist;
         });
         parsed.push({ file: file.name, data: d, duplicate: isDuplicate, selected: !isDuplicate,
-          sport: d.sport==='course'?'plan': d.sport==='natation'?'natation-libre': d.sport==='velo'?'velo':'autre'
+          sport: 'course-libre', // par défaut : course libre hors plan
+          week: 0, slot: 's1'
         });
       } else {
         parsed.push({ file: file.name, data: null, error: true, selected: false });
@@ -2438,16 +2439,27 @@ function renderBulkResults(){
 
     const info = d ? `${d.date||'?'} · ${d.distance_km?.toFixed(2)||'?'} km · ${d.duree_min||'?'} min${d.fc_max?' · FC max '+d.fc_max:''}` : 'Fichier non reconnu';
 
-    const sportSel = d ? `<select onchange="bulkSetSport(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);margin-top:3px;width:100%">
+    const sportSel = d ? `<select id="bulk-sport-${i}" onchange="bulkSetSport(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);margin-top:4px;width:100%">
+      <option value="course-libre" ${p.sport==='course-libre'?'selected':''}>🏃 Course libre (hors plan)</option>
       <option value="plan" ${p.sport==='plan'?'selected':''}>🏃 Course (plan)</option>
-      <option value="course-libre" ${p.sport==='course-libre'?'selected':''}>🏃 Course libre</option>
       <option value="natation-plan" ${p.sport==='natation-plan'?'selected':''}>🏊 Natation (plan)</option>
       <option value="natation-libre" ${p.sport==='natation-libre'?'selected':''}>🏊 Natation libre</option>
       <option value="velo" ${p.sport==='velo'?'selected':''}>🚴 Vélo</option>
       <option value="padel" ${p.sport==='padel'?'selected':''}>🎾 Padel</option>
       <option value="krav" ${p.sport==='krav'?'selected':''}>🥋 Krav Maga</option>
       <option value="autre" ${p.sport==='autre'?'selected':''}>⚡ Autre</option>
-    </select>` : '';
+    </select>
+    ${(p.sport==='plan'||p.sport==='natation-plan')?`
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <select id="bulk-week-${i}" onchange="bulkSetWeek(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);flex:1">
+        <option value="0">— Semaine du plan —</option>
+        ${allWeeks().map(w=>`<option value="${w.n}" ${p.week===w.n?'selected':''}>${'S'+w.n+' ('+w.dates+')'}</option>`).join('')}
+      </select>
+      <select id="bulk-slot-${i}" onchange="bulkSetSlot(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:70px">
+        <option value="s1" ${p.slot==='s1'?'selected':''}>S1</option>
+        <option value="s2" ${p.slot==='s2'?'selected':''}>S2</option>
+      </select>
+    </div>`:''}`:``;
 
     h += `<div style="padding:8px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;font-size:11px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -2468,7 +2480,12 @@ function renderBulkResults(){
 
 function bulkSetSport(i, sport){
   bulkParsed[i].sport = sport;
+  // Réinitialiser week/slot si on quitte le mode plan
+  if(sport!=='plan'&&sport!=='natation-plan'){ bulkParsed[i].week=0; bulkParsed[i].slot='s1'; }
+  renderBulkResults();
 }
+function bulkSetWeek(i, week){ bulkParsed[i].week = parseInt(week)||0; }
+function bulkSetSlot(i, slot){ bulkParsed[i].slot = slot; }
 
 function bulkToggle(i, checked){
   bulkParsed[i].selected = checked;
@@ -2489,7 +2506,7 @@ function bulkConfirm(){
     const d = p.data;
     const session = {
       id: Date.now() + Math.random(),
-      sport: p.sport || 'plan',
+      sport: p.sport || 'course-libre',
       date: d.date || '',
       dist: d.distance_km || 0,
       dur: d.duree_min || 0,
@@ -2500,8 +2517,8 @@ function bulkConfirm(){
       comment: `Importé depuis ${p.file}`,
       kmDetails: d.km_details || [],
       gpsTrace: d.gpsTrace || [],
-      week: 0,
-      slot: 's1'
+      week: p.week || 0,
+      slot: p.slot || 's1'
     };
     sessions.push(session);
     added++;
