@@ -444,6 +444,12 @@ canvas{display:block;width:100%!important}
         <button class="btn btn-ghost" onclick="fbSendEmailLink()" style="white-space:nowrap">📧 Lien magique</button>
       </div>
       <div id="fb-email-msg" style="font-size:11px;color:#27AE60;margin-top:6px;display:none"></div>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin:8px 0">— ou utilise un code de transfert —</div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="fb-token-input" placeholder="Code à 6 chiffres" maxlength="6" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;letter-spacing:4px;text-align:center;background:var(--bg);color:var(--text)">
+        <button class="btn btn-ghost" onclick="fbUseToken()" style="white-space:nowrap">Utiliser</button>
+      </div>
+      <div id="fb-token-msg" style="font-size:11px;color:var(--re);margin-top:6px;display:none"></div>
     </div>
     <div id="fb-settings-logged-in" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
@@ -454,7 +460,16 @@ canvas{display:block;width:100%!important}
         </div>
         <span id="fb-sync-indicator" style="margin-left:auto;font-size:11px;color:var(--text3)">✓ Synchronisé</span>
       </div>
-      <button class="btn btn-ghost btn-full" onclick="fbToggleAuth()">Se déconnecter</button>
+      <button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">Se déconnecter</button>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">📱 Transférer la session vers un autre appareil</div>
+        <button class="btn btn-ghost btn-full" onclick="fbGenerateToken()">🔑 Générer un code de transfert</button>
+        <div id="fb-token-display" style="display:none;margin-top:8px;text-align:center">
+          <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:var(--or)" id="fb-token-code"></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Valable 10 minutes · Saisis ce code dans la PWA</div>
+          <div id="fb-token-timer" style="font-size:11px;color:var(--am);margin-top:2px"></div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -3229,6 +3244,82 @@ try {
   function fbSetSyncStatus(msg){ const el=document.getElementById('fb-sync-indicator'); if(el)el.textContent=msg; }
 
   window.fbSaveData = fbSaveData;
+
+  // ── TOKEN DE TRANSFERT ──────────────────────────────────────────────────
+  window.fbGenerateToken = async function(){
+    if(!fbUser) return;
+    // Générer un code à 6 chiffres
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 min
+    try {
+      // Stocker dans Firestore sous tokens/{code}
+      await fbDb.collection('tokens').doc(code).set({
+        uid: fbUser.uid,
+        email: fbUser.email,
+        expiresAt,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      // Afficher le code
+      document.getElementById('fb-token-code').textContent = code;
+      document.getElementById('fb-token-display').style.display = 'block';
+      // Compte à rebours
+      let remaining = 600;
+      const timerEl = document.getElementById('fb-token-timer');
+      const timerInterval = setInterval(() => {
+        remaining--;
+        const m = Math.floor(remaining/60), s = remaining%60;
+        if(timerEl) timerEl.textContent = `Expire dans ${m}:${String(s).padStart(2,'0')}`;
+        if(remaining <= 0){
+          clearInterval(timerInterval);
+          document.getElementById('fb-token-display').style.display = 'none';
+          // Supprimer le token expiré
+          fbDb.collection('tokens').doc(code).delete().catch(()=>{});
+        }
+      }, 1000);
+    } catch(e){ toast('Erreur génération code : '+e.message); }
+  };
+
+  window.fbUseToken = async function(){
+    const code = document.getElementById('fb-token-input')?.value?.trim();
+    if(!code || code.length !== 6){ toast('Code invalide'); return; }
+    const msgEl = document.getElementById('fb-token-msg');
+    try {
+      const snap = await fbDb.collection('tokens').doc(code).get();
+      if(!snap.exists){
+        if(msgEl){ msgEl.textContent = '❌ Code invalide ou expiré'; msgEl.style.display='block'; }
+        return;
+      }
+      const data = snap.data();
+      if(Date.now() > data.expiresAt){
+        if(msgEl){ msgEl.textContent = '❌ Code expiré — génère-en un nouveau'; msgEl.style.display='block'; }
+        fbDb.collection('tokens').doc(code).delete().catch(()=>{});
+        return;
+      }
+      // Connexion via token custom — signe avec un custom token
+      // On charge directement les données de l'utilisateur sans re-authentification
+      // (la session Firebase ne peut pas être transférée directement)
+      // On stocke les données dans localStorage depuis Firestore
+      const userSnap = await fbDb.collection('users').doc(data.uid).get();
+      if(userSnap.exists){
+        const d = userSnap.data();
+        if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
+        if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
+        if(d.coach_json&&d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
+        if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
+        // Supprimer le token utilisé
+        fbDb.collection('tokens').doc(code).delete().catch(()=>{});
+        renderPlan(); renderStats(); loadCoachCard();
+        // Mettre à jour la bannière pour indiquer que les données sont chargées (sans auth complète)
+        document.getElementById('fb-dot').style.background = '#27AE60';
+        document.getElementById('fb-label').textContent = data.email + ' (données synchronisées)';
+        document.getElementById('fb-token-input').value = '';
+        if(msgEl) msgEl.style.display='none';
+        toast('✅ Données synchronisées depuis ' + data.email);
+      }
+    } catch(e){ 
+      if(msgEl){ msgEl.textContent = '❌ Erreur : '+e.message; msgEl.style.display='block'; }
+    }
+  };
 
   const _orig=localStorage.setItem.bind(localStorage);
   localStorage.setItem=function(key,value){
