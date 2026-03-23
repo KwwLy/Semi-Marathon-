@@ -3187,18 +3187,32 @@ try {
   };
 
   // Vérifier si on revient d'un lien magique
-  if(firebase.auth.isSignInWithEmailLink(fbAuth, window.location.href)){
+  const currentUrl = window.location.href;
+  const isEmailLink = firebase.auth.isSignInWithEmailLink(fbAuth, currentUrl);
+
+  // Debug visible dans l'app (utile sur iPhone sans DevTools)
+  if(currentUrl.includes('oobCode')){
+    const dbgEl = document.getElementById('fb-email-msg');
+    if(dbgEl){ dbgEl.textContent = 'Lien détecté, connexion en cours…'; dbgEl.style.display='block'; dbgEl.style.color='var(--or)'; }
+  }
+
+  if(isEmailLink){
     let email = localStorage.getItem('smi_email_link');
-    if(!email) email = prompt('Confirme ton adresse email :');
+    if(!email) email = prompt('Confirme ton adresse email pour te connecter :');
     if(email){
-      fbAuth.signInWithEmailLink(email, window.location.href)
+      fbAuth.signInWithEmailLink(email, currentUrl)
         .then(() => {
           localStorage.removeItem('smi_email_link');
-          // Nettoyer l'URL
           window.history.replaceState({}, document.title, window.location.pathname);
-          toast('✅ Connecté !');
+          toast('✅ Connecté avec succès !');
         })
-        .catch(e => toast('Erreur connexion email : '+e.message));
+        .catch(e => {
+          console.error('Email link error:', e);
+          // Afficher l'erreur dans l'app
+          const dbgEl = document.getElementById('fb-email-msg');
+          if(dbgEl){ dbgEl.textContent = '❌ Erreur : '+e.message; dbgEl.style.display='block'; dbgEl.style.color='var(--re)'; }
+          toast('Erreur : '+e.message);
+        });
     }
   }
 
