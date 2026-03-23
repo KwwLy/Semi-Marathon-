@@ -163,7 +163,8 @@ textarea{resize:vertical;min-height:60px}
 canvas{display:block;width:100%!important}
 
 /* TOAST */
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.explain-box{background:var(--bll);border:1px solid var(--bl);border-radius:var(--r);padding:10px 12px;margin-top:10px;font-size:11px;color:var(--text);line-height:1.65}
+.explain-box b{color:var(--bl)};transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
 
 /* SPORT BADGE COLORS */
@@ -634,8 +635,16 @@ function renderPlan(){
         <div class="wdet" id="det-${w.n}">
           ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
           <div class="sg">
-            <div class="sb"><div class="st" style="color:${ph.color}">${w.s1.title}</div>${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
-            <div class="sb"><div class="st" style="color:#27AE60">${w.s2.title}</div>${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
+            <div class="sb">
+              <div class="st" style="color:${ph.color}">${w.s1.title}</div>
+              ${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
+              ${(()=>{const e=sessionExplain(w.s1.title,w.s1.steps);return e?e:''})()}
+            </div>
+            <div class="sb">
+              <div class="st" style="color:#27AE60">${w.s2.title}</div>
+              ${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
+              ${(()=>{const e=sessionExplain(w.s2.title,w.s2.steps);return e?e:''})()}
+            </div>
           </div>
           <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
           <button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s2')">✏️ Saisir S2</button>
@@ -682,6 +691,77 @@ function applyPlanOverrides(modifications){
   });
   localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
   return count;
+}
+
+// ── EXPLICATION SÉANCE ────────────────────────────────────────────────────
+function sessionExplain(title, steps){
+  const t=title.toLowerCase();
+  const stepsText=steps.map(s=>s[1]).join(' ').toLowerCase();
+
+  // VMA / 400m
+  if(t.includes('400m')||t.includes('vma')){
+    return`<div class="explain-box">
+      <b>🏃 Séance VMA — Vitesse Maximale Aérobie</b><br>
+      Le but est de courir à ton allure <b>maximale soutenable sur ~1 min</b> (Z5). Ces répétitions courtes à haute intensité développent ton plafond aérobie (VO2max) — plus il monte, plus ton allure semi devient "facile" en relatif.<br><br>
+      <b>Comment faire :</b> Lance-toi à fond sur 400m (un tour de piste) en visant l'allure indiquée. La récupération trottinant est aussi importante que l'effort — respecte-la scrupuleusement. Dès que tu n'arrives plus à tenir l'allure, arrête.<br><br>
+      <b>Ressenti cible :</b> Très difficile, tu ne peux pas parler. FC proche du max. Tu dois pouvoir terminer chaque répétition à la même allure que la première.
+    </div>`;
+  }
+
+  // Fractions 5 min
+  if(t.includes('5 min')||t.includes('×5 min')){
+    return`<div class="explain-box">
+      <b>⚡ Fractions longues — Z3</b><br>
+      5 minutes à allure semi, c'est un effort <b>soutenu mais gérable</b>. L'objectif est d'habituer ton corps à courir à l'allure cible du 4 octobre par petites doses.<br><br>
+      <b>Comment faire :</b> Lance ton chrono, cours 5 min à 5:10-5:15/km (allure légèrement plus rapide que ta cible semi), puis récupère 3 min en trottinant lentement. Répète. Les premières répétitions doivent sembler faciles — si tu es à bout dès la 2e, tu pars trop vite.<br><br>
+      <b>Ressenti cible :</b> "Difficile mais tenu" — tu peux prononcer quelques mots. FC autour de 85-88% de ta FC max.
+    </div>`;
+  }
+
+  // Fractions 2 km ou 3 km
+  if((t.includes('×2 km')||t.includes('×3 km'))&&(t.includes('5:'))){
+    const reps=t.match(/(\d+)×/)?.[1]||'';
+    const km=t.includes('2 km')?2:3;
+    return`<div class="explain-box">
+      <b>🎯 Blocs à allure semi — Z3</b><br>
+      ${reps} blocs de ${km} km à allure semi-marathon. C'est la séance <b>la plus spécifique</b> de ta préparation — tu cours exactement à la vitesse du 4 octobre.<br><br>
+      <b>Comment faire :</b> Commence chaque bloc au calme, atteins l'allure cible en 200m et maintiens-la. La récupération trottine (3-4 min Z1) doit te permettre de repartir à la même allure au bloc suivant. Si tu n'y arrives pas, la récupération est trop courte — allonge-la.<br><br>
+      <b>Ressenti cible :</b> Effort contrôlé et régulier. FC vers 80-87%. Tu dois finir le dernier bloc à la même allure que le premier — c'est le signe d'une bonne exécution.
+    </div>`;
+  }
+
+  // Seuil 1 km
+  if(t.includes('×1 km')&&(t.includes('z3')||t.includes('z4')||t.includes('5:'))){
+    return`<div class="explain-box">
+      <b>🔥 Séance Seuil — Z4</b><br>
+      Des répétitions d'1 km à allure <b>seuil lactique</b> — juste au-dessus de l'allure semi. C'est inconfortable mais pas maximal. Ces séances repoussent ton seuil et rendent l'allure semi "confortable" le jour J.<br><br>
+      <b>Comment faire :</b> Lance-toi à 4:55-5:15/km selon la semaine. L'allure doit être stable du 1er au dernier mètre de chaque km. La récupération (2 min trot) est courte pour habituer ton corps à enchaîner.<br><br>
+      <b>Ressenti cible :</b> "Difficile, respiration rapide, possible de tenir quelques mots". FC vers 88-93%. Si tu dois marcher en récupération, c'est normal au début.
+    </div>`;
+  }
+
+  // Sortie longue Z2
+  if((t.includes('km z2')||stepsText.includes('z2'))&&(t.includes('16')||t.includes('17')||t.includes('18')||t.includes('19')||t.includes('20'))){
+    return`<div class="explain-box">
+      <b>🏃 Sortie longue — Z2</b><br>
+      La reine des séances d'endurance. L'objectif n'est <b>pas d'aller vite</b> — c'est de rester longtemps en mouvement à allure confortable pour construire l'endurance musculaire et mentale.<br><br>
+      <b>Comment faire :</b> Commence les 2-3 premiers km très doucement (Z1), puis stabilise à 5:50-6:10/km. Si tu sens que tu accélères, ralentis. Prévoie de l'eau et un gel selon les indications. La conversation doit être possible tout du long.<br><br>
+      <b>Ravitaillement :</b> Gel sucré (15-20g glucides) + eau. Ne jamais tester un nouveau gel ou aliment en course — utilise ce que tu prendras le 4 octobre.<br><br>
+      <b>Ressenti cible :</b> Facile à modéré. FC 70-80%. Tu dois finir en ayant l'impression de pouvoir encore courir 20-30 min.
+    </div>`;
+  }
+
+  // Séance spécifique semi (allure semi sur portion)
+  if(stepsText.includes('z3')&&(stepsText.includes('km z2'))){
+    return`<div class="explain-box">
+      <b>🎯 Sortie longue spécifique semi</b><br>
+      Format progressif : tu démarres en Z2 confortable, puis tu glisses sur l'allure semi (Z3) en milieu de sortie. C'est la séance qui te prépare le mieux au 4 octobre.<br><br>
+      <b>Comment faire :</b> Kilomètres d'échauffement très faciles, puis engage l'allure semi (5:13-5:20/km) sur la portion indiquée. La clé : ne pas partir trop vite sur les premiers km Z2 pour avoir les jambes fraîches sur la portion Z3.<br><br>
+      <b>Ressenti cible :</b> Z2 = facile · Z3 = soutenu mais tenu. Si la portion Z3 est impossible, tu es parti trop vite en Z2. La fatigue doit arriver sur le dernier tiers.
+    </div>`;
+  }
+
+  return null; // Pas d'explication pour les séances simples (Z1, natation, repos)
 }
 
 function toggleW(n){
