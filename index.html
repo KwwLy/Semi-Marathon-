@@ -1009,31 +1009,16 @@ async function runCoachAnalysis(lastSession){
     return;
   }
 
-  // ── Prédictions algorithmiques multiples ──
-  // On utilise les séances ≥ 10 km pour être fiable
-  const longRuns=runSessions.filter(s=>s.dist>=10);
-  const refSession=longRuns.length?longRuns[longRuns.length-1]:runSessions[runSessions.length-1];
+  // ── Prédiction algorithmique — meilleure séance, 3 formules, médiane ──
+  const bestSession=bestPaceSession(runSessions);
+  const medianPred=bestSession?predictSemiFromSession(bestSession):null;
 
-  // 1. VDOT Jack Daniels
-  const vdot=computeVDOT(refSession.dist,refSession.dur);
-  const predVDOT=vdot?semiTimeFromVDOT(vdot):null;
-
-  // 2. Formule de Riegel (T2 = T1 × (D2/D1)^1.06) — directement depuis la séance la plus longue
-  const longestRun=runSessions.reduce((b,s)=>s.dist>b.dist?s:b,runSessions[0]);
-  const predRiegel=longestRun.dist>=5?longestRun.dur*Math.pow(21.1/longestRun.dist,1.06):null;
-
-  // 3. Cameron (modèle de déclin non linéaire) : t2 = t1 × exp(a×(1/d1 - 1/d2)) avec a=13.49681
-  const a=13.49681;
-  const predCameron=longestRun.dist>=5?longestRun.dur*Math.exp(a*(1/longestRun.dist-1/21.1)):null;
-
-  // 4. Allure récente × 21.1 km avec facteur fatigue 1.04 (correction longue distance)
-  const lastPaceSec=refSession.pace?paceToSec(refSession.pace):refSession.dist>0?(refSession.dur/refSession.dist*60):0;
-  const predPace=lastPaceSec>0?(lastPaceSec*21.1/60)*1.04:null;
-
-  // Synthèse : médiane des prédictions valides
-  const preds=[predVDOT,predRiegel,predCameron,predPace].filter(p=>p&&p>75&&p<300);
-  const sortedPreds=[...preds].sort((a,b)=>a-b);
-  const medianPred=sortedPreds.length?sortedPreds[Math.floor(sortedPreds.length/2)]:null;
+  // Détail pour le prompt
+  const camF=d=>13.49681-0.048865*d+2.438936/Math.pow(d,0.7905);
+  const riegelDetail=bestSession?minsToHMS(bestSession.dur*Math.pow(21.1/bestSession.dist,1.06)):'—';
+  const cameronDetail=bestSession?minsToHMS((bestSession.dur/bestSession.dist)*(camF(bestSession.dist)/camF(21.1))*21.1):'—';
+  const vdotBS=bestSession?computeVDOT(bestSession.dist,bestSession.dur):null;
+  const vdotDetail=vdotBS?minsToHMS(semiTimeFromVDOT(vdotBS)):'—';
 
   // ── VO2max algorithmique ──
   // Calculer sur chaque séance et prendre la tendance (première vs dernière)
@@ -1071,12 +1056,11 @@ PROFIL : Coureur intermédiaire. 20 km en 1h58 (5:54/km). Entraînement régulie
 TOUTES LES SÉANCES (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
 ${allSummary}
 
-PRÉDICTIONS ALGORITHMIQUES :
-- VDOT (Jack Daniels) : ${predVDOT?minsToHMS(predVDOT):'—'}
-- Riegel depuis ${longestRun.dist}km en ${longestRun.dur}min : ${predRiegel?minsToHMS(predRiegel):'—'}
-- Cameron (même base que Strava) : ${predCameron?minsToHMS(predCameron):'—'}
-- Allure récente × distance : ${predPace?minsToHMS(predPace):'—'}
-- Médiane des modèles : ${medianPred?minsToHMS(medianPred):'—'}
+PRÉDICTIONS ALGORITHMIQUES (depuis la meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
+- Riegel (T2=T1×(D2/D1)^1.06) : ${riegelDetail}
+- Cameron (régression non-linéaire mondiale) : ${cameronDetail}
+- VDOT Jack Daniels (vraie formule) : ${vdotDetail}
+- Médiane des 3 = valeur retenue : ${medianPred?minsToHMS(medianPred):'—'}
 
 VO2MAX ALGORITHMIQUE : ${vo2Summary}
 (Référence : VO2max ~42 → sub-2h · ~48 → 1h55 · ~52 → 1h50)
@@ -1372,18 +1356,66 @@ function semiTimeFromVDOT(vdot){
   return Math.max(75,Math.min(300,21097/v));
 }
 
-function predictSemiTime(session){
-  if(!session||!session.dist||!session.dur||session.dist<3)return null;
-  const vdot=computeVDOT(session.dist,session.dur);
-  if(!vdot||vdot<15)return null;
-  const pred=semiTimeFromVDOT(vdot);
-  if(!pred)return null;
-  // Distances < 10km : pondérer vers 125 min (fatigue longue non représentée)
-  if(session.dist<10){
-    const w=session.dist/10;
-    return pred*w+125*(1-w);
+// ── PRÉDICTION SEMI ───────────────────────────────────────────────────────
+// Principe : on cherche la séance avec la MEILLEURE ALLURE (>= 5km)
+// et on applique 3 formules dessus. La médiane est la prédiction finale.
+// Cela évite la variabilité due au choix de "la dernière séance".
+
+function bestPaceSession(sessionList){
+  const eligible=sessionList.filter(s=>s.dist>=5&&s.dur>0);
+  if(!eligible.length)return null;
+  // Meilleure allure = min(dur/dist)
+  return eligible.reduce((b,s)=>s.dur/s.dist < b.dur/b.dist ? s : b);
+}
+
+function predictSemiFromSession(s){
+  if(!s||!s.dist||!s.dur)return null;
+  const d1=s.dist, t1=s.dur; // km et minutes
+
+  // 1. Riegel : T2 = T1 × (D2/D1)^1.06
+  const riegel = t1 * Math.pow(21.1/d1, 1.06);
+
+  // 2. Cameron (vraie formule, régression sur records mondiaux)
+  // f(d) = 13.49681 - 0.048865×d + 2.438936/(d^0.7905)  (d en km)
+  const camF = d => 13.49681 - 0.048865*d + 2.438936/Math.pow(d, 0.7905);
+  const cameron = (t1/d1) * (camF(d1)/camF(21.1)) * 21.1;
+
+  // 3. VDOT Jack Daniels (vraie formule avec exponentielles)
+  const v = d1*1000/t1; // m/min
+  const vo2 = -4.60+0.182258*v+0.000104*v*v;
+  const pct = 0.8+0.1894393*Math.exp(-0.012778*t1)+0.2989558*Math.exp(-0.1932605*t1);
+  const vdot = pct>0 ? vo2/pct : null;
+  let daniels=null;
+  if(vdot&&vdot>15){
+    let lo=60,hi=500;
+    for(let i=0;i<100;i++){
+      const mid=(lo+hi)/2;
+      const tM=21097/mid;
+      const v2=-4.60+0.182258*mid+0.000104*mid*mid;
+      const p2=0.8+0.1894393*Math.exp(-0.012778*tM)+0.2989558*Math.exp(-0.1932605*tM);
+      if(p2>0?v2/p2:0 < vdot) lo=mid; else hi=mid;
+    }
+    daniels=21097/((lo+hi)/2);
   }
-  return pred;
+
+  // Médiane des 3
+  const preds=[riegel,cameron,daniels].filter(p=>p&&p>75&&p<240);
+  if(!preds.length)return null;
+  preds.sort((a,b)=>a-b);
+  return preds[Math.floor(preds.length/2)];
+}
+
+// Appelé par le dashboard — prédit depuis la meilleure séance parmi toutes
+function predictSemiTime(session){
+  // Pour la carte dashboard on passe une séance individuelle
+  // On utilise directement cette séance
+  return predictSemiFromSession(session);
+}
+
+// Meilleure prédiction globale (utilisée par le Coach IA)
+function bestSemiPrediction(runSessions){
+  const best=bestPaceSession(runSessions);
+  return best ? predictSemiFromSession(best) : null;
 }
 
 function computeVO2max(session){
