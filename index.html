@@ -1077,7 +1077,8 @@ VO2MAX ALGORITHMIQUE : ${vo2Summary}
 PROCHAINES SEMAINES DU PLAN (non encore réalisées) :
 ${remainingWeeks||'(toutes réalisées)'}
 
-OBJECTIF AMBITIEUX : Si les données le permettent, propose un plan adapté pour viser 1h45 (4:59/km) plutôt que 1h50. Si c'est trop ambitieux, reste sur 1h50 en l'expliquant.
+OBJECTIF MINIMUM : Le plan vise TOUJOURS au minimum 1h50 (5:13/km). Ne jamais proposer un plan moins ambitieux que 1h50.
+OBJECTIF ÉLEVÉ : Si les données montrent un potentiel suffisant (VO2max ≥ 46, allures récentes < 5:50/km, régularité de l'entraînement), propose un plan adapté pour viser 1h45 (4:59/km).
 
 Réponds en JSON STRICT, sans texte avant ni après :
 {
@@ -1112,7 +1113,10 @@ Règles :
 - Respecter la structure steps (tableau de paires ["label","description"])
 - Garder le format "Durée / distance" dans les steps si pertinent
 - Sois ambitieux mais réaliste — si le potentiel est là, propose 1h45
-- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon`;
+- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon
+- RÈGLE ABSOLUE : les modifications de plan visent TOUJOURS 1h50 minimum — ne jamais revoir à la baisse les allures cibles ou la charge par rapport au plan original
+- Si le potentiel le justifie, intensifier les allures vers 1h45 (5:00/km)
+- Ne modifier que pour progresser, jamais pour faciliter`;
 
   try{
     // Timeout 30 secondes avec AbortController
