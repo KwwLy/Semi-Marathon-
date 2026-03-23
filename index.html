@@ -1118,7 +1118,12 @@ async function runAnalysis(s,week){
     if(loadEl)loadEl.style.display='none';
     if(data.content&&data.content[0]){
       const idx=sessions.findIndex(x=>x.id===s.id);
-      if(idx>=0){sessions[idx].claudeAnalysis=data.content[0].text;localStorage.setItem('smi_s',JSON.stringify(sessions));}
+      if(idx>=0){
+        sessions[idx].claudeAnalysis=data.content[0].text;
+        localStorage.setItem('smi_s',JSON.stringify(sessions));
+        // Forcer sync Firebase immédiatement après analyse
+        if(window.fbSaveData) window.fbSaveData();
+      }
       renderHistory();
       setTimeout(()=>{
         const d=document.getElementById('hist-detail-'+s.id);
@@ -2407,8 +2412,7 @@ async function bulkImport(input){
           return sameDate && similarDist;
         });
         parsed.push({ file: file.name, data: d, duplicate: isDuplicate, selected: !isDuplicate,
-          sport: 'course-libre', // par défaut : course libre hors plan
-          week: 0, slot: 's1'
+          sport: 'course-libre', week: 0, slot: 's1', comment: ''
         });
       } else {
         parsed.push({ file: file.name, data: null, error: true, selected: false });
@@ -2477,6 +2481,7 @@ function renderBulkResults(){
         <span style="color:${statusColor};white-space:nowrap;font-weight:600">${statusLabel}</span>
       </div>
       ${sportSel}
+      ${d?`<input type="text" placeholder="Commentaire (optionnel)" value="${p.comment||''}" onchange="bulkSetComment(${i},this.value)" style="width:100%;margin-top:4px;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">`:``}
     </div>`;
   });
 
@@ -2484,6 +2489,7 @@ function renderBulkResults(){
   listEl.innerHTML = h;
 }
 
+function bulkSetComment(i, comment){ bulkParsed[i].comment = comment; }
 function bulkSetSport(i, sport){
   bulkParsed[i].sport = sport;
   // Réinitialiser week/slot si on quitte le mode plan
@@ -2520,7 +2526,7 @@ function bulkConfirm(){
       pace: d.allure_moy || '',
       hr: d.fc_moy || 0,
       hrmax: d.fc_max || 0,
-      comment: `Importé depuis ${p.file}`,
+      comment: p.comment || '',
       kmDetails: d.km_details || [],
       gpsTrace: d.gpsTrace || [],
       week: p.week || 0,
