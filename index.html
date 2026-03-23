@@ -2818,8 +2818,14 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      // signInWithRedirect fonctionne sur Safari/iPhone (pas de popup bloquée)
-      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
+      // Safari/iPhone : redirect — autres navigateurs : popup
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if(isSafari || isMobile){
+        fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
+      } else {
+        fbAuth.signInWithPopup(provider).catch(e=>toast('Erreur connexion : '+e.message));
+      }
     }
   };
 
