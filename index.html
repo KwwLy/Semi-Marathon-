@@ -921,7 +921,7 @@ async function runAnalysis(s,week){
       method:'POST',
       signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,temperature:0.2,messages:[{role:'user',content:prompt}]})
     });
     clearTimeout(timeoutId);
     const data=await res.json();
@@ -1141,7 +1141,7 @@ Règles :
       method:'POST',
       signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,temperature:0.2,messages:[{role:'user',content:prompt}]})
     });
     clearTimeout(timeoutId);
     clearInterval(countdownInterval);
@@ -1335,42 +1335,41 @@ function renderStats(){
 // puis on prédit le temps semi depuis ce VDOT. Valide pour distances ≥ 5 km.
 // Pour les courtes distances on applique un plafond réaliste basé sur l'historique.
 
+// ── FORMULES JACK DANIELS / DANIELS-GILBERT (exactes) ────────────────────
+// Source : Daniels & Gilbert 1979
+// VDOT = VO2 / pctVO2max
+// VO2(v)     = -4.60 + 0.182258*v + 0.000104*v²        (v en m/min)
+// pctVO2max  = 0.8 + 0.1894393*e^(-0.012778*t)
+//                  + 0.2989558*e^(-0.1932605*t)         (t en minutes)
 function computeVDOT(distKm, timeMin){
   if(!distKm||!timeMin||distKm<1)return null;
-  const v=(distKm*1000)/(timeMin*60)*60; // m/min
-  const vo2=-4.6*v+0.182258*v*v+0.000104*v*v*v;
+  const v=(distKm*1000)/timeMin;            // vitesse en m/min
+  const vo2=-4.60+0.182258*v+0.000104*v*v;
   if(vo2<=0)return null;
-  // % VO2max selon durée (Jack Daniels)
-  let pct;
-  if(timeMin<=5)pct=1.0;
-  else if(timeMin<=8)pct=0.98;
-  else if(timeMin<=12)pct=0.975;
-  else if(timeMin<=20)pct=0.97;
-  else if(timeMin<=30)pct=0.96;
-  else if(timeMin<=45)pct=0.95;
-  else if(timeMin<=60)pct=0.94;
-  else if(timeMin<=90)pct=0.93;
-  else if(timeMin<=120)pct=0.92;
-  else pct=0.91;
-  // Pas de borne max sur le VDOT — laisser le calcul libre
-  return Math.max(15, vo2/pct);
+  const t=timeMin;
+  const pct=0.8+0.1894393*Math.exp(-0.012778*t)+0.2989558*Math.exp(-0.1932605*t);
+  if(pct<=0)return null;
+  const vdot=vo2/pct;
+  return Math.max(15,vdot); // pas de borne haute — laisser libre
 }
 
+// Prédiction temps semi depuis VDOT
+// On cherche v tel que VO2(v)/pctVO2max(t) = vdot, avec t = 21097/v
+// Résolution numérique par dichotomie
 function semiTimeFromVDOT(vdot){
   if(!vdot||vdot<15)return null;
-  // Vitesse de course au semi = vitesse pour vo2 = vdot × 0.94
-  const target=vdot*0.94;
-  // Dichotomie sur v (m/min)
-  let lo=60,hi=500;
+  let lo=60,hi=500; // vitesses en m/min (3.6 à 30 km/h)
   for(let i=0;i<80;i++){
     const mid=(lo+hi)/2;
-    const vo2=-4.6*mid+0.182258*mid*mid+0.000104*mid*mid*mid;
-    if(vo2<target)lo=mid;else hi=mid;
+    const tMid=21097/mid; // durée estimée en minutes
+    const vo2=-4.60+0.182258*mid+0.000104*mid*mid;
+    const pct=0.8+0.1894393*Math.exp(-0.012778*tMid)+0.2989558*Math.exp(-0.1932605*tMid);
+    const vdotAtMid=pct>0?vo2/pct:0;
+    if(vdotAtMid<vdot)lo=mid;else hi=mid;
   }
   const v=(lo+hi)/2;
   if(v<=0)return null;
-  const timeMin=21097/v;
-  return Math.max(75,Math.min(300,timeMin));
+  return Math.max(75,Math.min(300,21097/v));
 }
 
 function predictSemiTime(session){
@@ -1379,7 +1378,7 @@ function predictSemiTime(session){
   if(!vdot||vdot<15)return null;
   const pred=semiTimeFromVDOT(vdot);
   if(!pred)return null;
-  // Distances < 10km : pondérer légèrement vers 125 min car fatigue longue durée non représentée
+  // Distances < 10km : pondérer vers 125 min (fatigue longue non représentée)
   if(session.dist<10){
     const w=session.dist/10;
     return pred*w+125*(1-w);
@@ -1389,16 +1388,36 @@ function predictSemiTime(session){
 
 function computeVO2max(session){
   if(!session)return null;
-  // Priorité 1 : FC (formule Uth-Sørensen, plus fiable si FC dispo)
-  if(session.hrmax&&session.hr&&session.hr>40){
-    const fcRest=Math.min(session.hr,65); // utilise FC moy comme proxy repos si raisonnable
+
+  // ── Méthode 1 : Uth-Sørensen via FC (la plus fiable si FC dispo) ──────────
+  // VO2max = 15 × (FCmax / FCrepos)
+  // FCrepos estimée à 55 bpm (coureur entraîné). Si FC moy disponible on l'utilise
+  // comme proxy repos (sous-estimation intentionnelle pour rester conservateur).
+  if(session.hrmax&&session.hrmax>100){
+    const fcRest=55; // estimation coureur entraîné
     const val=15*(session.hrmax/fcRest);
-    if(val>25&&val<75)return Math.round(val*10)/10;
+    if(val>30&&val<80)return Math.round(val*10)/10;
   }
-  // Priorité 2 : VDOT depuis allure + distance (Jack Daniels)
-  if(session.dist>=3&&session.dur){
+
+  // ── Méthode 2 : VDOT corrigé pour effort d'entraînement ──────────────────
+  // Jack Daniels VDOT suppose un effort MAXIMAL (compétition).
+  // En entraînement Z2, l'effort correspond à ~75-80% du VO2max réel.
+  // On corrige en divisant par 0.77 pour retrouver la VO2max réelle estimée.
+  if(session.dist>=5&&session.dur){
     const vdot=computeVDOT(session.dist,session.dur);
-    return vdot?Math.round(vdot*10)/10:null;
+    if(!vdot)return null;
+    // Facteur de correction selon l'allure relative
+    // Si allure proche Z3 (5:10-5:20) -> effort ~87% -> correction /0.87
+    // Si allure Z2 (5:50-6:20) -> effort ~78% -> correction /0.78
+    // Si allure Z1 (>6:30) -> effort ~70% -> correction /0.70
+    const paceSec=session.dur*60/session.dist/1000*1000; // sec/km
+    let corrFactor=0.78; // Z2 par défaut
+    if(paceSec<313)corrFactor=0.90;      // Z3+ allure semi ou plus rapide
+    else if(paceSec<350)corrFactor=0.85; // Z2 tonique (5:20-5:50)
+    else if(paceSec<390)corrFactor=0.78; // Z2 (5:50-6:30)
+    else corrFactor=0.72;                // Z1 (>6:30)
+    const vo2maxEst=vdot/corrFactor;
+    return Math.round(Math.min(75,Math.max(25,vo2maxEst))*10)/10;
   }
   return null;
 }
@@ -2179,7 +2198,21 @@ function parseGpxTcx(text, ext, filename){
         const elev=parseFloat(p.querySelector('ele')?.textContent||0);
         if(prevElev!==null&&elev>prevElev)elevGain+=(elev-prevElev);
         prevElev=elev;
-        const hr=parseInt(p.querySelector('hr,heartrate,gpxtpx\\:hr')?.textContent||0);
+        // FC : Apple Watch utilise <gpxtpx:hr> dans l'extension <extensions>
+        // Le sélecteur CSS avec namespace est peu fiable — on cherche par nom de tag
+        let hr=0;
+        const ext=p.querySelector('extensions');
+        if(ext){
+          // Chercher hr dans tous les enfants de extensions (quelque soit le namespace)
+          const allEls=ext.getElementsByTagName('*');
+          for(let e of allEls){
+            if(e.localName==='hr'||e.localName==='heartrate'){
+              hr=parseInt(e.textContent)||0;
+              break;
+            }
+          }
+        }
+        if(!hr) hr=parseInt(p.querySelector('hr')?.textContent||0);
         if(hr>0){hrVals.push(hr);kmHr.push(hr);}
         // Stocker GPS sous-échantillonné
         if(i%step===0){
@@ -2486,7 +2519,7 @@ async function extractStravaData(){
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,temperature:0.2,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:stravaImageType,data:stravaImageB64}},
         {type:'text',text:prompt}
       ]}]})
