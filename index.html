@@ -636,14 +636,18 @@ function renderPlan(){
           ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
           <div class="sg">
             <div class="sb">
-              <div class="st" style="color:${ph.color}">${w.s1.title}</div>
+              ${(()=>{const e=sessionExplain(w.s1.title,w.s1.steps);return`
+              <div class="st" style="color:${ph.color}">${w.s1.title}${e?`<button onclick="event.stopPropagation();toggleExplain('e-${w.n}-s1')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;opacity:.6;vertical-align:middle" title="Explication">ℹ️</button>`:''}
+              </div>
               ${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-              ${(()=>{const e=sessionExplain(w.s1.title,w.s1.steps);return e?e:''})()}
+              ${e?`<div id="e-${w.n}-s1" style="display:none">${e}</div>`:''}`})()}
             </div>
             <div class="sb">
-              <div class="st" style="color:#27AE60">${w.s2.title}</div>
+              ${(()=>{const e=sessionExplain(w.s2.title,w.s2.steps);return`
+              <div class="st" style="color:#27AE60">${w.s2.title}${e?`<button onclick="event.stopPropagation();toggleExplain('e-${w.n}-s2')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;opacity:.6;vertical-align:middle" title="Explication">ℹ️</button>`:''}
+              </div>
               ${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-              ${(()=>{const e=sessionExplain(w.s2.title,w.s2.steps);return e?e:''})()}
+              ${e?`<div id="e-${w.n}-s2" style="display:none">${e}</div>`:''}`})()}
             </div>
           </div>
           <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
@@ -794,7 +798,7 @@ function sessionExplain(title, steps){
   // Natation
   if(t.includes('natation'))
     return box('🏊','Natation — récupération active',
-      'La natation sollicite le cardio <b>sans impact sur les articulations</b>. Idéale pour récupérer en maintenant la condition aérobie.<br><br><b>Comment faire :</b> Crawl lent en échauffement, endurance douce, brasse en retour pour détendre le dos.<br><br><b>Si tu ne sais pas nager :</b> 45 min vélo Z1-Z2 ou elliptique.');
+      'La natation sollicite le cardio <b>sans impact sur les articulations</b>. Idéale pour récupérer tout en maintenant ta condition aérobie.<br><br><b>Comment nager :</b> Crawl lent en échauffement pour t\'allonger dans l\'eau, puis endurance douce à rythme régulier sur la portion principale. La brasse en retour au calme détend les épaules et le dos, souvent sollicités chez les coureurs.<br><br><b>Intensité :</b> Effort modéré, respiration contrôlée. Tu dois pouvoir nager sans t\'arrêter sur toute la durée.<br><br><b>Si tu ne nages pas :</b> Remplace par 45 min de vélo en Z1-Z2 ou elliptique à intensité légère.');
 
   // Repos
   if(t.includes('repos')||sv.includes('repos'))
@@ -806,12 +810,16 @@ function sessionExplain(title, steps){
     return box('📉','Semaine allégée — supercompensation',
       'Toutes les 4-5 semaines, le plan réduit le volume volontairement. C\'est la <b>supercompensation</b> : en réduisant la charge, ton corps rebondit au-dessus de son niveau précédent.<br><br>Ne rajoute pas de km — la semaine suivante sera plus dure.');
 
-  // Fallback
-  return box('ℹ️','Info séance',
-    'Suis les étapes indiquées. Respecte les allures cibles et les temps de récupération — ils ont été calculés pour ton objectif 1h50. En cas de doute sur l\'allure : consulte l\'onglet 🏃 Zones.');
+  // Pour les séances modifiées par le Coach IA sans correspondance connue,
+  // on ne force pas d'explication générique
+  return null;
 }
 
 
+function toggleExplain(id){
+  const el=document.getElementById(id);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
 function toggleW(n){
   const d=document.getElementById('det-'+n);
   const c=document.getElementById('chev-'+n);
