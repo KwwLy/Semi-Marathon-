@@ -3246,16 +3246,24 @@ try {
   window.fbSaveData = fbSaveData;
 
   // ── TOKEN DE TRANSFERT ──────────────────────────────────────────────────
+  // Le token encode directement les données — pas besoin de Firestore côté PWA
   window.fbGenerateToken = async function(){
     if(!fbUser) return;
-    // Générer un code à 6 chiffres
+    // Forcer une sauvegarde fresh
+    await fbSaveData();
+    // Générer un code à 6 chiffres comme clé dans Firestore
     const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 min
+    const expiresAt = Date.now() + 10 * 60 * 1000;
     try {
-      // Stocker dans Firestore sous tokens/{code}
+      // Stocker les données dans Firestore sous ce code
+      const coachRaw = localStorage.getItem('smi_coach');
       await fbDb.collection('tokens').doc(code).set({
         uid: fbUser.uid,
-        email: fbUser.email,
+        email: fbUser.email||'',
+        sessions_json: JSON.stringify(sessions),
+        planOverrides_json: JSON.stringify(planOverrides),
+        settings_json: JSON.stringify({...settings, apiKey:''}),
+        coach_json: coachRaw||'null',
         expiresAt,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -3265,64 +3273,71 @@ try {
       // Compte à rebours
       let remaining = 600;
       const timerEl = document.getElementById('fb-token-timer');
-      const timerInterval = setInterval(() => {
+      const iv = setInterval(() => {
         remaining--;
-        const m = Math.floor(remaining/60), s = remaining%60;
+        const m=Math.floor(remaining/60), s=remaining%60;
         if(timerEl) timerEl.textContent = `Expire dans ${m}:${String(s).padStart(2,'0')}`;
-        if(remaining <= 0){
-          clearInterval(timerInterval);
-          document.getElementById('fb-token-display').style.display = 'none';
-          // Supprimer le token expiré
+        if(remaining<=0){
+          clearInterval(iv);
+          document.getElementById('fb-token-display').style.display='none';
           fbDb.collection('tokens').doc(code).delete().catch(()=>{});
         }
-      }, 1000);
-    } catch(e){ toast('Erreur génération code : '+e.message); }
+      },1000);
+      toast('Code généré — valable 10 min');
+    } catch(e){ toast('Erreur : '+e.message); }
   };
 
   window.fbUseToken = async function(){
     const code = document.getElementById('fb-token-input')?.value?.trim();
-    if(!code || code.length !== 6){ toast('Code invalide'); return; }
+    if(!code||code.length!==6){ toast('Entre un code à 6 chiffres'); return; }
     const msgEl = document.getElementById('fb-token-msg');
-    if(msgEl){ msgEl.textContent = '⏳ Vérification…'; msgEl.style.display='block'; msgEl.style.color='var(--or)'; }
-    console.log('fbUseToken: code=', code, 'fbDb=', !!fbDb);
+    if(msgEl){ msgEl.textContent='⏳ Chargement…'; msgEl.style.display='block'; msgEl.style.color='var(--or)'; }
+
+    // Utiliser fetch() direct vers Firestore REST API — ne nécessite pas d'auth
+    const projectId = 'semi-marathon-94d90';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/tokens/${code}`;
     try {
-      console.log('Tentative lecture token...');
-      const snap = await fbDb.collection('tokens').doc(code).get();
-      console.log('Lecture OK, exists=', snap.exists);
-      if(!snap.exists){
-        if(msgEl){ msgEl.textContent = '❌ Code invalide ou expiré'; msgEl.style.display='block'; }
+      const resp = await fetch(url);
+      if(!resp.ok){
+        if(msgEl){ msgEl.textContent='❌ Code invalide ou expiré'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
         return;
       }
-      const data = snap.data();
-      if(Date.now() > data.expiresAt){
-        if(msgEl){ msgEl.textContent = '❌ Code expiré — génère-en un nouveau'; msgEl.style.display='block'; }
-        fbDb.collection('tokens').doc(code).delete().catch(()=>{});
+      const doc = await resp.json();
+      const fields = doc.fields;
+      if(!fields){ if(msgEl){ msgEl.textContent='❌ Code invalide'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; } return; }
+
+      // Vérifier expiration
+      const expiresAt = parseInt(fields.expiresAt?.integerValue||fields.expiresAt?.doubleValue||0);
+      if(expiresAt && Date.now() > expiresAt){
+        if(msgEl){ msgEl.textContent='❌ Code expiré — génère-en un nouveau'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
         return;
       }
-      // Connexion via token custom — signe avec un custom token
-      // On charge directement les données de l'utilisateur sans re-authentification
-      // (la session Firebase ne peut pas être transférée directement)
-      // On stocke les données dans localStorage depuis Firestore
-      const userSnap = await fbDb.collection('users').doc(data.uid).get();
-      if(userSnap.exists){
-        const d = userSnap.data();
-        if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
-        if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
-        if(d.coach_json&&d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
-        if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-        // Supprimer le token utilisé
-        fbDb.collection('tokens').doc(code).delete().catch(()=>{});
-        renderPlan(); renderStats(); loadCoachCard();
-        // Mettre à jour la bannière pour indiquer que les données sont chargées (sans auth complète)
-        document.getElementById('fb-dot').style.background = '#27AE60';
-        document.getElementById('fb-label').textContent = data.email + ' (données synchronisées)';
-        document.getElementById('fb-token-input').value = '';
-        if(msgEl) msgEl.style.display='none';
-        toast('✅ Données synchronisées depuis ' + data.email);
-      }
-    } catch(e){ 
-      console.error('fbUseToken error:', e.code, e.message);
-      if(msgEl){ msgEl.textContent = '❌ '+e.code+' : '+e.message; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
+
+      // Extraire les données (Firestore REST encode les strings différemment)
+      const get = (f) => fields[f]?.stringValue||'';
+      const sJson = get('sessions_json');
+      const pJson = get('planOverrides_json');
+      const cJson = get('coach_json');
+      const stJson = get('settings_json');
+      const email = get('email');
+
+      if(sJson){ sessions=JSON.parse(sJson); localStorage.setItem('smi_s',sJson); }
+      if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
+      if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
+      if(stJson){ const s=JSON.parse(stJson); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
+
+      renderPlan(); renderStats(); loadCoachCard();
+      document.getElementById('fb-dot').style.background='#27AE60';
+      document.getElementById('fb-label').textContent=email+' (données chargées)';
+      document.getElementById('fb-token-input').value='';
+      if(msgEl) msgEl.style.display='none';
+      toast('✅ Données synchronisées !');
+
+      // Supprimer le token via REST
+      fetch(url, {method:'DELETE'}).catch(()=>{});
+
+    } catch(e){
+      if(msgEl){ msgEl.textContent='❌ Erreur : '+e.message; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
     }
   };
 
