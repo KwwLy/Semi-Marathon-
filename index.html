@@ -675,6 +675,8 @@ function applyPlanOverrides(modifications){
   localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
   return count;
 }
+
+function toggleW(n){
   const d=document.getElementById('det-'+n);
   const c=document.getElementById('chev-'+n);
   const o=d.classList.toggle('open');
