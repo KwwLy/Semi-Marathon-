@@ -3085,6 +3085,25 @@ onSportChange();
 setImportMode('fit');
 loadCoachCard();
 renderStats();
+
+// ── SERVICE WORKER ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Vérifier les mises à jour toutes les 60 minutes
+    setInterval(() => reg.update(), 60 * 60 * 1000);
+  }).catch(e => console.warn('SW:', e));
+
+  // Écouter les messages du Service Worker (nouvelle version disponible)
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data?.type === 'NEW_VERSION'){
+      // Afficher une bannière de mise à jour
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;z-index:9999;display:flex;align-items:center;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+      banner.innerHTML = '🆕 Nouvelle version disponible <button onclick="window.location.reload()" style="background:var(--or);color:#fff;border:none;padding:4px 10px;border-radius:10px;cursor:pointer;font-size:12px">Mettre à jour</button>';
+      document.body.appendChild(banner);
+    }
+  });
+}
 </script>
 
 
