@@ -3227,13 +3227,14 @@ try {
     fbSyncing=true; fbSetSyncStatus('⏳ Sync…');
     try {
       const coachRaw=localStorage.getItem('smi_coach');
-      // Sérialiser en JSON string pour éviter tout problème de structure Firestore
-      // (tableaux imbriqués, undefined, etc.)
+      const now = Date.now();
+      localStorage.setItem('smi_updated_at', String(now));
       await fbDb.collection('users').doc(fbUser.uid).set({
         sessions_json: JSON.stringify(sessions),
         planOverrides_json: JSON.stringify(planOverrides),
         settings_json: JSON.stringify({...settings, apiKey:''}),
         coach_json: coachRaw || 'null',
+        updated_at: now,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       fbSetSyncStatus('✓ Synchronisé');
@@ -3345,54 +3346,86 @@ try {
     }
   };
 
+  // ── SYNC AUTO AU DÉMARRAGE (PWA sans auth) ──────────────────────────────
+  const FB_PROJECT = 'semi-marathon-94d90';
+
+  async function fbRestRead(uid){
+    try {
+      const resp = await fetch(`https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}`);
+      if(!resp.ok) return null;
+      return await resp.json();
+    } catch(e){ return null; }
+  }
+
+  async function fbRestWrite(uid){
+    try {
+      const coachRaw = localStorage.getItem('smi_coach');
+      const now = Date.now();
+      localStorage.setItem('smi_updated_at', String(now));
+      const body = {
+        fields: {
+          sessions_json:      { stringValue: JSON.stringify(sessions) },
+          planOverrides_json: { stringValue: JSON.stringify(planOverrides) },
+          settings_json:      { stringValue: JSON.stringify({...settings,apiKey:''}) },
+          coach_json:         { stringValue: coachRaw||'null' },
+          updated_at:         { integerValue: String(now) }
+        }
+      };
+      await fetch(
+        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
+        { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
+      );
+      fbSetSyncStatus('✓ Synchronisé');
+    } catch(e){ fbSetSyncStatus('⚠️ Sync échouée'); }
+  }
+
+  async function fbAutoSyncOnStart(){
+    if(fbUser) return;
+    const uid = localStorage.getItem('smi_fb_uid');
+    if(!uid) return;
+    const doc = await fbRestRead(uid);
+    if(!doc||!doc.fields) return;
+    const get = f => doc.fields[f]?.stringValue||'';
+    const cloudUpdatedAt = parseInt(doc.fields.updated_at?.integerValue||0);
+    const localUpdatedAt = parseInt(localStorage.getItem('smi_updated_at')||0);
+
+    // Sync si le cloud est plus récent que le local
+    if(cloudUpdatedAt <= localUpdatedAt) return;
+
+    const sJson = get('sessions_json');
+    const pJson = get('planOverrides_json');
+    const cJson = get('coach_json');
+    if(sJson){
+      sessions = JSON.parse(sJson);
+      localStorage.setItem('smi_s', sJson);
+      localStorage.setItem('smi_updated_at', String(cloudUpdatedAt));
+    }
+    if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
+    if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
+    renderPlan(); renderStats(); loadCoachCard();
+    document.getElementById('fb-dot').style.background='#27AE60';
+    document.getElementById('fb-label').textContent='✓ Synchronisé automatiquement';
+    toast('☁️ Données mises à jour depuis le cloud');
+  }
+
+  // Patch localStorage : sync dans les deux sens
+  // - Si authentifié → fbSaveData (SDK)
+  // - Si PWA avec UID stocké → fbRestWrite (REST)
   const _orig=localStorage.setItem.bind(localStorage);
   localStorage.setItem=function(key,value){
     _orig(key,value);
     if(['smi_s','smi_plan_overrides','smi_coach'].includes(key)){
       clearTimeout(localStorage._fbTimer);
-      localStorage._fbTimer=setTimeout(fbSaveData,1500);
+      localStorage._fbTimer=setTimeout(()=>{
+        if(fbUser) fbSaveData();
+        else {
+          const uid=localStorage.getItem('smi_fb_uid');
+          if(uid) fbRestWrite(uid);
+        }
+      },1500);
     }
   };
 
-  // ── SYNC AUTO AU DÉMARRAGE (PWA sans auth) ──────────────────────────────
-  // Si on a un UID stocké (après transfert token) et qu'on n'est pas authentifié,
-  // on charge les données depuis Firestore via REST à chaque ouverture
-  async function fbAutoSyncOnStart(){
-    if(fbUser) return; // déjà authentifié, pas besoin
-    const uid = localStorage.getItem('smi_fb_uid');
-    if(!uid) return; // jamais fait de transfert
-    try {
-      const projectId = 'semi-marathon-94d90';
-      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}`;
-      const resp = await fetch(url);
-      if(!resp.ok) return;
-      const doc = await resp.json();
-      const fields = doc.fields;
-      if(!fields) return;
-      const get = f => fields[f]?.stringValue||'';
-      const sJson = get('sessions_json');
-      const pJson = get('planOverrides_json');
-      const cJson = get('coach_json');
-      // Vérifier si les données cloud sont plus récentes
-      // On compare le nombre de séances — si plus de séances dans le cloud, on met à jour
-      if(sJson){
-        const cloudSessions = JSON.parse(sJson);
-        if(cloudSessions.length >= sessions.length){
-          sessions = cloudSessions;
-          localStorage.setItem('smi_s', sJson);
-          if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
-          if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
-          renderPlan(); renderStats(); loadCoachCard();
-          // Mettre à jour la bannière
-          document.getElementById('fb-dot').style.background='#27AE60';
-          document.getElementById('fb-label').textContent='✓ Synchronisé automatiquement';
-          toast('☁️ Données mises à jour');
-        }
-      }
-    } catch(e){ console.warn('Auto-sync failed:', e.message); }
-  }
-
-  // Lancer la sync auto après un court délai (laisser l'app s'initialiser)
   setTimeout(fbAutoSyncOnStart, 2000);
 
 } catch(e){ console.warn('Firebase non disponible:', e); }
