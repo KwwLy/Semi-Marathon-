@@ -437,7 +437,13 @@ canvas{display:block;width:100%!important}
     <div class="card-title"><span class="bar"></span>☁️ Synchronisation multi-appareils</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte-toi avec Google pour synchroniser automatiquement tes séances, ton plan et tes réglages sur tous tes appareils.</p>
     <div id="fb-settings-logged-out">
-      <button class="btn btn-or btn-full" onclick="fbToggleAuth()">🔑 Se connecter avec Google</button>
+      <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">🔑 Se connecter avec Google</button>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:8px">— ou —</div>
+      <div style="display:flex;gap:6px">
+        <input type="email" id="fb-email-input" placeholder="ton@email.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--text)">
+        <button class="btn btn-ghost" onclick="fbSendEmailLink()" style="white-space:nowrap">📧 Lien magique</button>
+      </div>
+      <div id="fb-email-msg" style="font-size:11px;color:#27AE60;margin-top:6px;display:none"></div>
     </div>
     <div id="fb-settings-logged-in" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
@@ -3149,7 +3155,7 @@ try {
   function fbSetDisconnected(){
     document.getElementById('fb-dot').style.background = 'var(--text3)';
     document.getElementById('fb-label').textContent = 'Non connecté — données locales uniquement';
-    document.getElementById('fb-btn').textContent = 'Se connecter avec Google';
+    document.getElementById('fb-btn').textContent = 'Se connecter';
     document.getElementById('fb-settings-logged-out').style.display = 'block';
     document.getElementById('fb-settings-logged-in').style.display = 'none';
   }
@@ -3159,12 +3165,44 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      // signInWithRedirect pour tous les navigateurs (popup bloquée par COOP sur GitHub Pages)
       fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
     }
   };
 
-  // Récupérer le résultat après redirection
+  // Lien magique par email
+  window.fbSendEmailLink = async function(){
+    const email = document.getElementById('fb-email-input')?.value?.trim();
+    if(!email){ toast('Entre ton adresse email'); return; }
+    const actionCodeSettings = {
+      url: 'https://kwwly.github.io/semi-marathon/',
+      handleCodeInApp: true
+    };
+    try {
+      await fbAuth.sendSignInLinkToEmail(email, actionCodeSettings);
+      localStorage.setItem('smi_email_link', email);
+      const msgEl = document.getElementById('fb-email-msg');
+      if(msgEl){ msgEl.textContent = '✅ Email envoyé à '+email+' — clique le lien dans l\'email !'; msgEl.style.display='block'; }
+      toast('📧 Email envoyé !');
+    } catch(e){ toast('Erreur envoi email : '+e.message); }
+  };
+
+  // Vérifier si on revient d'un lien magique
+  if(firebase.auth.isSignInWithEmailLink(fbAuth, window.location.href)){
+    let email = localStorage.getItem('smi_email_link');
+    if(!email) email = prompt('Confirme ton adresse email :');
+    if(email){
+      fbAuth.signInWithEmailLink(email, window.location.href)
+        .then(() => {
+          localStorage.removeItem('smi_email_link');
+          // Nettoyer l'URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          toast('✅ Connecté !');
+        })
+        .catch(e => toast('Erreur connexion email : '+e.message));
+    }
+  }
+
+  // Récupérer le résultat après redirection Google
   fbAuth.getRedirectResult().then(result => {
     if(result && result.user) console.log('Connexion redirect OK:', result.user.email);
   }).catch(e=>{ console.error('Redirect result error:', e); });
