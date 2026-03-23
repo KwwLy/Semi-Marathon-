@@ -2064,41 +2064,39 @@ function renderPersonalRecords(){
     runs.forEach(s=>{
       const effectiveDist = t.dist===20 && s.dist>=19.5 ? 20 : s.dist;
 
-      // ── Fenêtre glissante sur kmDetails (données réelles km par km) ──
-      const kd = s.kmDetails||s.kmRows||[];
-      if(kd.length>=1){
+      // ── Fenêtre glissante sur kmRows (données réelles km par km) ──
+      const kd = s.kmRows||s.kmDetails||[];
+      if(kd.length >= Math.floor(t.dist)){
         const kmT = kd.map(r=>{
-          // kmDetails peut avoir allure ou pace
-          const pace = r.allure||r.pace||'';
+          const pace = r.pace||r.allure||'';
           return paceToMin(pace);
         });
 
-        const nKm = Math.floor(t.dist); // nb de km entiers
-        const frac = t.dist - nKm;      // fraction restante (ex: 0.1 pour semi)
+        const nKm = Math.floor(t.dist);
+        const frac = t.dist - nKm;
 
-        // Fenêtre glissante sur nKm km consécutifs
-        if(kmT.length >= nKm){
-          for(let i=0; i<=kmT.length-nKm; i++){
-            let seg=0, ok=true;
-            for(let j=i; j<i+nKm; j++){
-              if(kmT[j]==null){ok=false;break;}
-              seg+=kmT[j];
-            }
-            if(!ok) continue;
-            // Ajouter la fraction du km suivant si besoin
-            if(frac>0 && i+nKm<kmT.length && kmT[i+nKm]!=null){
-              seg+=kmT[i+nKm]*frac;
-            }
-            if(!best||seg<best.t) best={t:seg, date:s.date, dist:s.dist};
+        for(let i=0; i<=kmT.length-nKm; i++){
+          let seg=0, ok=true;
+          for(let j=i; j<i+nKm; j++){
+            if(kmT[j]==null){ok=false;break;}
+            seg+=kmT[j];
           }
+          if(!ok) continue;
+          if(frac>0 && i+nKm<kmT.length && kmT[i+nKm]!=null){
+            seg+=kmT[i+nKm]*frac;
+          }
+          if(!best||seg<best.t) best={t:seg, date:s.date, dist:s.dist};
         }
       }
 
-      // ── Fallback : séance entière si dist >= minDist et pas de kmDetails ──
-      if(!kd.length && s.dist>=t.minDist && s.dur>0){
-        // Calculer le temps proportionnel pour la distance cible
-        const segTime = s.dur * (t.dist / effectiveDist);
-        if(!best||segTime<best.t) best={t:segTime, date:s.date, dist:s.dist};
+      // ── Fallback : séance entière si dist >= minDist et pas de kmRows utilisables ──
+      const hasUsableKm = kd.length >= Math.floor(t.dist) && kd.some(r=>(r.pace||r.allure));
+      if(!hasUsableKm && s.dist>=t.minDist && s.dur>0){
+        const effectiveDist = t.dist===20 && s.dist>=19.5 ? s.dist : s.dist;
+        const segTime = s.dur * (t.dist===20 && s.dist>=19.5 ? 20/s.dist : t.dist/s.dist);
+        if(t.dist===20||s.dist>=t.minDist){
+          if(!best||segTime<best.t) best={t:segTime, date:s.date, dist:s.dist};
+        }
       }
     });
 
