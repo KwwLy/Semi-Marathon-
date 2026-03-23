@@ -341,49 +341,8 @@ canvas{display:block;width:100%!important}
 
 <!-- DASHBOARD -->
 <div class="section" id="tab-stats">
-  <div class="sg4" id="stats-grid"></div>
-  <div class="prog-wrap">
-    <div class="prog-hd"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--or);font-weight:700">0%</span></div>
-    <div class="pbar"><div class="pfill" id="prog-bar" style="width:0%"></div></div>
-    <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
-  </div>
 
-  <!-- COACH IA -->
-  <div class="card" id="coach-card">
-    <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
-    <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
-    <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
-    <!-- Métriques : prédiction + VO2max côte à côte -->
-    <div id="coach-metrics-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🎯 Prédiction semi</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="coach-pred-time" style="font-size:26px;font-weight:700"></span>
-          <span id="coach-pred-arrow" style="font-size:26px;line-height:1"></span>
-        </div>
-        <div id="coach-pred-vs" style="font-size:11px;margin-top:3px"></div>
-      </div>
-      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🫁 VO2max estimée</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="coach-vo2-val" style="font-size:26px;font-weight:700"></span>
-          <span id="coach-vo2-arrow" style="font-size:26px;line-height:1"></span>
-        </div>
-        <div id="coach-vo2-sub" style="font-size:11px;color:var(--text2);margin-top:3px"></div>
-      </div>
-    </div>
-    <!-- Analyse textuelle -->
-    <div id="coach-result" style="font-size:12px;line-height:1.75;color:var(--text);white-space:pre-wrap;display:none"></div>
-    <div id="coach-date" style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right"></div>
-  </div>
-
-  <!-- RECORDS PERSONNELS -->
-  <div class="card" id="pr-card" style="display:none">
-    <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
-    <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
-  </div>
-
-  <!-- CALENDRIER -->
+  <!-- 1. CALENDRIER -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title"><span class="bar"></span>📅 Calendrier d'activité</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -402,14 +361,56 @@ canvas{display:block;width:100%!important}
     </div>
     <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;color:var(--text3)" id="cal-legend"></div>
-    <!-- Récapitulatif mensuel -->
     <div id="cal-summary" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
 
+  <!-- 2. COACH IA -->
+  <div class="card" id="coach-card">
+    <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
+    <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
+    <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
+    <div id="coach-metrics-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🎯 Prédiction semi</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="coach-pred-time" style="font-size:26px;font-weight:700"></span>
+          <span id="coach-pred-arrow" style="font-size:26px;line-height:1"></span>
+        </div>
+        <div id="coach-pred-vs" style="font-size:11px;margin-top:3px"></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🫁 VO2max estimée</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="coach-vo2-val" style="font-size:26px;font-weight:700"></span>
+          <span id="coach-vo2-arrow" style="font-size:26px;line-height:1"></span>
+        </div>
+        <div id="coach-vo2-sub" style="font-size:11px;color:var(--text2);margin-top:3px"></div>
+      </div>
+    </div>
+    <div id="coach-result" style="font-size:12px;line-height:1.75;color:var(--text);white-space:pre-wrap;display:none"></div>
+    <div id="coach-date" style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right"></div>
+  </div>
+
+  <!-- 3. AVANCEMENT DU PLAN -->
+  <div class="prog-wrap">
+    <div class="prog-hd"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--or);font-weight:700">0%</span></div>
+    <div class="pbar"><div class="pfill" id="prog-bar" style="width:0%"></div></div>
+    <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
+  </div>
+
+  <!-- 4. KPIs + RECORDS -->
+  <div class="sg4" id="stats-grid"></div>
+  <div class="card" id="pr-card" style="display:none">
+    <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
+    <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
+  </div>
+
+  <!-- 5. HISTORIQUE -->
   <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:12px 14px 0;font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Historique des séances</div>
     <div id="history-list" style="padding:0"></div>
   </div>
+
 </div>
 
 <!-- ZONES -->
