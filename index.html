@@ -3326,12 +3326,16 @@ try {
       if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
       if(stJson){ const s=JSON.parse(stJson); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
 
+      // Stocker l'UID pour la sync automatique future
+      const uid = fields.uid?.stringValue||'';
+      if(uid) localStorage.setItem('smi_fb_uid', uid);
+
       renderPlan(); renderStats(); loadCoachCard();
       document.getElementById('fb-dot').style.background='#27AE60';
-      document.getElementById('fb-label').textContent=email+' (données chargées)';
+      document.getElementById('fb-label').textContent=email+' (✓ sync auto activée)';
       document.getElementById('fb-token-input').value='';
       if(msgEl) msgEl.style.display='none';
-      toast('✅ Données synchronisées !');
+      toast('✅ Données synchronisées ! Sync auto activée.');
 
       // Supprimer le token via REST
       fetch(url, {method:'DELETE'}).catch(()=>{});
@@ -3349,6 +3353,47 @@ try {
       localStorage._fbTimer=setTimeout(fbSaveData,1500);
     }
   };
+
+  // ── SYNC AUTO AU DÉMARRAGE (PWA sans auth) ──────────────────────────────
+  // Si on a un UID stocké (après transfert token) et qu'on n'est pas authentifié,
+  // on charge les données depuis Firestore via REST à chaque ouverture
+  async function fbAutoSyncOnStart(){
+    if(fbUser) return; // déjà authentifié, pas besoin
+    const uid = localStorage.getItem('smi_fb_uid');
+    if(!uid) return; // jamais fait de transfert
+    try {
+      const projectId = 'semi-marathon-94d90';
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}`;
+      const resp = await fetch(url);
+      if(!resp.ok) return;
+      const doc = await resp.json();
+      const fields = doc.fields;
+      if(!fields) return;
+      const get = f => fields[f]?.stringValue||'';
+      const sJson = get('sessions_json');
+      const pJson = get('planOverrides_json');
+      const cJson = get('coach_json');
+      // Vérifier si les données cloud sont plus récentes
+      // On compare le nombre de séances — si plus de séances dans le cloud, on met à jour
+      if(sJson){
+        const cloudSessions = JSON.parse(sJson);
+        if(cloudSessions.length >= sessions.length){
+          sessions = cloudSessions;
+          localStorage.setItem('smi_s', sJson);
+          if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
+          if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
+          renderPlan(); renderStats(); loadCoachCard();
+          // Mettre à jour la bannière
+          document.getElementById('fb-dot').style.background='#27AE60';
+          document.getElementById('fb-label').textContent='✓ Synchronisé automatiquement';
+          toast('☁️ Données mises à jour');
+        }
+      }
+    } catch(e){ console.warn('Auto-sync failed:', e.message); }
+  }
+
+  // Lancer la sync auto après un court délai (laisser l'app s'initialiser)
+  setTimeout(fbAutoSyncOnStart, 2000);
 
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
