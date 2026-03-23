@@ -855,11 +855,15 @@ async function runAnalysis(s,week){
   if(btn)btn.style.display='none';
 
   try{
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),90000);
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
+      signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
     });
+    clearTimeout(timeoutId);
     const data=await res.json();
     if(loadEl)loadEl.style.display='none';
     if(data.content&&data.content[0]){
@@ -874,12 +878,12 @@ async function runAnalysis(s,week){
       },50);
     }else{
       if(btn)btn.style.display='block';
-      toast('Erreur API');
+      toast('Erreur API — vérifie ta clé');
     }
   }catch(e){
     if(loadEl)loadEl.style.display='none';
     if(btn)btn.style.display='block';
-    toast('Erreur réseau');
+    toast(e.name==='AbortError'?'⏱️ Délai 90s dépassé — réessaie':'Erreur réseau');
   }
 }
 
@@ -1032,16 +1036,38 @@ Règles strictes :
 - plan_adjustment : si tu suggères un changement, sois concret`;
 
   try{
+    // Timeout 30 secondes avec AbortController
+    const controller=new AbortController();
+    const TIMEOUT=90000;
+    const timeoutId=setTimeout(()=>controller.abort(),TIMEOUT);
+
+    // Compte à rebours affiché
+    let countdown=90;
+    const loadEl=document.getElementById('coach-loading');
+    const loadSpan=loadEl.querySelector('span');
+    const countdownInterval=setInterval(()=>{
+      countdown--;
+      if(loadSpan)loadSpan.textContent=`Analyse en cours… (${countdown}s)`;
+      if(countdown<=0)clearInterval(countdownInterval);
+    },1000);
+
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
+      signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})
     });
+    clearTimeout(timeoutId);
+    clearInterval(countdownInterval);
+
     const data=await res.json();
     document.getElementById('coach-loading').style.display='none';
     btn.disabled=false;btn.textContent='🔍 Relancer l\'analyse';
 
-    if(!data.content||!data.content[0]){toast('Erreur analyse coach');return;}
+    if(!data.content||!data.content[0]){
+      toast('Erreur analyse coach — vérifie ta clé API dans Réglages');
+      return;
+    }
 
     let json;
     try{
@@ -1050,6 +1076,7 @@ Règles strictes :
     }catch(e){
       document.getElementById('coach-result').textContent=data.content[0].text;
       document.getElementById('coach-result').style.display='block';
+      btn.disabled=false;btn.textContent='🔍 Relancer l\'analyse';
       return;
     }
 
@@ -1059,7 +1086,11 @@ Règles strictes :
   }catch(e){
     document.getElementById('coach-loading').style.display='none';
     btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
-    toast('Erreur réseau coach IA');
+    if(e.name==='AbortError'){
+      toast('⏱️ Délai dépassé (90s) — vérifie ta clé API dans Réglages');
+    } else {
+      toast('Erreur réseau — vérifie ta connexion');
+    }
   }
 }
 
