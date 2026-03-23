@@ -432,6 +432,7 @@ canvas{display:block;width:100%!important}
   </div>
   <div class="card" style="background:var(--rel);border-color:var(--re)">
     <div class="card-title" style="color:var(--re)"><span class="bar" style="background:var(--re)"></span>Zone danger</div>
+    <button class="btn btn-full" style="background:var(--pu);color:#fff;margin-bottom:8px" onclick="resetPlanOverrides()">↩ Restaurer le plan original (annuler toutes les modifs IA)</button>
     <button class="btn btn-full" style="background:var(--re);color:#fff" onclick="clearAll()">🗑️ Effacer toutes les données</button>
   </div>
 </div>
@@ -555,6 +556,20 @@ const SPORT_CLASSES={'plan':'s-run','natation-plan':'s-nat','course-libre':'s-ru
 let sessions=JSON.parse(localStorage.getItem('smi_s')||'[]');
 let kmRows=[];
 let settings=JSON.parse(localStorage.getItem('smi_cfg')||'{"weight":75,"target":"5:13","apiKey":""}');
+// Modifications du plan par le Coach IA — stockées séparément pour pouvoir revenir au plan original
+let planOverrides=JSON.parse(localStorage.getItem('smi_plan_overrides')||'{}');
+
+// Applique les overrides sur une semaine
+function getWeekWithOverride(n){
+  const base=allWeeks().find(w=>w.n===n);
+  if(!base)return null;
+  const ov=planOverrides[n];
+  if(!ov)return base;
+  return{...base,...ov,
+    s1:ov.s1?{...base.s1,...ov.s1,steps:ov.s1.steps||base.s1.steps}:base.s1,
+    s2:ov.s2?{...base.s2,...ov.s2,steps:ov.s2.steps||base.s2.steps}:base.s2,
+  };
+}
 
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
@@ -567,7 +582,7 @@ function sw(t){
 }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 function allWeeks(){return PLAN.flatMap(p=>p.weeks)}
-function getWeek(n){return allWeeks().find(w=>w.n===n)}
+function getWeek(n){return getWeekWithOverride(n)}
 function todayWeek(){
   const s=new Date('2026-03-16'),now=new Date();
   const d=Math.floor((now-s)/(7*24*3600*1000));
@@ -587,16 +602,19 @@ function renderPlan(){
   let h='';
   PLAN.forEach(ph=>{
     h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color}"></span>${ph.phase}</div>`;
-    ph.weeks.forEach(w=>{
+    ph.weeks.forEach(baseW=>{
+      const w=getWeekWithOverride(baseW.n);
+      const isModified=!!planOverrides[baseW.n];
       let cls='wcard';
       if(w.vacation)cls+=' vac';
       if(done.includes(w.n))cls+=' done';
       else if(w.n===cur)cls+=' cur';
+      if(isModified)cls+=' ia-modified';
       h+=`<div class="${cls}">
         <div class="wsumm" onclick="toggleW(${w.n},this)">
           <span class="wn">S${w.n}</span>
           <span class="wdates">${w.dates}</span>
-          <span class="wttl">${w.title}</span>
+          <span class="wttl">${w.title}${isModified?' <span style="font-size:9px;background:#8E44AD;color:#fff;border-radius:3px;padding:1px 4px;vertical-align:middle">🤖 IA</span>':''}</span>
           <div class="wright">
             ${(w.badges||[]).map(badgeHtml).join('')}
             ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
@@ -606,6 +624,7 @@ function renderPlan(){
           </div>
         </div>
         <div class="wdet" id="det-${w.n}">
+          ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
           <div class="sg">
             <div class="sb"><div class="st" style="color:${ph.color}">${w.s1.title}</div>${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
             <div class="sb"><div class="st" style="color:#27AE60">${w.s2.title}</div>${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}</div>
@@ -619,7 +638,43 @@ function renderPlan(){
   });
   document.getElementById('plan-content').innerHTML=h;
 }
-function toggleW(n){
+function restoreWeek(n){
+  delete planOverrides[n];
+  localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
+  renderPlan();
+  toast(`Semaine ${n} restaurée au plan original`);
+}
+
+function applyPlanOverrides(modifications){
+  if(!modifications||!Array.isArray(modifications))return 0;
+  let count=0;
+  modifications.forEach(mod=>{
+    const n=mod.week;
+    if(!n||n<1||n>30)return;
+    const base=allWeeks().find(w=>w.n===n);
+    if(!base)return;
+    // Ne pas modifier les semaines déjà réalisées
+    const alreadyDone=sessions.some(s=>s.week===n&&['plan','natation-plan'].includes(s.sport));
+    if(alreadyDone)return;
+    planOverrides[n]={};
+    if(mod.title)planOverrides[n].title=mod.title;
+    if(mod.s1){
+      planOverrides[n].s1={
+        title:mod.s1.title||base.s1.title,
+        steps:mod.s1.steps||base.s1.steps
+      };
+    }
+    if(mod.s2){
+      planOverrides[n].s2={
+        title:mod.s2.title||base.s2.title,
+        steps:mod.s2.steps||base.s2.steps
+      };
+    }
+    count++;
+  });
+  localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
+  return count;
+}
   const d=document.getElementById('det-'+n);
   const c=document.getElementById('chev-'+n);
   const o=d.classList.toggle('open');
@@ -989,48 +1044,73 @@ async function runCoachAnalysis(lastSession){
   const today=new Date();
   const weeksLeft=Math.max(0,Math.round((raceDate-today)/(7*86400000)));
 
-  const prompt=`Tu es un coach running expert et bienveillant. Analyse la préparation de cet athlète pour un semi-marathon.
+  // Semaines restantes non encore réalisées
+  const doneWeeks=new Set(sessions.filter(s=>['plan','natation-plan'].includes(s.sport)&&s.week).map(s=>s.week));
+  const remainingWeeks=allWeeks()
+    .filter(w=>!doneWeeks.has(w.n)&&!w.vacation)
+    .slice(0,8) // les 8 prochaines semaines
+    .map(w=>`  S${w.n} (${w.dates}) : S1="${w.s1.title}" · S2="${w.s2.title}"`).join('\n');
+
+  const prompt=`Tu es un coach running expert et bienveillant. Analyse la préparation et adapte le plan si nécessaire.
 
 COURSE CIBLE : Semi-marathon le 4 octobre 2026 (${weeksLeft} semaines restantes)
 OBJECTIF A : 1h50 (5:13/km) · OBJECTIF B : sub 2h00 (5:41/km)
 CONTRAINTES : max 2 séances course/semaine · natation possible en complément
 
-PROFIL ATHLÈTE : Coureur intermédiaire. A déjà couru 20 km en 1h58 (5:54/km). S'entraîne régulièrement depuis plusieurs mois.
+PROFIL : Coureur intermédiaire. 20 km en 1h58 (5:54/km). Entraînement régulier depuis plusieurs mois.
 
 TOUTES LES SÉANCES (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
 ${allSummary}
 
-PRÉDICTIONS ALGORITHMIQUES SEMI :
+PRÉDICTIONS ALGORITHMIQUES :
 - VDOT (Jack Daniels) : ${predVDOT?minsToHMS(predVDOT):'—'}
 - Riegel depuis ${longestRun.dist}km en ${longestRun.dur}min : ${predRiegel?minsToHMS(predRiegel):'—'}
-- Cameron (modèle non linéaire, même base que Strava) : ${predCameron?minsToHMS(predCameron):'—'}
+- Cameron (même base que Strava) : ${predCameron?minsToHMS(predCameron):'—'}
 - Allure récente × distance : ${predPace?minsToHMS(predPace):'—'}
 - Médiane des modèles : ${medianPred?minsToHMS(medianPred):'—'}
 
-VO2MAX ALGORITHMIQUE (Jack Daniels VDOT) : ${vo2Summary}
-- Pour référence : VO2max ~42 → sub-2h possible · ~48 → 1h55 possible · ~52 → 1h50 possible
+VO2MAX ALGORITHMIQUE : ${vo2Summary}
+(Référence : VO2max ~42 → sub-2h · ~48 → 1h55 · ~52 → 1h50)
 
-IMPORTANT : Ces algorithmes tendent à sous-estimer pour les coureurs réguliers. Tiens compte de la progression visible, de la régularité, et du potentiel avec ${weeksLeft} semaines d'entraînement structuré.
+PROCHAINES SEMAINES DU PLAN (non encore réalisées) :
+${remainingWeeks||'(toutes réalisées)'}
+
+OBJECTIF AMBITIEUX : Si les données le permettent, propose un plan adapté pour viser 1h45 (4:59/km) plutôt que 1h50. Si c'est trop ambitieux, reste sur 1h50 en l'expliquant.
 
 Réponds en JSON STRICT, sans texte avant ni après :
 {
-  "prediction_time": "1h58:00",
+  "prediction_time": "1h56:00",
   "prediction_direction": "up",
   "prediction_comment": "phrase courte sur la trajectoire",
   "vo2max": 44.5,
   "vo2max_trend": 1.2,
-  "plan_adjustment_needed": false,
-  "plan_adjustment": null,
-  "analysis": "analyse en 5-6 phrases : progression constatée, VO2max et ce qu'elle implique, points forts, axe de travail principal, probabilité d'atteindre 1h50 vs sub-2h, conseil clé"
+  "plan_adjustment_needed": true,
+  "plan_adjustment": "résumé en 1-2 phrases de ce qui change et pourquoi",
+  "analysis": "analyse en 5-6 phrases : progression, VO2max, points forts, axe de travail, probabilité 1h50 ou mieux, conseil clé",
+  "plan_modifications": [
+    {
+      "week": 5,
+      "title": "Nouveau titre de la semaine",
+      "s1": {
+        "title": "Nouveau titre séance 1",
+        "steps": [["Échauffement","15 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]
+      },
+      "s2": {
+        "title": "Nouveau titre séance 2",
+        "steps": [["Corps","description"],["Retour","description"]]
+      }
+    }
+  ]
 }
 
-Règles strictes :
-- prediction_time : ton estimation réaliste, optimiste si les données le justifient
-- prediction_direction : "up" si sub-2h atteignable ET progression vers 1h50 plausible, "down" si sub-2h incertain
-- vo2max : ta propre estimation numérique (nombre décimal, ex: 44.5) basée sur les données
-- vo2max_trend : variation estimée depuis le début de l'entraînement (positif = amélioration)
-- Sois réaliste mais bienveillant — valorise les efforts et la progression
-- plan_adjustment : si tu suggères un changement, sois concret`;
+Règles :
+- plan_modifications : tableau des semaines à modifier (vides = [] si aucune modification)
+- Ne modifier QUE les semaines futures non encore réalisées
+- Maximum 5 semaines modifiées par analyse
+- Respecter la structure steps (tableau de paires ["label","description"])
+- Garder le format "Durée / distance" dans les steps si pertinent
+- Sois ambitieux mais réaliste — si le potentiel est là, propose 1h45
+- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon`;
 
   try{
     // Timeout 30 secondes avec AbortController
@@ -1080,6 +1160,15 @@ Règles strictes :
     const coachData={...json,savedAt:new Date().toISOString()};
     localStorage.setItem('smi_coach',JSON.stringify(coachData));
     renderCoachCard(json);
+
+    // Appliquer les modifications du plan si présentes
+    if(json.plan_modifications&&json.plan_modifications.length>0){
+      const count=applyPlanOverrides(json.plan_modifications);
+      if(count>0){
+        renderPlan();
+        toast(`✅ Plan mis à jour : ${count} semaine${count>1?'s':''} modifiée${count>1?'s':''} par le Coach IA`);
+      }
+    }
   }catch(e){
     document.getElementById('coach-loading').style.display='none';
     btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
@@ -1847,7 +1936,15 @@ function saveSettings(){
   saveApiKey();
   toast('Réglages enregistrés ✓');
 }
-function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');sessions=[];renderPlan();toast('Données effacées')}}
+function resetPlanOverrides(){
+  if(confirm('Restaurer le plan original ? Toutes les modifications du Coach IA seront annulées.')){
+    planOverrides={};
+    localStorage.removeItem('smi_plan_overrides');
+    renderPlan();
+    toast('Plan restauré à la version originale');
+  }
+}
+function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');localStorage.removeItem('smi_coach');sessions=[];renderPlan();renderStats();toast('Données effacées')}}
 
 // ── IMPORT MODE ───────────────────────────────────────────────────────────
 let stravaImageB64='';
