@@ -3142,23 +3142,15 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      // Safari/iPhone : redirect — autres navigateurs : popup
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if(isSafari || isMobile){
-        fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
-      } else {
-        fbAuth.signInWithPopup(provider).catch(e=>toast('Erreur connexion : '+e.message));
-      }
+      // signInWithRedirect pour tous les navigateurs (popup bloquée par COOP sur GitHub Pages)
+      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
     }
   };
 
-  // Récupérer le résultat après redirection (iPhone Safari)
+  // Récupérer le résultat après redirection
   fbAuth.getRedirectResult().then(result => {
-    if(result && result.user){
-      // Connexion via redirect réussie — onAuthStateChanged s'en charge
-    }
-  }).catch(e=>{ if(e.code !== 'auth/no-current-user') toast('Erreur connexion : '+e.message); });
+    if(result && result.user) console.log('Connexion redirect OK:', result.user.email);
+  }).catch(e=>{ console.error('Redirect result error:', e); });
 
   async function fbLoadData(){
     if(!fbUser) return;
@@ -3183,8 +3175,16 @@ try {
     fbSyncing=true; fbSetSyncStatus('⏳ Sync…');
     try {
       const coachRaw=localStorage.getItem('smi_coach');
+      // Firestore n'accepte pas les tableaux imbriqués (gpsTrace contient des objets avec coords)
+      // On strip gpsTrace et kmDetails avant d'envoyer, on les garde uniquement en localStorage
+      const sessionsSafe = sessions.map(s => {
+        const {gpsTrace, kmDetails, ...rest} = s;
+        return rest;
+      });
+
       await fbDb.collection('users').doc(fbUser.uid).set({
-        sessions, planOverrides,
+        sessions: sessionsSafe,
+        planOverrides,
         settings:{...settings,apiKey:''},
         coachData: coachRaw?JSON.parse(coachRaw):null,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
