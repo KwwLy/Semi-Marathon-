@@ -2818,9 +2818,17 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      fbAuth.signInWithPopup(provider).catch(e=>toast('Erreur connexion : '+e.message));
+      // signInWithRedirect fonctionne sur Safari/iPhone (pas de popup bloquée)
+      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
     }
   };
+
+  // Récupérer le résultat après redirection (iPhone Safari)
+  fbAuth.getRedirectResult().then(result => {
+    if(result && result.user){
+      // Connexion via redirect réussie — onAuthStateChanged s'en charge
+    }
+  }).catch(e=>{ if(e.code !== 'auth/no-current-user') toast('Erreur connexion : '+e.message); });
 
   async function fbLoadData(){
     if(!fbUser) return;
