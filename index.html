@@ -696,73 +696,121 @@ function applyPlanOverrides(modifications){
 // ── EXPLICATION SÉANCE ────────────────────────────────────────────────────
 function sessionExplain(title, steps){
   const t=title.toLowerCase();
-  const stepsText=steps.map(s=>s[1]).join(' ').toLowerCase();
-
-  // VMA / 400m
-  if(t.includes('400m')||t.includes('vma')){
-    return`<div class="explain-box">
-      <b>🏃 Séance VMA — Vitesse Maximale Aérobie</b><br>
-      Le but est de courir à ton allure <b>maximale soutenable sur ~1 min</b> (Z5). Ces répétitions courtes à haute intensité développent ton plafond aérobie (VO2max) — plus il monte, plus ton allure semi devient "facile" en relatif.<br><br>
-      <b>Comment faire :</b> Lance-toi à fond sur 400m (un tour de piste) en visant l'allure indiquée. La récupération trottinant est aussi importante que l'effort — respecte-la scrupuleusement. Dès que tu n'arrives plus à tenir l'allure, arrête.<br><br>
-      <b>Ressenti cible :</b> Très difficile, tu ne peux pas parler. FC proche du max. Tu dois pouvoir terminer chaque répétition à la même allure que la première.
-    </div>`;
+  const sv=steps.map(s=>s[1]).join(' ').toLowerCase();
+  function box(icon,head,body){
+    return`<div class="explain-box"><b>${icon} ${head}</b><br>${body}</div>`;
   }
+
+  // Jour J
+  if(t.includes('stratégie de course')||sv.includes('1h50 !!'))
+    return box('🏁','Jour J — Semi-marathon',
+      'C\'est le grand jour ! Stratégie clé : <b>partir prudemment</b>. Les 3 premiers km à 5:30-5:40/km sembleront trop lents — c\'est voulu. L\'adrénaline pousse à partir trop vite, résiste. De km 3 à 16 : verrouille 5:13/km. Si tu te sens bien à 16 km : accélère progressivement. Un semi se gagne dans les 5 derniers km.<br><br>Pense à 3 blocs de 7 km mentalement — ça rend la distance moins intimidante.');
+
+  // Activations semaine finale
+  if(t.includes('activations')||t.includes('lun-ven'))
+    return box('🔋','Semaine de récupération finale',
+      'Cette semaine, ton corps stocke de l\'énergie. Les séances sont courtes et légères — leur but n\'est pas de t\'améliorer (il est trop tard) mais de garder les jambes réactives sans les fatiguer. <b>Ne fais pas plus que ce qui est écrit.</b> Les 4×100m à allure semi le mardi servent à activer le système nerveux.');
+
+  // Préparation mentale
+  if(t.includes('mental')||t.includes('préparation mentale'))
+    return box('🧠','Préparation mentale',
+      'Aussi importante que l\'entraînement physique. Dors 8h minimum, bois 2L/eau par jour. Samedi soir : repas glucidique (pâtes, riz) sans excès. Prépare ton sac la veille (dossard, tenue, gels, chaussures). Visualise ta course : tu pars doucement, tu tiens l\'allure, tu accélères après le km 16.');
+
+  // Rappel allure / –60%
+  if(t.includes('rappel allure'))
+    return box('⚡','Affûtage final',
+      'Volume réduit de 60% — ton corps récupère et se prépare. Les 3×1 km à allure semi ont un seul but : <b>rappeler à tes jambes la sensation de cette allure</b>. Ne force pas. Après cette séance : repos complet jusqu\'au départ.');
+
+  // –40%
+  if(sv.includes('40%')||t.includes('5 km à allure semi'))
+    return box('📉','Semaine d\'affûtage',
+      'Volume réduit de 40% — c\'est normal et voulu. Ton corps convertit les semaines de travail en performances. Ne rajoute pas de km. Les 5 km à allure semi servent à tester tes jambes et confirmer que l\'allure cible est confortable.');
+
+  // VMA 400m
+  if(t.includes('400m')||t.includes('vma'))
+    return box('🏃','Séance VMA — Vitesse Maximale Aérobie',
+      'Le but : courir à ton allure <b>maximale soutenable sur ~1 min</b> (Z5). Ces répétitions développent ton plafond aérobie (VO2max) — plus il monte, plus ton allure semi devient facile en relatif.<br><br><b>Comment faire :</b> Lance-toi à fond sur chaque 400m en visant l\'allure indiquée. La récupération trottinante est aussi importante que l\'effort — respecte-la. Si tu n\'arrives plus à tenir l\'allure, arrête.<br><br><b>Ressenti cible :</b> Très difficile, impossible de parler. FC proche du max. Chaque répétition = même allure que la première.');
+
+  // 800m
+  if(t.includes('800m'))
+    return box('🔥','Séance 800m — Seuil lactique',
+      'Les 800m à allure Z4 combinent les bénéfices du seuil et de la VMA. Plus longues que des 400m, elles t\'apprennent à tenir l\'inconfort sur ~4 min.<br><br><b>Comment faire :</b> Pars à 4:55-5:05/km, reste régulier. Le 2e 400m de chaque 800m doit être au moins aussi rapide que le 1er. Récupère 2 min en trottinant.<br><br><b>Ressenti cible :</b> Difficile, souffle court. FC vers 88-93%.');
 
   // Fractions 5 min
-  if(t.includes('5 min')||t.includes('×5 min')){
-    return`<div class="explain-box">
-      <b>⚡ Fractions longues — Z3</b><br>
-      5 minutes à allure semi, c'est un effort <b>soutenu mais gérable</b>. L'objectif est d'habituer ton corps à courir à l'allure cible du 4 octobre par petites doses.<br><br>
-      <b>Comment faire :</b> Lance ton chrono, cours 5 min à 5:10-5:15/km (allure légèrement plus rapide que ta cible semi), puis récupère 3 min en trottinant lentement. Répète. Les premières répétitions doivent sembler faciles — si tu es à bout dès la 2e, tu pars trop vite.<br><br>
-      <b>Ressenti cible :</b> "Difficile mais tenu" — tu peux prononcer quelques mots. FC autour de 85-88% de ta FC max.
-    </div>`;
-  }
+  if(t.includes('5 min'))
+    return box('⚡','Fractions longues Z3',
+      'Cinq minutes à allure semi — effort soutenu mais gérable. L\'objectif : habituer ton corps à l\'allure cible par petites doses.<br><br><b>Comment faire :</b> 5 min à 5:10-5:15/km, puis 3 min trot. Les premières répétitions doivent sembler faciles — si tu es à bout dès la 2e, tu pars trop vite.<br><br><b>Ressenti cible :</b> Difficile mais tenu. FC ~85-88%.');
 
-  // Fractions 2 km ou 3 km
-  if((t.includes('×2 km')||t.includes('×3 km'))&&(t.includes('5:'))){
-    const reps=t.match(/(\d+)×/)?.[1]||'';
-    const km=t.includes('2 km')?2:3;
-    return`<div class="explain-box">
-      <b>🎯 Blocs à allure semi — Z3</b><br>
-      ${reps} blocs de ${km} km à allure semi-marathon. C'est la séance <b>la plus spécifique</b> de ta préparation — tu cours exactement à la vitesse du 4 octobre.<br><br>
-      <b>Comment faire :</b> Commence chaque bloc au calme, atteins l'allure cible en 200m et maintiens-la. La récupération trottine (3-4 min Z1) doit te permettre de repartir à la même allure au bloc suivant. Si tu n'y arrives pas, la récupération est trop courte — allonge-la.<br><br>
-      <b>Ressenti cible :</b> Effort contrôlé et régulier. FC vers 80-87%. Tu dois finir le dernier bloc à la même allure que le premier — c'est le signe d'une bonne exécution.
-    </div>`;
-  }
+  // Blocs 2 ou 3 km
+  if((t.includes('×2 km')||t.includes('×3 km'))&&t.includes(':'))
+    return box('🎯','Blocs à allure semi Z3',
+      'La séance <b>la plus spécifique</b> de ta préparation — tu cours exactement à la vitesse du 4 octobre.<br><br><b>Comment faire :</b> Atteins l\'allure cible en 200m et maintiens-la. La récupération (3-4 min trot Z1) doit te permettre de repartir à la même allure. Si tu n\'y arrives pas : allonge la récupération.<br><br><b>Critère de réussite :</b> Dernier bloc = même allure que le premier. FC ~80-87%.');
 
   // Seuil 1 km
-  if(t.includes('×1 km')&&(t.includes('z3')||t.includes('z4')||t.includes('5:'))){
-    return`<div class="explain-box">
-      <b>🔥 Séance Seuil — Z4</b><br>
-      Des répétitions d'1 km à allure <b>seuil lactique</b> — juste au-dessus de l'allure semi. C'est inconfortable mais pas maximal. Ces séances repoussent ton seuil et rendent l'allure semi "confortable" le jour J.<br><br>
-      <b>Comment faire :</b> Lance-toi à 4:55-5:15/km selon la semaine. L'allure doit être stable du 1er au dernier mètre de chaque km. La récupération (2 min trot) est courte pour habituer ton corps à enchaîner.<br><br>
-      <b>Ressenti cible :</b> "Difficile, respiration rapide, possible de tenir quelques mots". FC vers 88-93%. Si tu dois marcher en récupération, c'est normal au début.
-    </div>`;
-  }
+  if(t.includes('×1 km'))
+    return box('🔥','Séance Seuil Z4',
+      'Répétitions d\'1 km à allure seuil lactique — juste au-dessus de l\'allure semi. Ces séances repoussent ton seuil et rendent l\'allure semi confortable le jour J.<br><br><b>Comment faire :</b> Allure stable du 1er au dernier mètre. Récupération de 2 min courte volontairement.<br><br><b>Ressenti cible :</b> Difficile, respiration rapide. FC ~88-93%.');
 
-  // Sortie longue Z2
-  if((t.includes('km z2')||stepsText.includes('z2'))&&(t.includes('16')||t.includes('17')||t.includes('18')||t.includes('19')||t.includes('20'))){
-    return`<div class="explain-box">
-      <b>🏃 Sortie longue — Z2</b><br>
-      La reine des séances d'endurance. L'objectif n'est <b>pas d'aller vite</b> — c'est de rester longtemps en mouvement à allure confortable pour construire l'endurance musculaire et mentale.<br><br>
-      <b>Comment faire :</b> Commence les 2-3 premiers km très doucement (Z1), puis stabilise à 5:50-6:10/km. Si tu sens que tu accélères, ralentis. Prévoie de l'eau et un gel selon les indications. La conversation doit être possible tout du long.<br><br>
-      <b>Ravitaillement :</b> Gel sucré (15-20g glucides) + eau. Ne jamais tester un nouveau gel ou aliment en course — utilise ce que tu prendras le 4 octobre.<br><br>
-      <b>Ressenti cible :</b> Facile à modéré. FC 70-80%. Tu dois finir en ayant l'impression de pouvoir encore courir 20-30 min.
-    </div>`;
-  }
+  // 16 km + 3×2 km
+  if(t.includes('16 km')&&t.includes('3×2'))
+    return box('💪','Sortie longue + blocs finaux',
+      'Dernière séance intense avant les vacances. 10 km en Z2 pour te mettre en route, puis 3 blocs de 2 km à allure semi pour finir fort.<br><br><b>Clé :</b> Courir vite sur jambes fatiguées simule les conditions de fin de course. Après : récupère bien, les vacances sont là.');
 
-  // Séance spécifique semi (allure semi sur portion)
-  if(stepsText.includes('z3')&&(stepsText.includes('km z2'))){
-    return`<div class="explain-box">
-      <b>🎯 Sortie longue spécifique semi</b><br>
-      Format progressif : tu démarres en Z2 confortable, puis tu glisses sur l'allure semi (Z3) en milieu de sortie. C'est la séance qui te prépare le mieux au 4 octobre.<br><br>
-      <b>Comment faire :</b> Kilomètres d'échauffement très faciles, puis engage l'allure semi (5:13-5:20/km) sur la portion indiquée. La clé : ne pas partir trop vite sur les premiers km Z2 pour avoir les jambes fraîches sur la portion Z3.<br><br>
-      <b>Ressenti cible :</b> Z2 = facile · Z3 = soutenu mais tenu. Si la portion Z3 est impossible, tu es parti trop vite en Z2. La fatigue doit arriver sur le dernier tiers.
-    </div>`;
-  }
+  // Sortie spécifique semi (Z2 + portion Z3)
+  if(sv.includes('z3')&&sv.includes('km z2')&&!t.includes('×'))
+    return box('🎯','Sortie longue spécifique semi',
+      'Format progressif : Z2 confortable, puis allure semi (Z3) en milieu de sortie. C\'est la séance qui te prépare le mieux au 4 octobre.<br><br><b>Clé :</b> Ne pas partir trop vite en Z2 — tu dois avoir les jambes fraîches pour la portion Z3.<br><br><b>Ressenti cible :</b> Z2 = facile · Z3 = soutenu. La fatigue arrive sur le dernier tiers.');
 
-  return null; // Pas d'explication pour les séances simples (Z1, natation, repos)
+  // Sorties longues Z2
+  if((sv.includes('z2')||t.includes('z2'))&&parseInt(t.match(/(\d+)\s*km/)?.[1]||0)>=12)
+    return box('🏃','Sortie longue Z2 — Endurance fondamentale',
+      'L\'objectif n\'est <b>pas d\'aller vite</b> — c\'est de rester longtemps en mouvement pour construire l\'endurance musculaire, cardiaque et mentale.<br><br><b>Comment faire :</b> Démarre les 2-3 premiers km très doucement (Z1), stabilise à 5:45-6:10/km. Conversation possible tout du long.<br><br><b>Ravitaillement :</b> Gel sucré + eau. Mêmes gels que le jour J.<br><br><b>Ressenti cible :</b> Facile à modéré. FC 70-80%. Tu dois finir avec l\'impression de pouvoir encore tenir 20-30 min.');
+
+  // Footing bilan
+  if(t.includes('bilan'))
+    return box('📊','Footing bilan Z2',
+      'Première séance du plan — elle sert à <b>évaluer ton niveau de départ</b>. Cours en Z2 confortable et note tes sensations et ta FC. Ces données serviront de référence pour mesurer ta progression tout au long du plan.');
+
+  // Récup Z1
+  if(t.includes('récup')||(t.includes('z1')&&(t.includes('30 min')||t.includes('35 min')||t.includes('25 min'))))
+    return box('💚','Footing récupération Z1',
+      'Séance très facile pour <b>favoriser la récupération</b>. Courir lentement augmente le flux sanguin et élimine les déchets musculaires.<br><br><b>Règle d\'or :</b> FC sous 70% de ta FC max. Si tu as encore des courbatures, remplace par une marche rapide de 30 min.');
+
+  // Vacances
+  if(t.includes('plaisir')||t.includes('vacances'))
+    return box('🏖️','Footing plaisir — vacances',
+      'Pas de pression, pas de chrono. L\'objectif : maintenir l\'habitude et garder les jambes actives sans se fatiguer. Cours au feeling. Si tu te sens fatigué, écoute ton corps.');
+
+  // Accélérations réactivation
+  if(t.includes('accélérations'))
+    return box('⚡','Réactivation post-vacances',
+      'Après 3 semaines de volume réduit, cette séance réactive ton système nerveux. Les accélérations légères ne sont pas des sprints — juste une montée en allure pour rappeler à tes jambes qu\'elles peuvent courir vite.');
+
+  // Transition
+  if(t.includes('transition'))
+    return box('🔄','Semaine de transition',
+      '<b>Surtout pas d\'intensité cette semaine.</b> Ton corps revient doucement à la charge après les vacances. Une erreur classique : vouloir rattraper en faisant trop — c\'est là que les blessures arrivent.');
+
+  // Natation
+  if(t.includes('natation'))
+    return box('🏊','Natation — récupération active',
+      'La natation sollicite le cardio <b>sans impact sur les articulations</b>. Idéale pour récupérer en maintenant la condition aérobie.<br><br><b>Comment faire :</b> Crawl lent en échauffement, endurance douce, brasse en retour pour détendre le dos.<br><br><b>Si tu ne sais pas nager :</b> 45 min vélo Z1-Z2 ou elliptique.');
+
+  // Repos
+  if(t.includes('repos')||sv.includes('repos'))
+    return box('😴','Repos — aussi important que l\'entraînement',
+      'Le repos n\'est pas un jour perdu — c\'est pendant le repos que ton corps <b>assimile le travail</b> et construit la performance. Supprime ce jour et tu récupères moins bien.<br><br>Hydrate-toi, dors suffisamment. Résiste à l\'envie de faire plus.');
+
+  // Semaine allégée
+  if(t.includes('allégée'))
+    return box('📉','Semaine allégée — supercompensation',
+      'Toutes les 4-5 semaines, le plan réduit le volume volontairement. C\'est la <b>supercompensation</b> : en réduisant la charge, ton corps rebondit au-dessus de son niveau précédent.<br><br>Ne rajoute pas de km — la semaine suivante sera plus dure.');
+
+  // Fallback
+  return box('ℹ️','Info séance',
+    'Suis les étapes indiquées. Respecte les allures cibles et les temps de récupération — ils ont été calculés pour ton objectif 1h50. En cas de doute sur l\'allure : consulte l\'onglet 🏃 Zones.');
 }
+
 
 function toggleW(n){
   const d=document.getElementById('det-'+n);
