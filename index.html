@@ -636,18 +636,12 @@ function renderPlan(){
           ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
           <div class="sg">
             <div class="sb">
-              ${(()=>{const e=sessionExplain(w.s1.title,w.s1.steps);return`
-              <div class="st" style="color:${ph.color}">${w.s1.title}${e?`<button onclick="event.stopPropagation();toggleExplain('e-${w.n}-s1')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;opacity:.6;vertical-align:middle" title="Explication">ℹ️</button>`:''}
-              </div>
+              <div class="st" style="color:${ph.color}">${w.s1.title}</div>
               ${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-              ${e?`<div id="e-${w.n}-s1" style="display:none">${e}</div>`:''}`})()}
             </div>
             <div class="sb">
-              ${(()=>{const e=sessionExplain(w.s2.title,w.s2.steps);return`
-              <div class="st" style="color:#27AE60">${w.s2.title}${e?`<button onclick="event.stopPropagation();toggleExplain('e-${w.n}-s2')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;opacity:.6;vertical-align:middle" title="Explication">ℹ️</button>`:''}
-              </div>
+              <div class="st" style="color:#27AE60">${w.s2.title}</div>
               ${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-              ${e?`<div id="e-${w.n}-s2" style="display:none">${e}</div>`:''}`})()}
             </div>
           </div>
           <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
