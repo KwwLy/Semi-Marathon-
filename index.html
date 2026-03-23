@@ -1082,14 +1082,11 @@ OBJECTIF ÉLEVÉ : Si les données montrent un potentiel suffisant (VO2max ≥ 4
 
 Réponds en JSON STRICT, sans texte avant ni après :
 {
-  "prediction_time": "1h56:00",
   "prediction_direction": "up",
-  "prediction_comment": "phrase courte sur la trajectoire",
-  "vo2max": 44.5,
-  "vo2max_trend": 1.2,
+  "prediction_comment": "phrase courte sur la trajectoire vers l'objectif",
   "plan_adjustment_needed": true,
   "plan_adjustment": "résumé en 1-2 phrases de ce qui change et pourquoi",
-  "analysis": "analyse en 5-6 phrases : progression, VO2max, points forts, axe de travail, probabilité 1h50 ou mieux, conseil clé",
+  "analysis": "analyse en 5-6 phrases : progression, points forts, axe de travail, probabilité 1h50 ou mieux, conseil clé pour les prochaines semaines",
   "plan_modifications": [
     {
       "week": 5,
@@ -1107,15 +1104,14 @@ Réponds en JSON STRICT, sans texte avant ni après :
 }
 
 Règles :
-- plan_modifications : tableau des semaines à modifier (vides = [] si aucune modification)
+- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon
+- plan_modifications : tableau des semaines à modifier ([] si aucune modification)
 - Ne modifier QUE les semaines futures non encore réalisées
 - Maximum 5 semaines modifiées par analyse
 - Respecter la structure steps (tableau de paires ["label","description"])
 - Garder le format "Durée / distance" dans les steps si pertinent
-- Sois ambitieux mais réaliste — si le potentiel est là, propose 1h45
-- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon
-- RÈGLE ABSOLUE : les modifications de plan visent TOUJOURS 1h50 minimum — ne jamais revoir à la baisse les allures cibles ou la charge par rapport au plan original
-- Si le potentiel le justifie, intensifier les allures vers 1h45 (5:00/km)
+- RÈGLE ABSOLUE : les modifications visent TOUJOURS 1h50 minimum — ne jamais revoir à la baisse les allures cibles ou la charge
+- Si le potentiel le justifie (VO2max ≥ 46, allures < 5:50/km), intensifier vers 1h45 (5:00/km)
 - Ne modifier que pour progresser, jamais pour faciliter`;
 
   try{
@@ -1161,6 +1157,15 @@ Règles :
       document.getElementById('coach-result').style.display='block';
       btn.disabled=false;btn.textContent='🔍 Relancer l\'analyse';
       return;
+    }
+
+    // ── Injecter les valeurs algorithmiques déterministes ──
+    // La prédiction de temps et la VO2max sont calculées par nos algorithmes,
+    // pas par Claude, pour garantir la reproductibilité entre les appels.
+    if(medianPred) json.prediction_time=minsToHMS(medianPred);
+    if(vo2Last){
+      json.vo2max=Math.round(vo2Last*10)/10;
+      json.vo2max_trend=Math.round(vo2Trend*10)/10;
     }
 
     const coachData={...json,savedAt:new Date().toISOString()};
