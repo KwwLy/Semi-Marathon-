@@ -3188,7 +3188,7 @@ try {
 
   // Vérifier si on revient d'un lien magique
   const currentUrl = window.location.href;
-  const isEmailLink = firebase.auth.isSignInWithEmailLink(fbAuth, currentUrl);
+  const isEmailLink = fbAuth.isSignInWithEmailLink(currentUrl);
 
   console.log('URL actuelle:', currentUrl);
   console.log('Est un lien email Firebase:', isEmailLink);
