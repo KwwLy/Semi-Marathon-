@@ -468,6 +468,29 @@ canvas{display:block;width:100%!important}
     </div>
     <button class="btn btn-or" onclick="saveSettings()">Enregistrer</button>
   </div>
+
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>📂 Import en masse — GPX / FIT</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Sélectionne plusieurs fichiers GPX ou FIT d'un coup. L'app les analyse, détecte les doublons et te montre un récapitulatif avant d'importer.</p>
+    <button class="btn btn-or btn-full" onclick="document.getElementById('bulk-import-input').click()">📂 Sélectionner des fichiers GPX / FIT</button>
+    <input type="file" id="bulk-import-input" accept=".gpx,.fit,.tcx" multiple style="display:none" onchange="bulkImport(this)">
+    <div id="bulk-import-results" style="margin-top:12px;display:none">
+      <div id="bulk-import-list"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-or" style="flex:1" id="bulk-confirm-btn" onclick="bulkConfirm()">✅ Importer les séances sélectionnées</button>
+        <button class="btn btn-ghost" onclick="bulkCancel()">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>💾 Sauvegarde manuelle</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Exporte toutes tes données dans un fichier JSON à conserver sur ton appareil. Tu pourras les réimporter à tout moment.</p>
+    <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="exportData()">⬇️ Exporter mes données (JSON)</button>
+    <button class="btn btn-ghost btn-full" onclick="document.getElementById('import-file').click()">⬆️ Importer une sauvegarde</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+  </div>
+
   <div class="card" style="background:var(--rel);border-color:var(--re)">
     <div class="card-title" style="color:var(--re)"><span class="bar" style="background:var(--re)"></span>Zone danger</div>
     <button class="btn btn-full" style="background:var(--pu);color:#fff;margin-bottom:8px" onclick="resetPlanOverrides()">↩ Restaurer le plan original (annuler toutes les modifs IA)</button>
@@ -2334,6 +2357,307 @@ function saveSettings(){
   saveApiKey();
   toast('Réglages enregistrés ✓');
 }
+// ── IMPORT EN MASSE GPX/FIT ───────────────────────────────────────────────
+let bulkParsed = []; // résultats parsés en attente de confirmation
+
+async function bulkImport(input){
+  const files = [...input.files];
+  if(!files.length) return;
+  bulkParsed = [];
+
+  const listEl = document.getElementById('bulk-import-list');
+  const resultsEl = document.getElementById('bulk-import-results');
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:8px 0">Analyse en cours…</div>';
+  resultsEl.style.display = 'block';
+
+  let parsed = [];
+  for(const file of files){
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        const ext = file.name.split('.').pop().toLowerCase();
+        if(ext === 'fit'){
+          reader.onload = e => {
+            try { resolve({data: parseFitBulk(e.target.result), ext}); }
+            catch(err){ resolve(null); }
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          reader.onload = e => {
+            try { resolve({data: parseGpxTcxBulk(e.target.result, ext), ext}); }
+            catch(err){ resolve(null); }
+          };
+          reader.readAsText(file);
+        }
+        reader.onerror = () => resolve(null);
+      });
+      if(data && data.data && data.data.distance_km > 0){
+        // Détection doublon : même date ET distance similaire (±0.5 km)
+        const d = data.data;
+        const isDuplicate = sessions.some(s => {
+          if(!s.date || !d.date) return false;
+          const sameDate = s.date === d.date;
+          const similarDist = Math.abs((s.dist||0) - (d.distance_km||0)) < 0.5;
+          return sameDate && similarDist;
+        });
+        parsed.push({ file: file.name, data: d, duplicate: isDuplicate, selected: !isDuplicate,
+          sport: d.sport==='course'?'plan': d.sport==='natation'?'natation-libre': d.sport==='velo'?'velo':'autre'
+        });
+      } else {
+        parsed.push({ file: file.name, data: null, error: true, selected: false });
+      }
+    } catch(e) {
+      parsed.push({ file: file.name, data: null, error: true, selected: false });
+    }
+  }
+
+  bulkParsed = parsed;
+  renderBulkResults();
+  input.value = '';
+}
+
+function renderBulkResults(){
+  const listEl = document.getElementById('bulk-import-list');
+  const newCount = bulkParsed.filter(p=>p.selected).length;
+  const dupCount = bulkParsed.filter(p=>p.duplicate).length;
+  const errCount = bulkParsed.filter(p=>p.error).length;
+
+  let h = `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+    ${bulkParsed.length} fichier(s) analysé(s) · 
+    <span style="color:#27AE60">${newCount} à importer</span> · 
+    <span style="color:var(--am)">${dupCount} doublon(s)</span>
+    ${errCount?`· <span style="color:var(--re)">${errCount} erreur(s)</span>`:''}
+  </div>`;
+
+  bulkParsed.forEach((p, i) => {
+    const d = p.data;
+    let statusColor, statusLabel;
+    if(p.error){ statusColor='var(--re)'; statusLabel='❌ Erreur'; }
+    else if(p.duplicate){ statusColor='var(--am)'; statusLabel='⚠️ Doublon'; }
+    else { statusColor='#27AE60'; statusLabel='✅ Nouveau'; }
+
+    const info = d ? `${d.date||'?'} · ${d.distance_km?.toFixed(2)||'?'} km · ${d.duree_min||'?'} min${d.fc_max?' · FC max '+d.fc_max:''}` : 'Fichier non reconnu';
+
+    const sportSel = d ? `<select onchange="bulkSetSport(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);margin-top:3px;width:100%">
+      <option value="plan" ${p.sport==='plan'?'selected':''}>🏃 Course (plan)</option>
+      <option value="course-libre" ${p.sport==='course-libre'?'selected':''}>🏃 Course libre</option>
+      <option value="natation-plan" ${p.sport==='natation-plan'?'selected':''}>🏊 Natation (plan)</option>
+      <option value="natation-libre" ${p.sport==='natation-libre'?'selected':''}>🏊 Natation libre</option>
+      <option value="velo" ${p.sport==='velo'?'selected':''}>🚴 Vélo</option>
+      <option value="padel" ${p.sport==='padel'?'selected':''}>🎾 Padel</option>
+      <option value="krav" ${p.sport==='krav'?'selected':''}>🥋 Krav Maga</option>
+      <option value="autre" ${p.sport==='autre'?'selected':''}>⚡ Autre</option>
+    </select>` : '';
+
+    h += `<div style="padding:8px;background:var(--bg2);border-radius:var(--r);margin-bottom:6px;font-size:11px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" ${p.selected?'checked':''} ${p.error?'disabled':''} onchange="bulkToggle(${i},this.checked)" style="flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.file}</div>
+          <div style="color:var(--text2)">${info}</div>
+        </div>
+        <span style="color:${statusColor};white-space:nowrap;font-weight:600">${statusLabel}</span>
+      </div>
+      ${sportSel}
+    </div>`;
+  });
+
+  document.getElementById('bulk-confirm-btn').textContent = `✅ Importer ${newCount} séance(s)`;
+  listEl.innerHTML = h;
+}
+
+function bulkSetSport(i, sport){
+  bulkParsed[i].sport = sport;
+}
+
+function bulkToggle(i, checked){
+  bulkParsed[i].selected = checked;
+  renderBulkResults();
+}
+
+function bulkCancel(){
+  bulkParsed = [];
+  document.getElementById('bulk-import-results').style.display = 'none';
+}
+
+function bulkConfirm(){
+  const toImport = bulkParsed.filter(p => p.selected && p.data);
+  if(!toImport.length){ toast('Aucune séance sélectionnée'); return; }
+
+  let added = 0;
+  toImport.forEach(p => {
+    const d = p.data;
+    const session = {
+      id: Date.now() + Math.random(),
+      sport: p.sport || 'plan',
+      date: d.date || '',
+      dist: d.distance_km || 0,
+      dur: d.duree_min || 0,
+      dplus: d.denivele_plus || 0,
+      pace: d.allure_moy || '',
+      hr: d.fc_moy || 0,
+      hrmax: d.fc_max || 0,
+      comment: `Importé depuis ${p.file}`,
+      kmDetails: d.km_details || [],
+      gpsTrace: d.gpsTrace || [],
+      week: 0,
+      slot: 's1'
+    };
+    sessions.push(session);
+    added++;
+  });
+
+  sessions.sort((a,b) => {
+    const da = parseDate(a.date), db = parseDate(b.date);
+    return da && db ? da - db : 0;
+  });
+
+  localStorage.setItem('smi_s', JSON.stringify(sessions));
+  renderPlan(); renderStats();
+  toast(`✅ ${added} séance(s) importée(s)`);
+  bulkCancel();
+}
+
+// Versions "bulk" des parseurs (retournent les données sans remplir le formulaire)
+function parseGpxTcxBulk(text, ext){
+  const tmp = { name: 'bulk' };
+  // Réutilise parseGpxTcx mais intercepte applyExtractedData
+  const data = {date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[],gpsTrace:[]};
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'text/xml');
+
+  if(ext === 'gpx'){
+    const timeEl = doc.querySelector('metadata time') || doc.querySelector('trkpt time');
+    if(timeEl){ const d=new Date(timeEl.textContent); data.date=d.toLocaleDateString('fr-FR'); }
+    const pts = [...doc.querySelectorAll('trkpt')];
+    if(!pts.length) return data;
+    let totalDist=0, elevGain=0, prevElev=null;
+    const hrVals=[];
+    const startTime = new Date(pts[0].querySelector('time')?.textContent||0);
+    const endTime = new Date(pts[pts.length-1].querySelector('time')?.textContent||0);
+    data.duree_min = Math.round((endTime-startTime)/60000);
+    for(let i=1;i<pts.length;i++){
+      const p=pts[i], pp=pts[i-1];
+      const d=haversine(parseFloat(pp.getAttribute('lat')),parseFloat(pp.getAttribute('lon')),parseFloat(p.getAttribute('lat')),parseFloat(p.getAttribute('lon')));
+      totalDist+=d;
+      const elev=parseFloat(p.querySelector('ele')?.textContent||0);
+      if(prevElev!==null&&elev>prevElev) elevGain+=(elev-prevElev);
+      prevElev=elev;
+      const ext2=p.querySelector('extensions');
+      let hr=0;
+      if(ext2){ for(const e of ext2.getElementsByTagName('*')){ if(e.localName==='hr'||e.localName==='heartrate'){hr=parseInt(e.textContent)||0;break;} } }
+      if(!hr) hr=parseInt(p.querySelector('hr')?.textContent||0);
+      if(hr>0) hrVals.push(hr);
+    }
+    data.distance_km = Math.round(totalDist/10)/100;
+    data.denivele_plus = Math.round(elevGain);
+    data.fc_moy = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : 0;
+    data.fc_max = hrVals.length ? Math.max(...hrVals) : 0;
+    if(data.distance_km>0&&data.duree_min>0) data.allure_moy = secToPace(Math.round(data.duree_min*60/data.distance_km));
+  }
+  return data;
+}
+
+function parseFitBulk(buffer){
+  // Réutilise la logique de parseFit mais retourne les données directement
+  // Appel simplifié — on capture le résultat via une version modifiée
+  const data = {date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[],gpsTrace:[]};
+  try {
+    const bytes = new Uint8Array(buffer);
+    // Header FIT
+    if(bytes[8]!==0x2E||bytes[9]!==0x46||bytes[10]!==0x49||bytes[11]!==0x54) return data;
+    let offset = bytes[0]; // header size
+    const msgs = [];
+    const localDefs = {};
+    while(offset < bytes.length - 2){
+      const hdr = bytes[offset++];
+      if((hdr&0x80)===0){
+        const isdef=(hdr&0x40)!==0;
+        const localNum=hdr&0x0F;
+        if(isdef){
+          offset++; // reserved
+          const arch=bytes[offset++];
+          const globalMsgNum=(arch===1)?(bytes[offset]<<8|bytes[offset+1]):(bytes[offset]|bytes[offset+1]<<8);
+          offset+=2;
+          const nFields=bytes[offset++];
+          const fields=[];
+          for(let i=0;i<nFields;i++){fields.push({num:bytes[offset],size:bytes[offset+1],type:bytes[offset+2]});offset+=3;}
+          const nDevFields=0;
+          localDefs[localNum]={globalMsgNum,arch,fields,size:fields.reduce((a,f)=>a+f.size,0)};
+        } else {
+          const def=localDefs[localNum];
+          if(!def){break;}
+          const rec={globalMsgNum:def.globalMsgNum,fields:{}};
+          let o=offset;
+          def.fields.forEach(f=>{
+            let val=0;
+            for(let b=0;b<f.size;b++) val|=bytes[o+b]<<(8*b);
+            rec.fields[f.num]=val;
+            o+=f.size;
+          });
+          offset+=def.size;
+          msgs.push(rec);
+        }
+      } else { offset++; }
+    }
+    // Extraire session (global msg 18) et laps
+    const sessionMsg = msgs.find(m=>m.globalMsgNum===18);
+    if(sessionMsg){
+      const f=sessionMsg.fields;
+      if(f[253]) { const ts=f[253]+631065600; const d=new Date(ts*1000); data.date=d.toLocaleDateString('fr-FR'); }
+      if(f[9]) data.distance_km=Math.round(f[9]/100)/10;
+      if(f[7]) data.duree_min=Math.round(f[7]/60000);
+      if(f[15]) data.fc_moy=f[15];
+      if(f[16]) data.fc_max=f[16];
+      if(f[22]) data.calories=f[22];
+      if(data.distance_km>0&&data.duree_min>0) data.allure_moy=secToPace(Math.round(data.duree_min*60/data.distance_km));
+    }
+  } catch(e){}
+  return data;
+}
+
+function exportData(){
+  const data={
+    sessions,
+    planOverrides,
+    coachData: JSON.parse(localStorage.getItem('smi_coach')||'null'),
+    settings:{...settings, apiKey:''},
+    exportedAt: new Date().toISOString(),
+    version: 1
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const date=new Date().toISOString().slice(0,10);
+  a.href=url; a.download=`semi-marathon-backup-${date}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('✅ Export téléchargé');
+}
+
+function importData(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.sessions||!Array.isArray(data.sessions)) throw new Error('Format invalide');
+      if(!confirm(`Importer ${data.sessions.length} séance(s) ? Tes données actuelles seront remplacées.`)) return;
+      sessions=data.sessions;
+      planOverrides=data.planOverrides||{};
+      if(data.settings){const k=settings.apiKey; settings={...data.settings,apiKey:k};}
+      localStorage.setItem('smi_s',JSON.stringify(sessions));
+      localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
+      if(data.coachData) localStorage.setItem('smi_coach',JSON.stringify(data.coachData));
+      localStorage.setItem('smi_cfg',JSON.stringify(settings));
+      renderPlan(); renderStats(); loadCoachCard();
+      toast(`✅ ${sessions.length} séance(s) importée(s)`);
+      input.value='';
+    } catch(err){ toast('❌ Fichier invalide : '+err.message); }
+  };
+  reader.readAsText(file);
+}
+
 function resetPlanOverrides(){
   if(confirm('Restaurer le plan original ? Toutes les modifications du Coach IA seront annulées.')){
     planOverrides={};
