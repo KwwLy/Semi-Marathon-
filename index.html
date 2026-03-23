@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Semi-Marathon 1h50 — Tracker</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -182,6 +185,15 @@ canvas{display:block;width:100%!important}
   <div class="topbar-ic">🏃</div>
   <div><h1>Semi-Marathon 1h50</h1><p>Plan personnalisé · 4 octobre 2026</p></div>
 </div>
+<!-- FIREBASE SYNC BANNER -->
+<div id="fb-banner" style="display:none;align-items:center;justify-content:space-between;padding:8px 14px;font-size:12px;background:var(--bg2);border-bottom:1px solid var(--border)">
+  <div id="fb-status" style="display:flex;align-items:center;gap:6px;color:var(--text2)">
+    <span id="fb-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);display:inline-block"></span>
+    <span id="fb-label">Non connecté</span>
+  </div>
+  <button id="fb-btn" onclick="fbToggleAuth()" class="btn btn-ghost btn-sm" style="font-size:11px">Se connecter avec Google</button>
+</div>
+
 <div class="tabs">
   <button class="tab active" onclick="sw('plan')">📋 Plan</button>
   <button class="tab" onclick="sw('log')">✏️ Saisir</button>
@@ -421,6 +433,24 @@ canvas{display:block;width:100%!important}
 
 <!-- SETTINGS -->
 <div class="section" id="tab-settings">
+  <div class="card" id="fb-settings-card">
+    <div class="card-title"><span class="bar"></span>☁️ Synchronisation multi-appareils</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte-toi avec Google pour synchroniser automatiquement tes séances, ton plan et tes réglages sur tous tes appareils.</p>
+    <div id="fb-settings-logged-out">
+      <button class="btn btn-or btn-full" onclick="fbToggleAuth()">🔑 Se connecter avec Google</button>
+    </div>
+    <div id="fb-settings-logged-in" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <img id="fb-avatar" src="" style="width:36px;height:36px;border-radius:50%;display:none">
+        <div>
+          <div id="fb-username" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+          <div id="fb-useremail" style="font-size:11px;color:var(--text3)"></div>
+        </div>
+        <span id="fb-sync-indicator" style="margin-left:auto;font-size:11px;color:var(--text3)">✓ Synchronisé</span>
+      </div>
+      <button class="btn btn-ghost btn-full" onclick="fbToggleAuth()">Se déconnecter</button>
+    </div>
+  </div>
   <div class="card">
     <div class="card-title"><span class="bar"></span>Clé API Anthropic (pour analyse directe)</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Ta clé API permet d'analyser les séances directement dans l'app sans copier-coller. Elle est stockée uniquement dans ton navigateur (localStorage) et n'est jamais envoyée ailleurs qu'à l'API Anthropic.</p>
@@ -2736,6 +2766,111 @@ onSportChange();
 setImportMode('fit');
 loadCoachCard();
 renderStats();
+</script>
+
+
+<script>
+window.addEventListener('DOMContentLoaded', function(){
+try {
+  firebase.initializeApp({
+    apiKey: "AIzaSyCAxvE_GNcpqFePMdmU3Ht7QeS-sYAE5-E",
+    authDomain: "semi-marathon-94d90.firebaseapp.com",
+    projectId: "semi-marathon-94d90",
+    storageBucket: "semi-marathon-94d90.firebasestorage.app",
+    messagingSenderId: "430293017307",
+    appId: "1:430293017307:web:109e1cdbab4ac49350a2fe"
+  });
+
+  const fbAuth = firebase.auth();
+  const fbDb = firebase.firestore();
+  let fbUser = null;
+  let fbSyncing = false;
+
+  document.getElementById('fb-banner').style.display = 'flex';
+
+  fbAuth.onAuthStateChanged(async user => {
+    fbUser = user;
+    if(user){ fbSetConnected(user); await fbLoadData(); }
+    else { fbSetDisconnected(); }
+  });
+
+  function fbSetConnected(user){
+    document.getElementById('fb-dot').style.background = '#27AE60';
+    document.getElementById('fb-label').textContent = user.displayName||user.email;
+    document.getElementById('fb-btn').textContent = 'Se déconnecter';
+    document.getElementById('fb-settings-logged-out').style.display = 'none';
+    document.getElementById('fb-settings-logged-in').style.display = 'block';
+    document.getElementById('fb-username').textContent = user.displayName||'';
+    document.getElementById('fb-useremail').textContent = user.email||'';
+    if(user.photoURL){ const av=document.getElementById('fb-avatar'); av.src=user.photoURL; av.style.display='block'; }
+  }
+
+  function fbSetDisconnected(){
+    document.getElementById('fb-dot').style.background = 'var(--text3)';
+    document.getElementById('fb-label').textContent = 'Non connecté — données locales uniquement';
+    document.getElementById('fb-btn').textContent = 'Se connecter avec Google';
+    document.getElementById('fb-settings-logged-out').style.display = 'block';
+    document.getElementById('fb-settings-logged-in').style.display = 'none';
+  }
+
+  window.fbToggleAuth = function(){
+    if(fbUser){
+      if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
+    } else {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      fbAuth.signInWithPopup(provider).catch(e=>toast('Erreur connexion : '+e.message));
+    }
+  };
+
+  async function fbLoadData(){
+    if(!fbUser) return;
+    try {
+      const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+      if(snap.exists){
+        const d = snap.data();
+        if(d.sessions){ sessions=d.sessions; localStorage.setItem('smi_s',JSON.stringify(sessions)); }
+        if(d.planOverrides){ planOverrides=d.planOverrides; localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides)); }
+        if(d.coachData) localStorage.setItem('smi_coach',JSON.stringify(d.coachData));
+        if(d.settings){ const k=settings.apiKey; settings={...d.settings,apiKey:k||d.settings.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
+        renderPlan(); renderStats(); loadCoachCard();
+        toast('☁️ Données synchronisées');
+      } else {
+        await fbSaveData();
+      }
+    } catch(e){ toast('Erreur chargement : '+e.message); }
+  }
+
+  async function fbSaveData(){
+    if(!fbUser||fbSyncing) return;
+    fbSyncing=true; fbSetSyncStatus('⏳ Sync…');
+    try {
+      const coachRaw=localStorage.getItem('smi_coach');
+      await fbDb.collection('users').doc(fbUser.uid).set({
+        sessions, planOverrides,
+        settings:{...settings,apiKey:''},
+        coachData: coachRaw?JSON.parse(coachRaw):null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      fbSetSyncStatus('✓ Synchronisé');
+    } catch(e){ fbSetSyncStatus('⚠️ Erreur sync'); toast('Erreur sauvegarde : '+e.message); }
+    fbSyncing=false;
+  }
+
+  function fbSetSyncStatus(msg){ const el=document.getElementById('fb-sync-indicator'); if(el)el.textContent=msg; }
+
+  window.fbSaveData = fbSaveData;
+
+  const _orig=localStorage.setItem.bind(localStorage);
+  localStorage.setItem=function(key,value){
+    _orig(key,value);
+    if(['smi_s','smi_plan_overrides','smi_coach'].includes(key)){
+      clearTimeout(localStorage._fbTimer);
+      localStorage._fbTimer=setTimeout(fbSaveData,1500);
+    }
+  };
+
+} catch(e){ console.warn('Firebase non disponible:', e); }
+}); // DOMContentLoaded
 </script>
 </body>
 </html>
