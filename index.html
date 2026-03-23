@@ -3190,10 +3190,18 @@ try {
   const currentUrl = window.location.href;
   const isEmailLink = firebase.auth.isSignInWithEmailLink(fbAuth, currentUrl);
 
+  console.log('URL actuelle:', currentUrl);
+  console.log('Est un lien email Firebase:', isEmailLink);
+  console.log('Contient oobCode:', currentUrl.includes('oobCode'));
+
   // Debug visible dans l'app (utile sur iPhone sans DevTools)
   if(currentUrl.includes('oobCode')){
     const dbgEl = document.getElementById('fb-email-msg');
-    if(dbgEl){ dbgEl.textContent = 'Lien détecté, connexion en cours…'; dbgEl.style.display='block'; dbgEl.style.color='var(--or)'; }
+    if(dbgEl){ 
+      dbgEl.textContent = isEmailLink ? 'Lien détecté ✓, connexion en cours…' : '⚠️ Lien non reconnu par Firebase (isEmailLink=false)'; 
+      dbgEl.style.display='block'; 
+      dbgEl.style.color = isEmailLink ? 'var(--or)' : 'var(--re)'; 
+    }
   }
 
   if(isEmailLink){
@@ -3201,17 +3209,17 @@ try {
     if(!email) email = prompt('Confirme ton adresse email pour te connecter :');
     if(email){
       fbAuth.signInWithEmailLink(email, currentUrl)
-        .then(() => {
+        .then(result => {
+          console.log('Connexion email réussie:', result.user.email);
           localStorage.removeItem('smi_email_link');
           window.history.replaceState({}, document.title, window.location.pathname);
           toast('✅ Connecté avec succès !');
         })
         .catch(e => {
-          console.error('Email link error:', e);
-          // Afficher l'erreur dans l'app
+          console.error('Email link error:', e.code, e.message);
           const dbgEl = document.getElementById('fb-email-msg');
-          if(dbgEl){ dbgEl.textContent = '❌ Erreur : '+e.message; dbgEl.style.display='block'; dbgEl.style.color='var(--re)'; }
-          toast('Erreur : '+e.message);
+          if(dbgEl){ dbgEl.textContent = '❌ '+e.code+' : '+e.message; dbgEl.style.display='block'; dbgEl.style.color='var(--re)'; }
+          toast('Erreur : '+e.code);
         });
     }
   }
