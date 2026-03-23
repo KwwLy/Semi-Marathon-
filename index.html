@@ -185,6 +185,7 @@ canvas{display:block;width:100%!important}
   <button class="tab active" onclick="sw('plan')">📋 Plan</button>
   <button class="tab" onclick="sw('log')">✏️ Saisir</button>
   <button class="tab" onclick="sw('stats')">📊 Dashboard</button>
+  <button class="tab" onclick="sw('zones')">🏃 Zones</button>
   <button class="tab" onclick="sw('settings')">⚙️ Réglages</button>
 </div>
 
@@ -411,6 +412,11 @@ canvas{display:block;width:100%!important}
   </div>
 </div>
 
+<!-- ZONES -->
+<div class="section" id="tab-zones">
+  <div id="zones-content"></div>
+</div>
+
 <!-- SETTINGS -->
 <div class="section" id="tab-settings">
   <div class="card">
@@ -574,10 +580,11 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plan','log','stats','settings'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plan','log','stats','zones','settings'][i]===t));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='stats')renderStats();
+  if(t==='zones')renderZones();
   if(t==='settings')loadSettings();
 }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
@@ -1409,7 +1416,152 @@ function minsToHMS(mins){
 function updatePerfCards(){/* cartes supprimées — prédiction et VO2max dans Coach IA */}
 
 
-// ── CALENDRIER ────────────────────────────────────────────────────────────
+// ── ZONES D'ALLURE ────────────────────────────────────────────────────────
+function renderZones(){
+  // Lire l'objectif depuis l'analyse Coach IA (si dispo), sinon 1h50 par défaut
+  const coachSaved=localStorage.getItem('smi_coach');
+  let targetPaceSec=313; // 5:13/km = 1h50 par défaut
+  let targetLabel='1h50';
+  let targetFromCoach=false;
+
+  if(coachSaved){
+    try{
+      const cd=JSON.parse(coachSaved);
+      if(cd.prediction_time){
+        // Convertir "1h45:30" ou "1h50:00" en secondes/km pour 21.1km
+        const m=cd.prediction_time.match(/(\d+)h(\d+)[:\'](\d+)/);
+        if(m){
+          const totalMin=parseInt(m[1])*60+parseInt(m[2])+parseInt(m[3])/60;
+          const paceSec=Math.round(totalMin*60/21.1);
+          // Plancher : jamais plus lent que 5:41/km (2h00)
+          // Jamais plus rapide que 4:45/km (1h40) — raisonnable
+          if(paceSec>=285&&paceSec<=341){
+            targetPaceSec=paceSec;
+            targetLabel=cd.prediction_time.replace(':00','');
+            targetFromCoach=true;
+          }
+        }
+      }
+    }catch(e){}
+  }
+
+  // Toujours au moins 1h50 (5:13/km = 313 sec/km)
+  targetPaceSec=Math.min(targetPaceSec,313);
+  if(targetPaceSec<313){targetLabel=targetLabel;}
+  else{targetPaceSec=313;targetLabel='1h50';}
+
+  // Calculer les zones depuis l'allure semi cible (Z3)
+  // Z3 = allure semi ±4 sec
+  // Z2 = Z3 + 37s à + 67s (endurance fondamentale)
+  // Z1 = Z3 + 77s à +107s (récup)
+  // Z4 = Z3 − 18s à − 8s (seuil)
+  // Z5 = Z3 − 48s à − 33s (VMA)
+  const z3lo=targetPaceSec-4, z3hi=targetPaceSec+7;
+  const z2lo=targetPaceSec+33, z2hi=targetPaceSec+67;
+  const z1lo=targetPaceSec+77, z1hi=targetPaceSec+107;
+  const z4lo=targetPaceSec-23, z4hi=targetPaceSec-9;
+  const z5lo=targetPaceSec-53, z5hi=targetPaceSec-33;
+
+  function fmt(s){return Math.floor(s/60)+':'+(s%60<10?'0':'')+Math.round(s%60)}
+  function kmh(s){return(3600/s).toFixed(1)}
+  function zoneBlock(color,num,label,lo,hi,fcLow,fcHigh,desc,usage,star=''){
+    return`<div style="margin-bottom:10px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)">
+      <div style="background:${color};padding:9px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="color:#fff;font-weight:700;font-size:14px">Z${num} — ${label}${star}</div>
+        <div style="color:rgba(255,255,255,0.9);font-weight:700;font-size:15px">${fmt(lo)} – ${fmt(hi)} /km</div>
+      </div>
+      <div style="padding:10px 14px;background:var(--bg2)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase">Vitesse</span>
+            <div style="font-size:13px;font-weight:600">${kmh(hi)} – ${kmh(lo)} km/h</div></div>
+          <div><span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase">FC cible</span>
+            <div style="font-size:13px;font-weight:600">${fcLow}–${fcHigh}% FCmax</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--text2);line-height:1.5">${desc}</p>
+        <div style="margin-top:8px;padding:7px 10px;background:var(--bg3);border-radius:var(--r);font-size:11px;color:var(--text2)">
+          💡 <b>Usage :</b> ${usage}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const targetKmh=kmh(targetPaceSec);
+  const isAmbitious=targetPaceSec<313;
+
+  const html=`
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>🏃 Zones d'allure — Objectif ${targetLabel}</div>
+    ${targetFromCoach?`<div style="background:var(--pul);border:1px solid var(--pu);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pu)">
+      🤖 Zones calculées depuis la prédiction Coach IA (<b>${targetLabel}</b>). ${isAmbitious?'Plan plus ambitieux que 1h50 — allures relevées en conséquence.':'Objectif de base 1h50.'}
+    </div>`:`<div style="background:var(--bg2);border-radius:var(--r);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--text2)">
+      ℹ️ Zones calculées pour <b>1h50 (objectif minimum)</b>. Lance une analyse Coach IA pour les adapter à ta progression.
+    </div>`}
+
+    ${zoneBlock('#2980B9',1,'Récupération active',z1lo,z1hi,60,70,
+      'Allure très facile, tu peux tenir une conversation complète. Utilisée en échauffement, retour au calme et séances de récupération. Tu dois te sentir presque trop lent.',
+      'Échauffements · Retours au calme · S2 des semaines chargées')}
+    ${zoneBlock('#27AE60',2,'Endurance fondamentale',z2lo,z2hi,70,80,
+      'Allure confortable mais tonique. Tu peux parler mais pas chanter. Base de toute préparation — développe l\'endurance aérobie, brûle les graisses, construit le volume.',
+      'Sorties longues (16-20 km) · Base d\'endurance · Volume hebdomadaire')}
+    ${zoneBlock('#E8500A',3,'Allure semi ⭐',z3lo,z3hi,80,88,
+      `C'est <b>ton allure cible pour le 4 octobre</b> (${fmt(targetPaceSec)}/km = ${targetLabel}). Effort soutenu, tu peux prononcer quelques mots mais plus tenir une vraie conversation. Zone spécifique à apprivoiser.`,
+      'Blocs spécifiques semi · Fractions 2-3 km · Finales de sortie longue')}
+    ${zoneBlock('#C0392B',4,'Seuil lactique',z4lo,z4hi,88,93,
+      'Effort intense, respiration difficile. C\'est le seuil où l\'acide lactique commence à s\'accumuler. Développe ta capacité à soutenir des allures élevées — repousse le "mur" du semi.',
+      'Fractions 1 km · Répétitions 400-800m · Séances de seuil')}
+    ${zoneBlock('#8E44AD',5,'VMA (Vitesse Max Aérobie)',z5lo,z5hi,93,100,
+      'Effort maximal, impossible de tenir plus de 3-5 min. Développe ton plafond aérobie (VO2max) — plus ta VMA est élevée, plus ton allure semi sera facile relativement.',
+      '400m répétés · 30/30 · Intervalles courts et intenses')}
+
+    <!-- Tableau récap -->
+    <div class="card-title" style="margin-top:4px"><span class="bar"></span>Tableau récapitulatif</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--bg3)">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;color:var(--text3);font-size:10px;text-transform:uppercase">Zone</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--text3);font-size:10px;text-transform:uppercase">Allure</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--text3);font-size:10px;text-transform:uppercase">Vitesse</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:700;color:var(--text3);font-size:10px;text-transform:uppercase">FC</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${[
+            ['#2980B9','Z1','Récup',z1lo,z1hi,'60','70'],
+            ['#27AE60','Z2','Endurance',z2lo,z2hi,'70','80'],
+            ['#E8500A','Z3 ⭐','Semi',z3lo,z3hi,'80','88'],
+            ['#C0392B','Z4','Seuil',z4lo,z4hi,'88','93'],
+            ['#8E44AD','Z5','VMA',z5lo,z5hi,'93','100'],
+          ].map((r,i)=>`<tr style="${i%2?'background:var(--bg2)':''}border-top:1px solid var(--border)">
+            <td style="padding:8px 10px"><span style="background:${r[0]};color:#fff;border-radius:4px;padding:2px 7px;font-weight:700;font-size:11px">${r[1]}</span> <span style="font-size:11px;color:var(--text3)">${r[2]}</span></td>
+            <td style="padding:8px 10px;text-align:center;font-weight:600">${fmt(r[3])} – ${fmt(r[4])}</td>
+            <td style="padding:8px 10px;text-align:center;color:var(--text2)">${kmh(r[4])}–${kmh(r[3])} km/h</td>
+            <td style="padding:8px 10px;text-align:center;color:var(--text2)">${r[5]}–${r[6]}%</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>📡 Fréquence cardiaque de référence</div>
+    <p style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px">Les % de FC sont calculés par rapport à ta <b>FC max</b>. Si tu ne la connais pas, utilise <b>220 − âge</b> ou note ton FC max lors d'un sprint final en côte.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Allure semi cible</div>
+        <div style="font-size:22px;font-weight:700;color:var(--or)">${fmt(targetPaceSec)}/km</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">= ${targetLabel} sur 21.1 km</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Objectif minimum</div>
+        <div style="font-size:22px;font-weight:700;color:var(--bl)">5:13/km</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">= 1h50 (plancher)</div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('zones-content').innerHTML=html;
+}
 const SPORT_ICONS={
   'plan':'🏃','course-libre':'🏃','natation-plan':'🏊','natation-libre':'🏊',
   'velo':'🚴','padel':'🎾','krav':'🥋','autre':'⚡'
