@@ -3175,7 +3175,7 @@ try {
       } else {
         await fbSaveData();
       }
-    } catch(e){ toast('Erreur chargement : '+e.message); }
+    } catch(e){ console.error('FB LOAD ERROR:', e.code, e.message, e); toast('Erreur chargement : '+(e.code||e.message)); }
   }
 
   async function fbSaveData(){
@@ -3190,7 +3190,7 @@ try {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       fbSetSyncStatus('✓ Synchronisé');
-    } catch(e){ fbSetSyncStatus('⚠️ Erreur sync'); toast('Erreur sauvegarde : '+e.message); }
+    } catch(e){ fbSetSyncStatus('⚠️ Erreur sync'); console.error('FB SYNC ERROR:', e.code, e.message, e); toast('Erreur sync : '+(e.code||e.message)); }
     fbSyncing=false;
   }
 
