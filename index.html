@@ -3174,7 +3174,7 @@ try {
     const email = document.getElementById('fb-email-input')?.value?.trim();
     if(!email){ toast('Entre ton adresse email'); return; }
     const actionCodeSettings = {
-      url: 'https://kwwly.github.io/semi-marathon/',
+      url: window.location.origin + window.location.pathname,
       handleCodeInApp: true
     };
     try {
