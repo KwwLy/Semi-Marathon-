@@ -2543,100 +2543,49 @@ function bulkConfirm(){
 
 // Versions "bulk" des parseurs (retournent les données sans remplir le formulaire)
 function parseGpxTcxBulk(text, ext){
-  const tmp = { name: 'bulk' };
-  // Réutilise parseGpxTcx mais intercepte applyExtractedData
-  const data = {date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[],gpsTrace:[]};
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, 'text/xml');
-
-  if(ext === 'gpx'){
-    const timeEl = doc.querySelector('metadata time') || doc.querySelector('trkpt time');
-    if(timeEl){ const d=new Date(timeEl.textContent); data.date=d.toLocaleDateString('fr-FR'); }
-    const pts = [...doc.querySelectorAll('trkpt')];
-    if(!pts.length) return data;
-    let totalDist=0, elevGain=0, prevElev=null;
-    const hrVals=[];
-    const startTime = new Date(pts[0].querySelector('time')?.textContent||0);
-    const endTime = new Date(pts[pts.length-1].querySelector('time')?.textContent||0);
-    data.duree_min = Math.round((endTime-startTime)/60000);
-    for(let i=1;i<pts.length;i++){
-      const p=pts[i], pp=pts[i-1];
-      const d=haversine(parseFloat(pp.getAttribute('lat')),parseFloat(pp.getAttribute('lon')),parseFloat(p.getAttribute('lat')),parseFloat(p.getAttribute('lon')));
-      totalDist+=d;
-      const elev=parseFloat(p.querySelector('ele')?.textContent||0);
-      if(prevElev!==null&&elev>prevElev) elevGain+=(elev-prevElev);
-      prevElev=elev;
-      const ext2=p.querySelector('extensions');
-      let hr=0;
-      if(ext2){ for(const e of ext2.getElementsByTagName('*')){ if(e.localName==='hr'||e.localName==='heartrate'){hr=parseInt(e.textContent)||0;break;} } }
-      if(!hr) hr=parseInt(p.querySelector('hr')?.textContent||0);
-      if(hr>0) hrVals.push(hr);
-    }
-    data.distance_km = Math.round(totalDist/10)/100;
-    data.denivele_plus = Math.round(elevGain);
-    data.fc_moy = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : 0;
-    data.fc_max = hrVals.length ? Math.max(...hrVals) : 0;
-    if(data.distance_km>0&&data.duree_min>0) data.allure_moy = secToPace(Math.round(data.duree_min*60/data.distance_km));
-  }
-  return data;
+  // Réutilise le vrai parseur GPX/TCX en capturant le résultat avant applyExtractedData
+  let capturedData = null;
+  const origApply = window.applyExtractedData;
+  window.applyExtractedData = function(data){ capturedData = data; };
+  try { parseGpxTcx(text, ext, 'bulk'); } catch(e){}
+  window.applyExtractedData = origApply;
+  if(!capturedData) return null;
+  return {
+    date: capturedData.date||'',
+    distance_km: capturedData.distance_km||0,
+    duree_min: capturedData.duree_min||0,
+    allure_moy: capturedData.allure_moy||'',
+    fc_moy: capturedData.fc_moy||0,
+    fc_max: capturedData.fc_max||0,
+    denivele_plus: capturedData.denivele_plus||0,
+    calories: capturedData.calories||0,
+    sport: capturedData.sport||'course',
+    km_details: capturedData.km_details||[],
+    gpsTrace: capturedData.gpsTrace||[]
+  };
 }
 
 function parseFitBulk(buffer){
-  // Réutilise la logique de parseFit mais retourne les données directement
-  // Appel simplifié — on capture le résultat via une version modifiée
-  const data = {date:'',distance_km:0,duree_min:0,allure_moy:'',fc_moy:0,fc_max:0,denivele_plus:0,calories:0,sport:'course',km_details:[],gpsTrace:[]};
-  try {
-    const bytes = new Uint8Array(buffer);
-    // Header FIT
-    if(bytes[8]!==0x2E||bytes[9]!==0x46||bytes[10]!==0x49||bytes[11]!==0x54) return data;
-    let offset = bytes[0]; // header size
-    const msgs = [];
-    const localDefs = {};
-    while(offset < bytes.length - 2){
-      const hdr = bytes[offset++];
-      if((hdr&0x80)===0){
-        const isdef=(hdr&0x40)!==0;
-        const localNum=hdr&0x0F;
-        if(isdef){
-          offset++; // reserved
-          const arch=bytes[offset++];
-          const globalMsgNum=(arch===1)?(bytes[offset]<<8|bytes[offset+1]):(bytes[offset]|bytes[offset+1]<<8);
-          offset+=2;
-          const nFields=bytes[offset++];
-          const fields=[];
-          for(let i=0;i<nFields;i++){fields.push({num:bytes[offset],size:bytes[offset+1],type:bytes[offset+2]});offset+=3;}
-          const nDevFields=0;
-          localDefs[localNum]={globalMsgNum,arch,fields,size:fields.reduce((a,f)=>a+f.size,0)};
-        } else {
-          const def=localDefs[localNum];
-          if(!def){break;}
-          const rec={globalMsgNum:def.globalMsgNum,fields:{}};
-          let o=offset;
-          def.fields.forEach(f=>{
-            let val=0;
-            for(let b=0;b<f.size;b++) val|=bytes[o+b]<<(8*b);
-            rec.fields[f.num]=val;
-            o+=f.size;
-          });
-          offset+=def.size;
-          msgs.push(rec);
-        }
-      } else { offset++; }
-    }
-    // Extraire session (global msg 18) et laps
-    const sessionMsg = msgs.find(m=>m.globalMsgNum===18);
-    if(sessionMsg){
-      const f=sessionMsg.fields;
-      if(f[253]) { const ts=f[253]+631065600; const d=new Date(ts*1000); data.date=d.toLocaleDateString('fr-FR'); }
-      if(f[9]) data.distance_km=Math.round(f[9]/100)/10;
-      if(f[7]) data.duree_min=Math.round(f[7]/60000);
-      if(f[15]) data.fc_moy=f[15];
-      if(f[16]) data.fc_max=f[16];
-      if(f[22]) data.calories=f[22];
-      if(data.distance_km>0&&data.duree_min>0) data.allure_moy=secToPace(Math.round(data.duree_min*60/data.distance_km));
-    }
-  } catch(e){}
-  return data;
+  // Réutilise le vrai parseur FIT en capturant le résultat avant applyExtractedData
+  let capturedData = null;
+  const origApply = window.applyExtractedData;
+  window.applyExtractedData = function(data){ capturedData = data; };
+  try { parseFit(buffer, 'bulk'); } catch(e){}
+  window.applyExtractedData = origApply;
+  if(!capturedData) return null;
+  return {
+    date: capturedData.date||'',
+    distance_km: capturedData.distance_km||0,
+    duree_min: capturedData.duree_min||0,
+    allure_moy: capturedData.allure_moy||'',
+    fc_moy: capturedData.fc_moy||0,
+    fc_max: capturedData.fc_max||0,
+    denivele_plus: capturedData.denivele_plus||0,
+    calories: capturedData.calories||0,
+    sport: capturedData.sport||'course',
+    km_details: capturedData.km_details||[],
+    gpsTrace: capturedData.gpsTrace||[]
+  };
 }
 
 function exportData(){
