@@ -2029,23 +2029,21 @@ function openSessionFromCal(id){
   },150);
 }
 
-// ── HELPERS SEMAINE ────────────────────────────────────────────────────────
 // ── RECORDS PERSONNELS ────────────────────────────────────────────────────
 function renderPersonalRecords(){
   const card=document.getElementById('pr-card');
   const runs=sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>=1&&s.dur>0);
-  if(!runs.length){card.style.display='none';return}
+  if(!runs.length){card.style.display='none';return;}
   card.style.display='block';
 
   const targets=[
-    {dist:5,   label:'5 km'},
-    {dist:10,  label:'10 km'},
-    {dist:15,  label:'15 km'},
-    {dist:20,  label:'20 km'},
-    {dist:21.1,label:'Semi'},
+    {dist:5,   label:'5 km',  minDist:5},
+    {dist:10,  label:'10 km', minDist:10},
+    {dist:15,  label:'15 km', minDist:15},
+    {dist:20,  label:'20 km', minDist:19.5}, // arrondi : 19.5+ compte comme 20km
+    {dist:21.1,label:'Semi',  minDist:21.0},
   ];
 
-  function riegelTime(dReal,tReal,dTarget){return tReal*Math.pow(dTarget/dReal,1.06);}
   function fmtTime(mins){
     const h=Math.floor(mins/60),m=Math.floor(mins%60),s=Math.round((mins%1)*60);
     return h>0?`${h}h${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}`:`${m}'${String(s).padStart(2,'0')}`;
@@ -2054,49 +2052,63 @@ function renderPersonalRecords(){
     const p=mins/dist;
     return`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}/km`;
   }
+  function paceToMin(pace){
+    if(!pace) return null;
+    const p=pace.split(':');
+    return p.length===2?parseInt(p[0])+parseInt(p[1])/60:null;
+  }
 
   const records=targets.map(t=>{
     let best=null;
 
     runs.forEach(s=>{
-      // ── Source 1 : séance entière ≥ distance cible → Riegel
-      if(s.dist>=t.dist){
-        const est=riegelTime(s.dist,s.dur,t.dist);
-        if(!best||est<best.t) best={t:est,date:s.date,src:'course'};
-      }
+      const effectiveDist = t.dist===20 && s.dist>=19.5 ? 20 : s.dist;
 
-      // ── Source 2 : données km par km — meilleur segment cumulé
-      if(s.kmRows&&s.kmRows.length>=1){
-        // Convertir allures en temps par km (en minutes)
-        const kmT=s.kmRows.map(r=>{
-          if(!r.pace)return null;
-          const p=r.pace.split(':');
-          return p.length===2?parseInt(p[0])+parseInt(p[1])/60:null;
+      // ── Fenêtre glissante sur kmDetails (données réelles km par km) ──
+      const kd = s.kmDetails||s.kmRows||[];
+      if(kd.length>=1){
+        const kmT = kd.map(r=>{
+          // kmDetails peut avoir allure ou pace
+          const pace = r.allure||r.pace||'';
+          return paceToMin(pace);
         });
-        const fullKm=Math.floor(t.dist);
-        const frac=t.dist-fullKm;
-        // Fenêtre glissante sur fullKm km consécutifs
-        for(let i=0;i<=kmT.length-fullKm;i++){
-          let seg=0,ok=true;
-          for(let j=i;j<i+fullKm;j++){if(kmT[j]==null){ok=false;break;}seg+=kmT[j];}
-          if(!ok)continue;
-          if(frac>0&&i+fullKm<kmT.length&&kmT[i+fullKm]!=null) seg+=kmT[i+fullKm]*frac;
-          if(!best||seg<best.t) best={t:seg,date:s.date,src:'segment'};
-        }
-        // Si on a assez de km pour couvrir sans fraction
-        if(frac===0){
-          for(let i=0;i<=kmT.length-fullKm;i++){
-            let seg=0,ok=true;
-            for(let j=i;j<i+fullKm;j++){if(kmT[j]==null){ok=false;break;}seg+=kmT[j];}
-            if(!ok)continue;
-            if(!best||seg<best.t) best={t:seg,date:s.date,src:'segment'};
+
+        const nKm = Math.floor(t.dist); // nb de km entiers
+        const frac = t.dist - nKm;      // fraction restante (ex: 0.1 pour semi)
+
+        // Fenêtre glissante sur nKm km consécutifs
+        if(kmT.length >= nKm){
+          for(let i=0; i<=kmT.length-nKm; i++){
+            let seg=0, ok=true;
+            for(let j=i; j<i+nKm; j++){
+              if(kmT[j]==null){ok=false;break;}
+              seg+=kmT[j];
+            }
+            if(!ok) continue;
+            // Ajouter la fraction du km suivant si besoin
+            if(frac>0 && i+nKm<kmT.length && kmT[i+nKm]!=null){
+              seg+=kmT[i+nKm]*frac;
+            }
+            if(!best||seg<best.t) best={t:seg, date:s.date, dist:s.dist};
           }
         }
       }
+
+      // ── Fallback : séance entière si dist >= minDist et pas de kmDetails ──
+      if(!kd.length && s.dist>=t.minDist && s.dur>0){
+        // Calculer le temps proportionnel pour la distance cible
+        const segTime = s.dur * (t.dist / effectiveDist);
+        if(!best||segTime<best.t) best={t:segTime, date:s.date, dist:s.dist};
+      }
     });
 
-    if(!best)return{...t,best:null};
-    return{...t,best:{timeStr:fmtTime(best.t),paceStr:fmtPace(best.t,t.dist),date:best.date,src:best.src}};
+    if(!best) return{...t, best:null};
+    return{...t, best:{
+      timeStr: fmtTime(best.t),
+      paceStr: fmtPace(best.t, t.dist),
+      date: best.date,
+      dist: best.dist
+    }};
   });
 
   document.getElementById('pr-grid').innerHTML=records.map(r=>`
@@ -2105,7 +2117,8 @@ function renderPersonalRecords(){
       ${r.best?`
         <div style="font-size:19px;font-weight:700;color:var(--or);line-height:1.1">${r.best.timeStr}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:3px;font-weight:500">${r.best.paceStr}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:3px">${r.best.date||''}${r.best.src==='segment'?' · segment':''}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">${r.best.date||''}${r.best.dist&&r.best.dist!==r.dist?` · ${r.best.dist}km`:''}
+        </div>
       `:`<div style="font-size:13px;color:var(--text3);padding:8px 0">—</div>`}
     </div>`).join('');
 }
