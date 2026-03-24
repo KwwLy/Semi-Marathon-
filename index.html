@@ -3632,29 +3632,94 @@ function stravaCancelImport(){
   if(el){ el.style.display='none'; el.innerHTML=''; }
 }
 
-function stravaConfirmImport(){
+async function stravaConfirmImport(){
   const toImport=stravaPending.filter(p=>p.selected);
   if(!toImport.length){ toast('Aucune activité sélectionnée'); return; }
+
+  const statusEl=document.getElementById('strava-sync-status');
+  if(statusEl){ statusEl.textContent='⏳ Récupération des données GPS…'; statusEl.style.display='block'; }
+
+  const token=await stravaGetToken();
   const activePlan=getActivePlan();
   let added=0;
-  toImport.forEach(p=>{
+
+  for(const p of toImport){
+    let gpsTrace=[], kmDetails=[];
+
+    // Récupérer les streams GPS + cadence + FC km par km
+    if(token && p.act.id){
+      try {
+        if(statusEl) statusEl.textContent=`⏳ Récupération GPS : ${p.comment||p.date}…`;
+        const streamResp = await fetch(
+          `https://www.strava.com/api/v3/activities/${p.act.id}/streams?keys=latlng,distance,time,altitude,heartrate&key_by_type=true`,
+          { headers:{'Authorization':'Bearer '+token} }
+        );
+        const streams = await streamResp.json();
+
+        // Construire le tracé GPS (sous-échantillonné à 500 points max)
+        if(streams.latlng?.data){
+          const pts = streams.latlng.data;
+          const step = Math.max(1, Math.floor(pts.length/500));
+          const distData = streams.distance?.data||[];
+          const altData = streams.altitude?.data||[];
+          const hrData = streams.heartrate?.data||[];
+          gpsTrace = pts.filter((_,i)=>i%step===0).map((pt,i)=>({
+            lat: pt[0], lon: pt[1],
+            dist: distData[i*step]||0,
+            hr: hrData[i*step]||0
+          }));
+
+          // Construire le détail km par km
+          if(distData.length && distData[distData.length-1]>0){
+            const totalKm = Math.floor(distData[distData.length-1]/1000);
+            const timeData = streams.time?.data||[];
+            for(let km=1; km<=totalKm; km++){
+              // Trouver l'index où on franchit km*1000m
+              const targetDist = km*1000;
+              const prevTarget = (km-1)*1000;
+              const idxEnd = distData.findIndex(d=>d>=targetDist);
+              const idxStart = km===1 ? 0 : distData.findIndex(d=>d>=prevTarget);
+              if(idxEnd<0) break;
+              const timeSec = timeData.length ? (timeData[idxEnd]-(timeData[idxStart]||0)) : 0;
+              const pace = timeSec>0 ? secToPace(timeSec) : '';
+              // Dénivelé sur ce km
+              let dplus=0;
+              if(altData.length){
+                for(let i=idxStart+1;i<=idxEnd;i++){
+                  if(altData[i]>altData[i-1]) dplus+=altData[i]-altData[i-1];
+                }
+              }
+              // FC moyenne sur ce km
+              let hrKm=0;
+              if(hrData.length){
+                const slice=hrData.slice(idxStart,idxEnd+1).filter(Boolean);
+                hrKm=slice.length?Math.round(slice.reduce((a,b)=>a+b,0)/slice.length):0;
+              }
+              kmDetails.push({ km, allure:pace, pace, dplus:Math.round(dplus), hr:hrKm, note:'' });
+            }
+          }
+        }
+      } catch(e){ console.warn('Stream fetch error:', e.message); }
+    }
+
     sessions.push({
       id: Date.now()+Math.random(),
       sport: p.sport, date: p.date, dist: p.dist, dur: p.dur,
       dplus: p.dplus||0, pace: p.pace||'', hr: p.hr||0, hrmax: p.hrmax||0,
-      comment: p.comment||'', kmDetails:[], gpsTrace:[],
+      comment: p.comment||'', kmDetails, kmRows:kmDetails, gpsTrace,
       week: p.week||0, slot: p.slot||'s1',
       planId: (p.sport==='plan'||p.sport==='natation-plan')&&activePlan?activePlan.id:null,
       stravaId: p.act.id
     });
     added++;
-  });
+  }
+
   sessions.sort((a,b)=>{ const da=parseDate(a.date),db=parseDate(b.date); return da&&db?da-db:0; });
   localStorage.setItem('smi_s',JSON.stringify(sessions));
   localStorage.setItem('strava_last_sync',String(Math.floor(Date.now()/1000)));
   stravaUpdateUI(); renderPlan(); renderStats();
   stravaCancelImport();
-  toast(`✅ ${added} activité(s) importée(s)`);
+  toast(`✅ ${added} activité(s) importée(s) avec GPS`);
 }
 
 
