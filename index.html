@@ -420,7 +420,37 @@ canvas{display:block;width:100%!important}
     <div id="cal-summary" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
 
-  <!-- 2. LIEN VERS COACH IA (dans onglet Actif) -->
+  <!-- 2. HEATMAP -->
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>🟧 Activité annuelle</div>
+    <div id="heatmap-stats" style="display:flex;gap:12px;margin-bottom:10px"></div>
+    <div style="overflow-x:auto">
+      <div id="heatmap-months" style="display:flex;margin-left:22px;margin-bottom:3px;font-size:10px;color:var(--text3);position:relative;height:14px"></div>
+      <div style="display:flex;gap:3px">
+        <div style="display:flex;flex-direction:column;justify-content:space-around;margin-right:3px">
+          <div style="font-size:9px;color:var(--text3);height:11px;line-height:11px">L</div>
+          <div style="height:11px"></div>
+          <div style="font-size:9px;color:var(--text3);height:11px;line-height:11px">M</div>
+          <div style="height:11px"></div>
+          <div style="font-size:9px;color:var(--text3);height:11px;line-height:11px">J</div>
+          <div style="height:11px"></div>
+          <div style="font-size:9px;color:var(--text3);height:11px;line-height:11px">S</div>
+        </div>
+        <div id="heatmap-grid" style="display:flex;gap:3px"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:8px;justify-content:flex-end">
+      <span style="font-size:10px;color:var(--text3)">Moins</span>
+      <div style="width:11px;height:11px;border-radius:2px;background:var(--bg3)"></div>
+      <div style="width:11px;height:11px;border-radius:2px;background:#FAC775"></div>
+      <div style="width:11px;height:11px;border-radius:2px;background:#EF9F27"></div>
+      <div style="width:11px;height:11px;border-radius:2px;background:#BA7517"></div>
+      <div style="width:11px;height:11px;border-radius:2px;background:#854F0B"></div>
+      <span style="font-size:10px;color:var(--text3)">Plus</span>
+    </div>
+  </div>
+
+  <!-- 3. LIEN VERS COACH IA (dans onglet Actif) -->
   <div class="card" style="background:var(--orl);border-color:var(--or);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
     <div>
       <div style="font-size:12px;font-weight:700;color:var(--or)">🤖 Coach IA & Avancement</div>
@@ -1985,7 +2015,128 @@ function populateWeekSelect(){
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────
+// ── HEATMAP ───────────────────────────────────────────────────────────────
+function renderHeatmap(){
+  const gridEl = document.getElementById('heatmap-grid');
+  const monthsEl = document.getElementById('heatmap-months');
+  const statsEl = document.getElementById('heatmap-stats');
+  if(!gridEl) return;
+
+  // Indexer les séances par date
+  const byDate = {};
+  sessions.forEach(s => {
+    if(!s.date) return;
+    const d = parseDate(s.date);
+    if(!d) return;
+    const key = d.toISOString().slice(0,10);
+    if(!byDate[key]) byDate[key] = {sessions:[], km:0, dur:0};
+    byDate[key].sessions.push(s);
+    byDate[key].km += s.dist||0;
+    byDate[key].dur += s.dur||0;
+  });
+
+  // Stats globales
+  const activeDays = Object.keys(byDate).length;
+  const totalKmRun = sessions.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0);
+  statsEl.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--r);padding:6px 10px;text-align:center;flex:1">
+      <div style="font-size:16px;font-weight:700;color:var(--or)">${sessions.length}</div>
+      <div style="font-size:10px;color:var(--text3)">séances</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:var(--r);padding:6px 10px;text-align:center;flex:1">
+      <div style="font-size:16px;font-weight:700;color:var(--or)">${Math.round(totalKmRun)}</div>
+      <div style="font-size:10px;color:var(--text3)">km course</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:var(--r);padding:6px 10px;text-align:center;flex:1">
+      <div style="font-size:16px;font-weight:700;color:var(--or)">${activeDays}</div>
+      <div style="font-size:10px;color:var(--text3)">jours actifs</div>
+    </div>`;
+
+  // Plage : 12 mois glissants depuis aujourd'hui
+  const today = new Date();
+  const startDate = new Date(today);
+  startDate.setFullYear(startDate.getFullYear() - 1);
+  // Reculer au lundi précédent
+  while(startDate.getDay() !== 1) startDate.setDate(startDate.getDate()-1);
+
+  const COLORS_RUN  = ['#FAC775','#EF9F27','#BA7517','#854F0B'];
+  const COLORS_SWIM = ['#B5D4F4','#378ADD','#185FA5','#0C447C'];
+  const COLORS_BIKE = ['#9FE1CB','#1D9E75','#0F6E56','#085041'];
+  const COLORS_OTHER= ['#F4C0D1','#D4537E','#993556','#72243E'];
+
+  function intensity(km, dur){
+    const score = (km||0) + (dur||0)/10;
+    if(score < 5)  return 1;
+    if(score < 15) return 2;
+    if(score < 30) return 3;
+    return 4;
+  }
+
+  function cellColor(dayData){
+    if(!dayData) return 'var(--bg3)';
+    const sports = dayData.sessions.map(s=>s.sport);
+    const hasRun  = sports.some(s=>['plan','course-libre'].includes(s));
+    const hasSwim = sports.some(s=>['natation-plan','natation-libre'].includes(s));
+    const hasBike = sports.some(s=>s==='velo');
+    const lvl = intensity(dayData.km, dayData.dur) - 1;
+    if(hasRun)  return COLORS_RUN[lvl];
+    if(hasBike) return COLORS_BIKE[lvl];
+    if(hasSwim) return COLORS_SWIM[lvl];
+    return COLORS_OTHER[lvl];
+  }
+
+  // Construire la grille semaine par semaine
+  gridEl.innerHTML = '';
+  monthsEl.innerHTML = '';
+  const d = new Date(startDate);
+  let weekIdx = 0;
+  const monthSeen = {};
+
+  while(d <= today){
+    const weekDiv = document.createElement('div');
+    weekDiv.style.cssText = 'display:flex;flex-direction:column;gap:3px';
+
+    // Label mois
+    const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+    if(!monthSeen[monthKey]){
+      monthSeen[monthKey] = weekIdx;
+    }
+
+    for(let dow=0; dow<7; dow++){
+      const cell = document.createElement('div');
+      const key = d.toISOString().slice(0,10);
+      const dayData = byDate[key];
+      cell.style.cssText = `width:11px;height:11px;border-radius:2px;background:${cellColor(dayData)};cursor:${dayData?'pointer':'default'};flex-shrink:0`;
+
+      // Highlight today
+      if(key === today.toISOString().slice(0,10)){
+        cell.style.outline = '1.5px solid var(--or)';
+        cell.style.outlineOffset = '1px';
+      }
+
+      if(dayData){
+        cell.title = `${d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})} · ${dayData.sessions.length} séance(s) · ${Math.round(dayData.km)}km`;
+      }
+      weekDiv.appendChild(cell);
+      d.setDate(d.getDate()+1);
+    }
+    gridEl.appendChild(weekDiv);
+    weekIdx++;
+  }
+
+  // Labels des mois
+  const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  Object.entries(monthSeen).forEach(([key, pos]) => {
+    const month = parseInt(key.split('-')[1]);
+    const lbl = document.createElement('span');
+    lbl.textContent = MONTHS[month];
+    lbl.style.cssText = `position:absolute;left:${pos*14}px;font-size:10px;color:var(--text3)`;
+    monthsEl.appendChild(lbl);
+  });
+}
+
 function renderStats(){
+  renderHeatmap();
   const planSessions=sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.pace);
   const allS=sessions;
   const totalKm=allS.reduce((a,s)=>a+(s.dist||0),0);
