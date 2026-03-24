@@ -3034,6 +3034,63 @@ function renderSportChips(){
 }
 
 // ── JOURNAL ───────────────────────────────────────────────────────────────
+function sessionCard(s){
+  const sportLbl=SPORT_LABELS[s.sport]||s.sport;
+  const sportCls=SPORT_CLASSES[s.sport]||'s-autre';
+  const week=s.week?getWeek(s.week):null;
+  const kmHtml=s.kmRows&&s.kmRows.length?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div><table class="km-table"><thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead><tbody>${s.kmRows.map((r,i)=>`<tr><td style="font-weight:600;color:var(--text3)">${i+1}</td><td>${r.pace||'—'}</td><td>${r.dplus?r.dplus+'m':'—'}</td><td style="color:var(--text2)">${r.note||''}</td></tr>`).join('')}</tbody></table></div>`:'';
+  const lapsHtml=s.laps&&s.laps.length>1?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">⚡ Laps / Fractionnés (${s.laps.length})</div><table class="km-table"><thead><tr><th>Lap</th><th>Dist</th><th>Durée</th><th>Allure</th><th>FC</th></tr></thead><tbody>${s.laps.map(l=>`<tr><td style="font-weight:600;color:var(--text3)">${l.n}</td><td>${l.dist}m</td><td>${l.dur}s</td><td style="font-weight:600;color:var(--or)">${l.pace}</td><td>${l.hr?l.hr+' bpm':'—'}</td></tr>`).join('')}</tbody></table></div>`:'';
+  const compHtml=week?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px"><span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span><span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span></div></div>`:'';
+  const commentHtml=s.comment?`<div style="margin-top:8px;font-size:12px;color:var(--text2);font-style:italic">"${s.comment}"</div>`:'';
+  const analysisHtml=s.claudeAnalysis?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div><div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button></div>`:`<div style="margin-top:10px"><button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button></div>`;
+  const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
+  const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div><div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div></div>`:'';
+  // Badge plan lié
+  const planBadge = s.planId ? (()=>{const p=getPlanById(s.planId);return p?`<span style="font-size:10px;background:var(--orl);color:var(--or);padding:1px 6px;border-radius:10px;margin-left:5px">${p.name}</span>`:'';})() : '';
+  return `<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
+      <div class="hi-l">
+        <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+(s.slot?'-'+s.slot.toUpperCase():'')+'</b>':''} ${planBadge}</div>
+        <div class="hi-s">${s.date||''} · ${['krav','padel'].includes(s.sport)?'':(s.dist||'?')+' km · '}${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
+      </div>
+      <div class="hi-r">
+        <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
+        <span id="chev-hist-${s.id}" style="font-size:10px;color:var(--text3);transition:transform .2s;display:inline-block">▼</span>
+      </div>
+    </div>
+    <div id="hist-detail-${s.id}" style="display:none;width:100%;padding-top:10px;border-top:1px solid var(--border);margin-top:10px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:8px">
+        ${s.dist?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Distance</div><div style="font-size:16px;font-weight:700">${s.dist} km</div></div>`:''}
+        ${s.dur?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Durée</div><div style="font-size:16px;font-weight:700">${s.dur} min</div></div>`:''}
+        ${s.pace?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Allure</div><div style="font-size:16px;font-weight:700">${s.pace}/km</div></div>`:''}
+        ${s.hr?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC moy</div><div style="font-size:16px;font-weight:700">${s.hr} bpm</div></div>`:''}
+        ${s.hrmax?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC max</div><div style="font-size:16px;font-weight:700">${s.hrmax} bpm</div></div>`:''}
+        ${s.dplus?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">D+</div><div style="font-size:16px;font-weight:700">${s.dplus} m</div></div>`:''}
+        ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
+      </div>
+      ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
+      ${commentHtml}${mapHtml}${compHtml}${lapsHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap">Type :</label>
+          <select id="edit-sport-${s.id}" onchange="event.stopPropagation()" onclick="event.stopPropagation()" style="font-size:12px;padding:4px 7px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
+            <option value="plan" ${s.sport==='plan'?'selected':''}>Course (plan)</option>
+            <option value="course-libre" ${s.sport==='course-libre'?'selected':''}>Course libre</option>
+            <option value="natation-plan" ${s.sport==='natation-plan'?'selected':''}>Natation (plan)</option>
+            <option value="natation-libre" ${s.sport==='natation-libre'?'selected':''}>Natation libre</option>
+            <option value="velo" ${s.sport==='velo'?'selected':''}>Vélo</option>
+            <option value="padel" ${s.sport==='padel'?'selected':''}>Padel</option>
+            <option value="krav" ${s.sport==='krav'?'selected':''}>Krav Maga</option>
+            <option value="autre" ${s.sport==='autre'?'selected':''}>Autre sport</option>
+          </select>
+          <button class="btn btn-or btn-sm" onclick="event.stopPropagation();updateSport(${s.id})">✓ Ok</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delSession(${s.id})">🗑️ Supprimer</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function populateJournalPlanFilter(){
   const sel = document.getElementById('jf-plan');
   if(!sel) return;
