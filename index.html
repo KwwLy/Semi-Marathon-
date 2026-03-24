@@ -4915,14 +4915,25 @@ try {
   // ── TOKEN DE TRANSFERT ──────────────────────────────────────────────────
   // Le token encode directement les données — pas besoin de Firestore côté PWA
   window.fbGenerateToken = async function(){
-    if(!fbUser) return;
+    if(!fbUser){
+      toast('⚠️ Tu dois être connecté sur PC pour générer un code');
+      // Afficher un message dans l'interface
+      const display = document.getElementById('fb-token-display');
+      const code = document.getElementById('fb-token-code');
+      if(display && code){
+        code.textContent = '—';
+        code.style.fontSize = '14px';
+        code.style.color = 'var(--re)';
+        code.textContent = 'Connecte-toi d\'abord avec Google sur PC';
+        display.style.display = 'block';
+      }
+      return;
+    }
     // Forcer une sauvegarde fresh
     await fbSaveData();
-    // Générer un code à 6 chiffres comme clé dans Firestore
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 10 * 60 * 1000;
     try {
-      // Stocker les données dans Firestore sous ce code
       const coachRaw = localStorage.getItem('smi_coach');
       await fbDb.collection('tokens').doc(code).set({
         uid: fbUser.uid,
@@ -4934,10 +4945,10 @@ try {
         expiresAt,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      // Afficher le code
       document.getElementById('fb-token-code').textContent = code;
+      document.getElementById('fb-token-code').style.fontSize = '32px';
+      document.getElementById('fb-token-code').style.color = 'var(--or)';
       document.getElementById('fb-token-display').style.display = 'block';
-      // Compte à rebours
       let remaining = 600;
       const timerEl = document.getElementById('fb-token-timer');
       const iv = setInterval(() => {
@@ -4993,9 +5004,14 @@ try {
       if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
       if(stJson){ const s=JSON.parse(stJson); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
 
-      // Stocker l'UID de façon persistante dans IndexedDB (résiste au vidage Safari PWA)
+      // Stocker l'UID de façon persistante — localStorage + IndexedDB + cookie
       const uid = fields.uid?.stringValue||'';
-      if(uid){ IDB.set('smi_fb_uid', uid); localStorage.setItem('smi_fb_uid', uid); }
+      if(uid){
+        IDB.set('smi_fb_uid', uid);
+        localStorage.setItem('smi_fb_uid', uid);
+        // Cookie : expire dans 1 an, survit au vidage iOS
+        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+      }
 
       renderPlan(); renderStats(); loadCoachCard();
       document.getElementById('fb-dot').style.background='#27AE60';
@@ -5015,6 +5031,19 @@ try {
   // ── SYNC AUTO AU DÉMARRAGE (PWA sans auth) ──────────────────────────────
   const FB_PROJECT = 'semi-marathon-94d90';
 
+  // Lire l'UID depuis toutes les sources disponibles (localStorage, IDB, cookie)
+  function getCookieUid(){
+    const match = document.cookie.match(/smi_uid=([^;]+)/);
+    return match ? match[1] : null;
+  }
+
+  async function getStoredUid(){
+    return localStorage.getItem('smi_fb_uid')
+      || await IDB.get('smi_fb_uid')
+      || getCookieUid()
+      || null;
+  }
+
   async function fbRestRead(uid){
     try {
       const resp = await fetch(`https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}`);
@@ -5025,6 +5054,10 @@ try {
 
   async function fbRestWrite(uid){
     try {
+      // Rafraîchir le cookie à chaque sync pour maintenir la persistance
+      document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+      localStorage.setItem('smi_fb_uid', uid);
+      IDB.set('smi_fb_uid', uid);
       const coachRaw = localStorage.getItem('smi_coach');
       const now = Date.now();
       localStorage.setItem('smi_updated_at', String(now));
@@ -5050,7 +5083,7 @@ try {
   async function fbAutoSyncOnStart(){
     if(fbUser) return;
     // Lire l'UID depuis IDB (persistant) puis localStorage (fallback)
-    const uid = await IDB.get('smi_fb_uid') || localStorage.getItem('smi_fb_uid');
+    const uid = await getStoredUid();
     if(!uid) return;
     const doc = await fbRestRead(uid);
     if(!doc||!doc.fields) return;
@@ -5089,7 +5122,7 @@ try {
       localStorage._fbTimer=setTimeout(async ()=>{
         if(fbUser) fbSaveData();
         else {
-          const uid = await IDB.get('smi_fb_uid') || localStorage.getItem('smi_fb_uid');
+          const uid = await getStoredUid();
           if(uid) fbRestWrite(uid);
         }
       },1500);
