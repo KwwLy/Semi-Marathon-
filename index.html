@@ -207,7 +207,46 @@ canvas{display:block;width:100%!important}
 <div class="section active" id="tab-plans"><div id="plans-content"></div></div>
 
 <!-- PLAN ACTIF -->
-<div class="section" id="tab-plan"><div id="plan-content"></div></div>
+<div class="section" id="tab-plan">
+
+  <!-- COACH IA -->
+  <div class="card" id="coach-card">
+    <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
+    <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
+    <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
+    <div id="coach-metrics-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🎯 Prédiction semi</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="coach-pred-time" style="font-size:26px;font-weight:700"></span>
+          <span id="coach-pred-arrow" style="font-size:26px;line-height:1"></span>
+        </div>
+        <div id="coach-pred-vs" style="font-size:11px;margin-top:3px"></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🫁 VO2max estimée</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="coach-vo2-val" style="font-size:26px;font-weight:700"></span>
+          <span id="coach-vo2-arrow" style="font-size:26px;line-height:1"></span>
+        </div>
+        <div id="coach-vo2-sub" style="font-size:11px;color:var(--text2);margin-top:3px"></div>
+      </div>
+    </div>
+    <div id="coach-result" style="font-size:12px;line-height:1.75;color:var(--text);white-space:pre-wrap;display:none"></div>
+    <div id="coach-date" style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right"></div>
+  </div>
+
+  <!-- AVANCEMENT DU PLAN -->
+  <div class="prog-wrap">
+    <div class="prog-hd"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--or);font-weight:700">0%</span></div>
+    <div class="pbar"><div class="pfill" id="prog-bar" style="width:0%"></div></div>
+    <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
+  </div>
+
+  <!-- SEMAINES DU PLAN -->
+  <div id="plan-content"></div>
+
+</div>
 
 <!-- LOG -->
 <div class="section" id="tab-log">
@@ -381,48 +420,23 @@ canvas{display:block;width:100%!important}
     <div id="cal-summary" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
 
-  <!-- 2. COACH IA -->
-  <div class="card" id="coach-card">
-    <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
-    <button class="btn btn-or btn-full" id="coach-analyze-btn" onclick="runCoachAnalysis(null)" style="margin-bottom:12px">🔍 Analyser l'ensemble de mes séances</button>
-    <div id="coach-loading" style="display:none" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>
-    <div id="coach-metrics-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🎯 Prédiction semi</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="coach-pred-time" style="font-size:26px;font-weight:700"></span>
-          <span id="coach-pred-arrow" style="font-size:26px;line-height:1"></span>
-        </div>
-        <div id="coach-pred-vs" style="font-size:11px;margin-top:3px"></div>
-      </div>
-      <div style="background:var(--bg2);border-radius:var(--r);padding:12px 14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">🫁 VO2max estimée</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="coach-vo2-val" style="font-size:26px;font-weight:700"></span>
-          <span id="coach-vo2-arrow" style="font-size:26px;line-height:1"></span>
-        </div>
-        <div id="coach-vo2-sub" style="font-size:11px;color:var(--text2);margin-top:3px"></div>
-      </div>
+  <!-- 2. LIEN VERS COACH IA (dans onglet Actif) -->
+  <div class="card" style="background:var(--orl);border-color:var(--or);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--or)">🤖 Coach IA & Avancement</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">Disponibles dans l'onglet Plan actif</div>
     </div>
-    <div id="coach-result" style="font-size:12px;line-height:1.75;color:var(--text);white-space:pre-wrap;display:none"></div>
-    <div id="coach-date" style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right"></div>
+    <button class="btn btn-or btn-sm" onclick="sw('plan')">Voir →</button>
   </div>
 
-  <!-- 3. AVANCEMENT DU PLAN -->
-  <div class="prog-wrap">
-    <div class="prog-hd"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--or);font-weight:700">0%</span></div>
-    <div class="pbar"><div class="pfill" id="prog-bar" style="width:0%"></div></div>
-    <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
-  </div>
-
-  <!-- 4. KPIs + RECORDS -->
+  <!-- 3. KPIs + RECORDS -->
   <div class="sg4" id="stats-grid"></div>
   <div class="card" id="pr-card" style="display:none">
     <div class="card-title"><span class="bar"></span>🏅 Records personnels</div>
     <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
   </div>
 
-  <!-- 5. HISTORIQUE -->
+  <!-- 4. HISTORIQUE -->
   <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:12px 14px 0;font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Historique des séances</div>
     <div id="history-list" style="padding:0"></div>
@@ -728,7 +742,7 @@ function sw(t){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='plans')renderPlans();
-  if(t==='plan')renderPlan();
+  if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
   if(t==='zones')renderZones();
   if(t==='settings')loadSettings();
