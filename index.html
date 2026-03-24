@@ -1060,41 +1060,76 @@ Réponds UNIQUEMENT avec ce JSON strict, sans texte avant ni après :
     const clean = text.replace(/```json|```/g,'').trim();
     const planData = JSON.parse(clean);
 
-    // Archiver le plan actif si existant
-    const active = getActivePlan();
-    if(active){ active.status='archived'; active.archivedAt=new Date().toISOString(); }
+    const totalWeeks = planData.phases.reduce((a,p)=>a+p.weeks.length,0);
+    statusEl.innerHTML = `✅ Plan généré — ${totalWeeks} semaines. Vérifie l'aperçu ci-dessous avant d'enregistrer.`;
 
-    // Créer le nouveau plan
-    const newPlanId = 'plan_'+Date.now();
-    const newPlan = {
-      id: newPlanId,
-      name: name || planData.planName || typeLabel+' '+date.slice(0,4),
-      type,
-      goal: goalA,
-      goalB: goalB||'',
-      goalPace: '',
-      raceDate: date,
-      startDate: new Date().toISOString().slice(0,10),
-      status: 'active',
-      color: '#E8500A',
-      weeksCount: weeksAvail,
-      phases: planData.phases, // stocker les semaines générées
-      createdAt: new Date().toISOString()
-    };
-    plans.push(newPlan);
-    savePlans();
+    // Stocker le plan généré temporairement
+    window._pendingPlan = { planData, type, date, goalA, goalB, name, weeksAvail };
 
-    statusEl.innerHTML = '✅ Plan généré avec succès ! '+planData.phases.reduce((a,p)=>a+p.weeks.length,0)+' semaines créées.';
-    setTimeout(()=>{
-      renderPlans();
-      sw('plan');
-      toast('✅ Plan créé — '+newPlan.name);
-    }, 1500);
+    // Afficher l'aperçu des semaines générées
+    let previewH = `<div class="card" style="margin-top:12px">
+      <div class="card-title"><span class="bar"></span>Aperçu du plan généré</div>`;
+    planData.phases.forEach(ph => {
+      previewH += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:10px 0 5px;letter-spacing:.05em">${ph.phase}</div>`;
+      ph.weeks.forEach(w => {
+        previewH += `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);min-width:26px">S${w.n}</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${w.title}</div>
+            <div style="font-size:10px;color:var(--text3)">${w.dates} · ${w.s1?.title||''}</div>
+          </div>
+        </div>`;
+      });
+    });
+    previewH += `</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-or" style="flex:1" onclick="confirmSavePlan()">✅ Enregistrer ce plan</button>
+      <button class="btn btn-ghost" onclick="createNewPlan()">↺ Regénérer</button>
+      <button class="btn btn-ghost" onclick="renderPlans()">Annuler</button>
+    </div>`;
+
+    document.getElementById('plans-content').innerHTML =
+      document.getElementById('plans-content').innerHTML + previewH;
 
   } catch(e){
     statusEl.innerHTML = '❌ Erreur : '+e.message;
     console.error('Plan generation error:', e);
   }
+}
+
+function confirmSavePlan(){
+  const pending = window._pendingPlan;
+  if(!pending){ toast('Aucun plan en attente'); return; }
+  const {planData, type, date, goalA, goalB, name, weeksAvail} = pending;
+
+  // Archiver le plan actif seulement maintenant
+  const active = getActivePlan();
+  if(active){ active.status='archived'; active.archivedAt=new Date().toISOString(); }
+
+  const newPlanId = 'plan_'+Date.now();
+  const typeLabel = {semi:'Semi-marathon',marathon:'Marathon','10k':'10km','5k':'5km',trail:'Trail'}[type]||type;
+  const newPlan = {
+    id: newPlanId,
+    name: name || planData.planName || typeLabel+' '+date.slice(0,4),
+    type,
+    goal: goalA,
+    goalB: goalB||'',
+    goalPace: '',
+    raceDate: date,
+    startDate: new Date().toISOString().slice(0,10),
+    status: 'active',
+    color: '#E8500A',
+    weeksCount: weeksAvail,
+    phases: planData.phases,
+    createdAt: new Date().toISOString()
+  };
+  plans.push(newPlan);
+  savePlans();
+  window._pendingPlan = null;
+
+  renderPlans();
+  sw('plan');
+  toast('✅ Plan enregistré — '+newPlan.name);
 }
 function renderWeekCard(w, cls, isModified, phColor){
   const cur = todayWeek();
@@ -1182,39 +1217,7 @@ function renderPlan(){
       if(done.includes(w.n))cls+=' done';
       else if(w.n===cur)cls+=' cur';
       if(isModified)cls+=' ia-modified';
-      h+=renderWeekCard(w, cls, isModified);
-    });
-    h+='</div>';
-  });
-      h+=`<div class="${cls}">
-        <div class="wsumm" onclick="toggleW(${w.n},this)">
-          <span class="wn">S${w.n}</span>
-          <span class="wdates">${w.dates}</span>
-          <span class="wttl">${w.title}${isModified?' <span style="font-size:9px;background:#8E44AD;color:#fff;border-radius:3px;padding:1px 4px;vertical-align:middle">🤖 IA</span>':''}</span>
-          <div class="wright">
-            ${(w.badges||[]).map(badgeHtml).join('')}
-            ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
-            ${sessions.filter(s=>s.week===w.n&&s.slot==='s1'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn">✓S1</span>':''}
-            ${sessions.filter(s=>s.week===w.n&&s.slot==='s2'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn" style="background:#27AE60">✓S2</span>':''}
-            <span class="chev" id="chev-${w.n}">▼</span>
-          </div>
-        </div>
-        <div class="wdet" id="det-${w.n}">
-          ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
-          <div class="sg">
-            <div class="sb">
-              <div class="st" style="color:${ph.color}">${w.s1.title}</div>
-              ${w.s1.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-            </div>
-            <div class="sb">
-              <div class="st" style="color:#27AE60">${w.s2.title}</div>
-              ${w.s2.steps.map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-            </div>
-          </div>
-          <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
-          <button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s2')">✏️ Saisir S2</button>
-        </div>
-      </div>`;
+      h+=renderWeekCard(w, cls, isModified, ph.color);
     });
     h+='</div>';
   });
