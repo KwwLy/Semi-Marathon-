@@ -219,6 +219,9 @@ canvas{display:block;width:100%!important}
     <button class="nav-item" id="nav-stats" onclick="sw('stats')">
       <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
     </button>
+    <button class="nav-item" id="nav-journal" onclick="sw('journal')">
+      <span class="nav-icon">📒</span><span class="nav-label">Journal</span>
+    </button>
     <button class="nav-item" id="nav-settings" onclick="sw('settings')">
       <span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span>
     </button>
@@ -507,12 +510,41 @@ canvas{display:block;width:100%!important}
     <div id="pr-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
   </div>
 
-  <!-- 4. HISTORIQUE -->
-  <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:12px 14px 0;font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Historique des séances</div>
-    <div id="history-list" style="padding:0"></div>
-  </div>
+</div>
 
+<!-- JOURNAL -->
+<div class="section" id="tab-journal">
+  <!-- FILTRES -->
+  <div class="card" style="padding:10px 14px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select id="jf-sport" onchange="renderJournal()" style="flex:1;min-width:110px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px">
+        <option value="">Tous les sports</option>
+        <option value="plan">🏃 Course plan</option>
+        <option value="course-libre">🏃 Course libre</option>
+        <option value="natation-plan">🏊 Natation plan</option>
+        <option value="natation-libre">🏊 Natation libre</option>
+        <option value="velo">🚴 Vélo</option>
+        <option value="padel">🎾 Padel</option>
+        <option value="krav">🥋 Krav Maga</option>
+        <option value="autre">⚡ Autre</option>
+      </select>
+      <select id="jf-plan" onchange="renderJournal()" style="flex:1;min-width:110px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px">
+        <option value="">Tous les plans</option>
+        <option value="none">Hors plan</option>
+      </select>
+      <select id="jf-period" onchange="renderJournal()" style="flex:1;min-width:110px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px">
+        <option value="">Toute la période</option>
+        <option value="7">7 derniers jours</option>
+        <option value="30">30 derniers jours</option>
+        <option value="90">3 derniers mois</option>
+        <option value="365">12 derniers mois</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="resetJournalFilters()" style="white-space:nowrap">✕ Reset</button>
+    </div>
+    <div id="jf-summary" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+  </div>
+  <!-- LISTE -->
+  <div id="history-list" style="padding:0"></div>
 </div>
 
 <!-- ZONES -->
@@ -794,6 +826,23 @@ if(!plans){
 function getActivePlan(){ return plans.find(p=>p.status==='active')||null; }
 function getPlanById(id){ return plans.find(p=>p.id===id)||null; }
 
+// Nombre de séances par semaine selon le plan actif
+function getSlotCount(){
+  const plan = getActivePlan();
+  if(plan?.sessionsPerWeek) return parseInt(plan.sessionsPerWeek)||2;
+  return 2; // défaut
+}
+
+// Génère les options HTML pour le sélecteur de slot
+function getSlotOptions(selected){
+  const n = getSlotCount();
+  const labels = ['Séance 1','Séance 2','Séance 3','Séance 4'];
+  return Array.from({length:n},(_,i)=>{
+    const val = 's'+(i+1);
+    return `<option value="${val}" ${selected===val?'selected':''}>${labels[i]||'Séance '+(i+1)}</option>`;
+  }).join('');
+}
+
 function savePlans(){
   localStorage.setItem('smi_plans', JSON.stringify(plans));
 }
@@ -813,8 +862,7 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  // Mettre à jour les nav-items
-  ['plans','plan','log','stats','settings'].forEach(id=>{
+  ['plans','plan','log','stats','journal','settings'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.classList.toggle('active', id===t);
   });
@@ -823,6 +871,7 @@ function sw(t){
   if(t==='plans')renderPlans();
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
+  if(t==='journal'){populateJournalPlanFilter();renderJournal();}
   if(t==='settings')loadSettings();
 }
 
@@ -1238,7 +1287,7 @@ Réponds UNIQUEMENT avec ce JSON strict, sans texte avant ni après :
     statusEl.innerHTML = `✅ Plan généré — ${totalWeeks} semaines. Vérifie l'aperçu ci-dessous avant d'enregistrer.`;
 
     // Stocker le plan généré temporairement
-    window._pendingPlan = { planData, type, date, goalA, goalB, name, weeksAvail };
+    window._pendingPlan = { planData, type, date, goalA, goalB, name, weeksAvail, nSess };
 
     // Afficher l'aperçu des semaines générées
     let previewH = `<div class="card" style="margin-top:12px">
@@ -1294,6 +1343,7 @@ function confirmSavePlan(){
     status: 'active',
     color: '#3B82F6',
     weeksCount: weeksAvail,
+    sessionsPerWeek: parseInt(window._pendingPlan?.nSess)||2,
     phases: planData.phases,
     createdAt: new Date().toISOString()
   };
@@ -1316,8 +1366,8 @@ function renderWeekCard(w, cls, isModified, phColor){
       <div class="wright">
         ${(w.badges||[]).map(badgeHtml).join('')}
         ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
-        ${sessions.filter(s=>s.week===w.n&&s.slot==='s1'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn">✓S1</span>':''}
-        ${sessions.filter(s=>s.week===w.n&&s.slot==='s2'&&['plan','natation-plan'].includes(s.sport)).length?'<span class="badge bdn" style="background:#27AE60">✓S2</span>':''}
+        ${(()=>{const sc=getSlotCount();const bc=["#3B82F6","#27AE60","#8E44AD","#E67E22"];let sb="";for(let i=0;i<sc;i++){const sl="s"+(i+1);if(sessions.filter(s=>s.week===w.n&&s.slot===sl&&["plan","natation-plan"].includes(s.sport)).length)sb+='<span class="badge bdn" style="background:'+bc[i]+'">✓S'+(i+1)+'</span>';}return sb;})()
+        }
         <span class="chev" id="chev-${w.n}">▼</span>
       </div>
     </div>
@@ -1334,7 +1384,7 @@ function renderWeekCard(w, cls, isModified, phColor){
         </div>
       </div>
       <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
-      <button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s2')">✏️ Saisir S2</button>
+      ${Array.from({length:Math.max(0,getSlotCount()-1)},(_,i)=>`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s${i+2}')">✏️ Saisir S${i+2}</button>`).join('')}
     </div>
   </div>`;
 }
@@ -1627,8 +1677,16 @@ function onSportChange(){
   document.getElementById('running-fields').style.display=isRunOrCycleOrSwim?'block':'none';
   document.getElementById('other-sport-fields').style.display=isRunOrCycleOrSwim?'none':'block';
   document.getElementById('km-detail-card').style.display=isRun?'block':'none';
+  // Mettre à jour le sélecteur de slot dynamiquement
+  if(isPlan){
+    const slotEl=document.getElementById('lg-slot');
+    if(slotEl){
+      const cur=slotEl.value||'s1';
+      slotEl.innerHTML=getSlotOptions(cur);
+    }
+    onWeekChange();
+  }
   if(!isRunOrCycleOrSwim)updateCalEst();
-  if(isPlan)onWeekChange();
 }
 
 function onWeekChange(){
@@ -2975,19 +3033,64 @@ function renderSportChips(){
   ).join('');
 }
 
-function renderHistory(){
-  const list=document.getElementById('history-list');
-  if(!sessions.length){list.innerHTML="<div class=\"no-data\">Aucune séance enregistrée. Utilise l'onglet Saisir pour commencer.</div>";return;}
+// ── JOURNAL ───────────────────────────────────────────────────────────────
+function populateJournalPlanFilter(){
+  const sel = document.getElementById('jf-plan');
+  if(!sel) return;
+  // Garder "Tous les plans" et "Hors plan", ajouter les vrais plans
+  const current = sel.value;
+  sel.innerHTML = `<option value="">Tous les plans</option>
+    <option value="none">Hors plan</option>
+    ${plans.map(p=>`<option value="${p.id}" ${current===p.id?'selected':''}>${p.name}${p.status==='archived'?' (archivé)':''}</option>`).join('')}`;
+  sel.value = current||'';
+}
 
-  const sorted=[...sessions].sort((a,b)=>{
+function resetJournalFilters(){
+  const els = ['jf-sport','jf-plan','jf-period'];
+  els.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  renderJournal();
+}
+
+function renderJournal(){
+  const sportFilter  = document.getElementById('jf-sport')?.value||'';
+  const planFilter   = document.getElementById('jf-plan')?.value||'';
+  const periodFilter = parseInt(document.getElementById('jf-period')?.value||'0');
+
+  // Filtrer les sessions
+  let filtered = [...sessions];
+
+  if(sportFilter) filtered = filtered.filter(s=>s.sport===sportFilter);
+
+  if(planFilter==='none') filtered = filtered.filter(s=>!s.planId&&!['plan','natation-plan'].includes(s.sport));
+  else if(planFilter) filtered = filtered.filter(s=>s.planId===planFilter);
+
+  if(periodFilter){
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate()-periodFilter);
+    filtered = filtered.filter(s=>{
+      const d=parseDate(s.date);
+      return d&&d>=cutoff;
+    });
+  }
+
+  // Trier par date décroissante
+  filtered.sort((a,b)=>{
     const da=parseDate(a.date),db=parseDate(b.date);
-    if(da&&db)return db-da;
+    if(da&&db) return db-da;
     return b.id-a.id;
   });
 
+  // Résumé des filtres
+  const totalKm = Math.round(filtered.filter(s=>['plan','course-libre'].includes(s.sport)).reduce((a,s)=>a+(s.dist||0),0));
+  const summaryEl = document.getElementById('jf-summary');
+  if(summaryEl){
+    summaryEl.textContent = `${filtered.length} séance(s)${totalKm?' · '+totalKm+' km course':''}`;
+  }
+
+  // Grouper par mois comme dans renderHistory
   const MONTHS_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const groups={};
-  sorted.forEach(s=>{
+  filtered.forEach(s=>{
     const d=parseDate(s.date);
     const key=d?`${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`:'0000-00';
     const label=d?`${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`:'Sans date';
@@ -2998,63 +3101,15 @@ function renderHistory(){
 
   const now=new Date();
   const currentKey=`${now.getFullYear()}-${String(now.getMonth()).padStart(2,'0')}`;
+  const list=document.getElementById('history-list');
+  if(!list) return;
 
-  function sessionCard(s){
-    const sportLbl=SPORT_LABELS[s.sport]||s.sport;
-    const sportCls=SPORT_CLASSES[s.sport]||'s-autre';
-    const week=s.week?getWeek(s.week):null;
-    const kmHtml=s.kmRows&&s.kmRows.length?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div><table class="km-table"><thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead><tbody>${s.kmRows.map((r,i)=>`<tr><td style="font-weight:600;color:var(--text3)">${i+1}</td><td>${r.pace||'—'}</td><td>${r.dplus?r.dplus+'m':'—'}</td><td style="color:var(--text2)">${r.note||''}</td></tr>`).join('')}</tbody></table></div>`:'';
-    const lapsHtml=s.laps&&s.laps.length>1?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">⚡ Laps / Fractionnés (${s.laps.length})</div><table class="km-table"><thead><tr><th>Lap</th><th>Dist</th><th>Durée</th><th>Allure</th><th>FC</th></tr></thead><tbody>${s.laps.map(l=>`<tr><td style="font-weight:600;color:var(--text3)">${l.n}</td><td>${l.dist}m</td><td>${l.dur}s</td><td style="font-weight:600;color:var(--or)">${l.pace}</td><td>${l.hr?l.hr+' bpm':'—'}</td></tr>`).join('')}</tbody></table></div>`:'';
-    const compHtml=week?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px"><span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span><span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span></div></div>`:'';
-    const commentHtml=s.comment?`<div style="margin-top:8px;font-size:12px;color:var(--text2);font-style:italic">"${s.comment}"</div>`:'';
-    const analysisHtml=s.claudeAnalysis?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div><div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button></div>`:`<div style="margin-top:10px"><button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button></div>`;
-    const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
-    const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div><div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div></div>`:'';
-    return `<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
-        <div class="hi-l">
-          <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+(s.slot?'-'+s.slot.toUpperCase():'')+'</b>':''}</div>
-          <div class="hi-s">${s.date||''} · ${['krav','padel'].includes(s.sport)?'':(s.dist||'?')+' km · '}${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
-        </div>
-        <div class="hi-r">
-          <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
-          <span id="chev-hist-${s.id}" style="font-size:10px;color:var(--text3);transition:transform .2s;display:inline-block">▼</span>
-        </div>
-      </div>
-      <div id="hist-detail-${s.id}" style="display:none;width:100%;padding-top:10px;border-top:1px solid var(--border);margin-top:10px">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:8px">
-          ${s.dist?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Distance</div><div style="font-size:16px;font-weight:700">${s.dist} km</div></div>`:''}
-          ${s.dur?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Durée</div><div style="font-size:16px;font-weight:700">${s.dur} min</div></div>`:''}
-          ${s.pace?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Allure</div><div style="font-size:16px;font-weight:700">${s.pace}/km</div></div>`:''}
-          ${s.hr?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC moy</div><div style="font-size:16px;font-weight:700">${s.hr} bpm</div></div>`:''}
-          ${s.hrmax?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC max</div><div style="font-size:16px;font-weight:700">${s.hrmax} bpm</div></div>`:''}
-          ${s.dplus?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">D+</div><div style="font-size:16px;font-weight:700">${s.dplus} m</div></div>`:''}
-          ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
-        </div>
-        ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
-        ${commentHtml}${mapHtml}${compHtml}${lapsHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
-        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:6px">
-            <label style="font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap">Type :</label>
-            <select id="edit-sport-${s.id}" onchange="event.stopPropagation()" onclick="event.stopPropagation()" style="font-size:12px;padding:4px 7px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-family:inherit">
-              <option value="plan" ${s.sport==='plan'?'selected':''}>Course (plan)</option>
-              <option value="course-libre" ${s.sport==='course-libre'?'selected':''}>Course libre</option>
-              <option value="natation-plan" ${s.sport==='natation-plan'?'selected':''}>Natation (plan)</option>
-              <option value="natation-libre" ${s.sport==='natation-libre'?'selected':''}>Natation libre</option>
-              <option value="velo" ${s.sport==='velo'?'selected':''}>Vélo</option>
-              <option value="padel" ${s.sport==='padel'?'selected':''}>Padel</option>
-              <option value="krav" ${s.sport==='krav'?'selected':''}>Krav Maga</option>
-              <option value="autre" ${s.sport==='autre'?'selected':''}>Autre sport</option>
-            </select>
-            <button class="btn btn-or btn-sm" onclick="event.stopPropagation();updateSport(${s.id})">✓ Ok</button>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();delSession(${s.id})">🗑️ Supprimer</button>
-        </div>
-      </div>
-    </div>`;
+  if(!filtered.length){
+    list.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Aucune séance pour ces filtres</div>';
+    return;
   }
 
-  const html=Object.entries(groups).map(([key,group])=>{
+  list.innerHTML=Object.entries(groups).map(([key,group])=>{
     const isOpen=key===currentKey;
     const kmStr=Math.round(group.km)>0?` · ${Math.round(group.km)} km`:'';
     return `<div style="border-radius:var(--r);overflow:hidden;margin-bottom:6px;border:1px solid var(--border)">
@@ -3065,13 +3120,22 @@ function renderHistory(){
         </div>
         <span id="chev-month-${key}" style="font-size:11px;color:var(--text3);transition:transform .2s;display:inline-block;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}">▼</span>
       </div>
-      <div id="hist-month-${key}" style="display:${isOpen?'block':'none'}">${group.sessions.map(sessionCard).join('')}</div>
+      <div id="hist-month-${key}" style="display:${isOpen?'block':'none'}">${group.sessions.map(s=>sessionCard(s)).join('')}</div>
     </div>`;
   }).join('');
-
-  list.innerHTML=html;
 }
 
+function renderHistory(){
+  // renderHistory redirige vers renderJournal (sans filtres)
+  // utilisé par les autres parties de l'app qui appellent renderHistory
+  const activeTab = document.querySelector('.section.active')?.id;
+  if(activeTab==='tab-journal'){
+    renderJournal();
+  } else {
+    // Appelé depuis stats ou autre : on met à jour l'history-list si visible
+    renderJournal();
+  }
+}
 function toggleHistMonth(key){
   const el=document.getElementById('hist-month-'+key);
   const chev=document.getElementById('chev-month-'+key);
@@ -3327,8 +3391,8 @@ function renderBulkResults(){
         ${allWeeks().map(w=>`<option value="${w.n}" ${p.week===w.n?'selected':''}>${'S'+w.n+' ('+w.dates+')'}</option>`).join('')}
       </select>
       <select id="bulk-slot-${i}" onchange="bulkSetSlot(${i},this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);width:70px">
-        <option value="s1" ${p.slot==='s1'?'selected':''}>S1</option>
-        <option value="s2" ${p.slot==='s2'?'selected':''}>S2</option>
+        ${getSlotOptions(p.slot)}
+      </select>
       </select>
     </div>`:''}`:``;
 
@@ -3682,8 +3746,7 @@ function stravaRenderPending(statusEl){
           <option value="0">— Semaine du plan —</option>${weeksOpts}
         </select>
         <select onchange="stravaPendingSetSlot(${i},this.value)" style="width:65px;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
-          <option value="s1" ${p.slot==='s1'?'selected':''}>S1</option>
-          <option value="s2" ${p.slot==='s2'?'selected':''}>S2</option>
+          ${getSlotOptions(p.slot)}
         </select>
       </div>`:''}
       <input type="text" value="${(p.comment||'').replace(/"/g,'&quot;')}" placeholder="Commentaire (optionnel)" onchange="stravaPendingSetComment(${i},this.value)" style="width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
