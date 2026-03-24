@@ -1341,57 +1341,79 @@ function renderPlan(){
   const cur=todayWeek();
   let h='';
 
-  // En-tête avec nom du plan actif
+  // En-tête avec nom du plan actif — bandeau bleu en haut
   if(activePlan){
     const weeksLeft = Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
-    h+=`<div style="background:${activePlan.color||'#3B82F6'};color:#fff;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+    h+=`<div style="background:var(--or);color:#fff;padding:12px 14px;margin:-14px -14px 14px -14px;display:flex;align-items:center;justify-content:space-between">
       <div>
-        <div style="font-size:13px;font-weight:700">${activePlan.name}</div>
-        <div style="font-size:11px;opacity:.85;margin-top:2px">${activePlan.raceDate} · ${weeksLeft} semaines restantes</div>
+        <div style="font-size:14px;font-weight:700">${activePlan.name}</div>
+        <div style="font-size:11px;opacity:.85;margin-top:2px">${activePlan.raceDate} · ${weeksLeft} sem. restantes</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:11px;opacity:.85">Objectif</div>
-        <div style="font-size:15px;font-weight:700">${activePlan.goal}</div>
+        <div style="font-size:10px;opacity:.75">Objectif</div>
+        <div style="font-size:16px;font-weight:700">${activePlan.goal}</div>
       </div>
     </div>`;
   }
 
-  // Si le plan actif a des phases générées par IA → les afficher
-  const planPhases = activePlan?.phases;
-  if(planPhases && planPhases.length){
-    planPhases.forEach(ph=>{
-      h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color||'#3B82F6'}"></span>${ph.phase}</div>`;
-      ph.weeks.forEach(baseW=>{
-        const w = getWeekWithOverride(baseW.n) || baseW;
+  // Phases dépliables
+  const renderPhases = (phases, getColorFn) => {
+    phases.forEach((ph, phIdx)=>{
+      const phKey = `phase-${phIdx}`;
+      // Phase ouverte par défaut si elle contient la semaine courante ou des semaines non faites
+      const phWeeks = ph.weeks||[];
+      const hasCurrent = phWeeks.some(w=>w.n===cur);
+      const hasUpcoming = phWeeks.some(w=>!done.includes(w.n)&&w.n>=cur);
+      const isOpen = hasCurrent || (hasUpcoming && phIdx===phases.findIndex(p=>(p.weeks||[]).some(w=>!done.includes(w.n))));
+      const doneCount = phWeeks.filter(w=>done.includes(w.n)).length;
+      const color = getColorFn(ph);
+
+      h+=`<div style="border-radius:var(--r);overflow:hidden;margin-bottom:8px;border:1px solid var(--border)">
+        <div onclick="togglePhase('${phKey}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:var(--bg2)">
+          <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block"></span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:var(--text)">${ph.phase}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">${phWeeks.length} semaines · ${doneCount} complétées</div>
+          </div>
+          <span id="chev-${phKey}" style="font-size:11px;color:var(--text3);transition:transform .2s;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}">▼</span>
+        </div>
+        <div id="${phKey}" style="display:${isOpen?'block':'none'}">`;
+
+      phWeeks.forEach(baseW=>{
+        const w = getWeekWithOverride(baseW.n)||baseW;
         const isModified=!!planOverrides[baseW.n];
         let cls='wcard';
+        if(w.vacation)cls+=' vac';
         if(done.includes(w.n))cls+=' done';
         else if(w.n===cur)cls+=' cur';
         if(isModified)cls+=' ia-modified';
-        h+=renderWeekCard(w, cls, isModified);
+        h+=renderWeekCard(w, cls, isModified, color);
       });
-      h+='</div>';
+
+      h+=`</div></div>`;
     });
+  };
+
+  // Plan IA généré
+  const planPhases = activePlan?.phases;
+  if(planPhases && planPhases.length){
+    renderPhases(planPhases, ph=>ph.color||'var(--or)');
     document.getElementById('plan-content').innerHTML=h;
     return;
   }
 
-  // Sinon → plan semi-marathon codé en dur (PLAN)
-  PLAN.forEach(ph=>{
-    h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color}"></span>${ph.phase}</div>`;
-    ph.weeks.forEach(baseW=>{
-      const w=getWeekWithOverride(baseW.n);
-      const isModified=!!planOverrides[baseW.n];
-      let cls='wcard';
-      if(w.vacation)cls+=' vac';
-      if(done.includes(w.n))cls+=' done';
-      else if(w.n===cur)cls+=' cur';
-      if(isModified)cls+=' ia-modified';
-      h+=renderWeekCard(w, cls, isModified, ph.color);
-    });
-    h+='</div>';
-  });
+  // Plan codé en dur
+  renderPhases(PLAN, ph=>ph.color);
   document.getElementById('plan-content').innerHTML=h;
+}
+
+function togglePhase(key){
+  const el=document.getElementById(key);
+  const chev=document.getElementById('chev-'+key);
+  if(!el) return;
+  const open=el.style.display==='block';
+  el.style.display=open?'none':'block';
+  if(chev) chev.style.transform=open?'rotate(0deg)':'rotate(180deg)';
 }
 function restoreWeek(n){
   delete planOverrides[n];
