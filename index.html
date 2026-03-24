@@ -3045,8 +3045,16 @@ function sessionCard(s){
   const analysisHtml=s.claudeAnalysis?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div><div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button></div>`:`<div style="margin-top:10px"><button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button></div>`;
   const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
   const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div><div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div></div>`:'';
-  // Badge plan lié
-  const planBadge = s.planId ? (()=>{const p=getPlanById(s.planId);return p?`<span style="font-size:10px;background:var(--orl);color:var(--or);padding:1px 6px;border-radius:10px;margin-left:5px">${p.name}</span>`:'';})() : '';
+  // Badge plan : utilise planId si dispo, sinon déduit depuis le sport pour les séances du plan
+  const planBadge = (()=>{
+    let p = null;
+    if(s.planId) p = getPlanById(s.planId);
+    // Fallback : séance de type plan sans planId → plan actif ou premier plan archivé
+    if(!p && ['plan','natation-plan'].includes(s.sport)){
+      p = getActivePlan() || plans[0] || null;
+    }
+    return p ? `<span style="font-size:10px;background:var(--orl);color:var(--or);padding:1px 6px;border-radius:10px;margin-left:5px">${p.name}</span>` : '';
+  })();
   return `<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
       <div class="hi-l">
