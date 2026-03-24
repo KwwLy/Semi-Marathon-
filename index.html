@@ -4208,6 +4208,35 @@ setImportMode('fit');
 loadCoachCard();
 renderStats();
 
+// ── STRAVA OAUTH CALLBACK ─────────────────────────────────────────────────
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const savedState = localStorage.getItem('strava_state');
+  if(code && state && state === savedState){
+    localStorage.removeItem('strava_state');
+    window.history.replaceState({}, document.title, window.location.pathname);
+    stravaExchangeCode(code);
+  }
+  stravaUpdateUI();
+})();
+
+// ── STRAVA OAUTH CALLBACK ─────────────────────────────────────────────────
+(function stravaHandleCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const savedState = localStorage.getItem('strava_state');
+  if(code && state && state === savedState){
+    localStorage.removeItem('strava_state');
+    // Nettoyer l'URL immédiatement
+    window.history.replaceState({}, document.title, window.location.pathname);
+    // Échanger le code contre un token
+    stravaExchangeCode(code);
+  }
+})();
+
 // ── SERVICE WORKER ────────────────────────────────────────────────────────
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').then(reg => {
