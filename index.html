@@ -3127,7 +3127,17 @@ function renderJournal(){
   if(sportFilter) filtered = filtered.filter(s=>s.sport===sportFilter);
 
   if(planFilter==='none') filtered = filtered.filter(s=>!s.planId&&!['plan','natation-plan'].includes(s.sport));
-  else if(planFilter) filtered = filtered.filter(s=>s.planId===planFilter);
+  else if(planFilter){
+    filtered = filtered.filter(s=>{
+      if(s.planId===planFilter) return true;
+      // Séances de type plan sans planId → appartiennent au plan actif/principal
+      if(!s.planId && ['plan','natation-plan'].includes(s.sport)){
+        const p = getActivePlan() || plans[0];
+        return p && p.id===planFilter;
+      }
+      return false;
+    });
+  }
 
   if(periodFilter){
     const cutoff = new Date();
@@ -3168,6 +3178,9 @@ function renderJournal(){
   const currentKey=`${now.getFullYear()}-${String(now.getMonth()).padStart(2,'0')}`;
   const list=document.getElementById('history-list');
   if(!list) return;
+
+  // Nettoyer les instances de carte avant de re-rendre
+  Object.keys(mapInstances).forEach(k=>{ try{mapInstances[k].remove();}catch(e){} delete mapInstances[k]; });
 
   if(!filtered.length){
     list.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Aucune séance pour ces filtres</div>';
@@ -3227,7 +3240,7 @@ function toggleHistDetail(id){
 function renderMap(id){
   const mapEl=document.getElementById('map-'+id);
   if(!mapEl||mapInstances[id])return;
-  const s=sessions.find(x=>x.id===id);
+  const s=sessions.find(x=>x.id==id); // == pour comparer number et string
   if(!s||!s.gpsTrace||s.gpsTrace.length<2)return;
 
   const pts=s.gpsTrace.map(p=>[p.lat,p.lon]);
