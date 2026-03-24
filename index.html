@@ -199,7 +199,6 @@ canvas{display:block;width:100%!important}
   <button class="tab" onclick="sw('plan')">📋 Actif</button>
   <button class="tab" onclick="sw('log')">✏️ Saisir</button>
   <button class="tab" onclick="sw('stats')">📊 Dashboard</button>
-  <button class="tab" onclick="sw('zones')">🏃 Zones</button>
   <button class="tab" onclick="sw('settings')">⚙️ Réglages</button>
 </div>
 
@@ -241,6 +240,14 @@ canvas{display:block;width:100%!important}
     <div class="prog-hd"><span>Avancement du plan</span><span id="prog-pct" style="color:var(--or);font-weight:700">0%</span></div>
     <div class="pbar"><div class="pfill" id="prog-bar" style="width:0%"></div></div>
     <p style="font-size:11px;color:var(--text3);margin-top:5px" id="prog-sub"></p>
+  </div>
+
+  <!-- ZONES (pliables) -->
+  <div style="margin-bottom:8px">
+    <button class="btn btn-ghost btn-full" onclick="toggleZones(this)" style="font-size:12px">🏃 Afficher les zones d'allure ▼</button>
+    <div id="zones-inline" style="display:none;margin-top:8px">
+      <div id="zones-content"></div>
+    </div>
   </div>
 
   <!-- SEMAINES DU PLAN -->
@@ -768,13 +775,12 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','zones','settings'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','settings'][i]===t));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='plans')renderPlans();
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
-  if(t==='zones')renderZones();
   if(t==='settings')loadSettings();
 }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
@@ -2427,6 +2433,14 @@ function updatePerfCards(){/* cartes supprimées — prédiction et VO2max dans 
 
 
 // ── ZONES D'ALLURE ────────────────────────────────────────────────────────
+function toggleZones(btn){
+  const el = document.getElementById('zones-inline');
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '🏃 Afficher les zones d\'allure ▼' : '🏃 Masquer les zones d\'allure ▲';
+  if(!open) renderZones();
+}
+
 function renderZones(){
   // Lire l'objectif depuis l'analyse Coach IA (si dispo), sinon 1h50 par défaut
   const coachSaved=localStorage.getItem('smi_coach');
@@ -2884,68 +2898,39 @@ function renderSportChips(){
 
 function renderHistory(){
   const list=document.getElementById('history-list');
-  if(!sessions.length){list.innerHTML='<div class="no-data">Aucune séance enregistrée.<br>Utilise l\'onglet "Saisir" pour commencer.</div>';return}
-  // Tri : plus récent en premier (par date puis par id)
+  if(!sessions.length){list.innerHTML="<div class=\"no-data\">Aucune séance enregistrée. Utilise l'onglet Saisir pour commencer.</div>";return;}
+
   const sorted=[...sessions].sort((a,b)=>{
     const da=parseDate(a.date),db=parseDate(b.date);
     if(da&&db)return db-da;
     return b.id-a.id;
   });
-  list.innerHTML=sorted.map(s=>{
-    const stars=s.rating?'★'.repeat(s.rating)+'☆'.repeat(5-s.rating):'';
+
+  const MONTHS_FR=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const groups={};
+  sorted.forEach(s=>{
+    const d=parseDate(s.date);
+    const key=d?`${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`:'0000-00';
+    const label=d?`${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`:'Sans date';
+    if(!groups[key])groups[key]={label,sessions:[],km:0};
+    groups[key].sessions.push(s);
+    groups[key].km+=s.dist||0;
+  });
+
+  const now=new Date();
+  const currentKey=`${now.getFullYear()}-${String(now.getMonth()).padStart(2,'0')}`;
+
+  function sessionCard(s){
     const sportLbl=SPORT_LABELS[s.sport]||s.sport;
     const sportCls=SPORT_CLASSES[s.sport]||'s-autre';
     const week=s.week?getWeek(s.week):null;
-    // KM table
-    const kmHtml=s.kmRows&&s.kmRows.length?`
-      <div style="margin-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div>
-        <table class="km-table">
-          <thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead>
-          <tbody>${s.kmRows.map((r,i)=>`<tr>
-            <td style="font-weight:600;color:var(--text3)">${i+1}</td>
-            <td>${r.pace||'—'}</td>
-            <td>${r.dplus?r.dplus+'m':'—'}</td>
-            <td style="color:var(--text2)">${r.note||''}</td>
-          </tr>`).join('')}</tbody>
-        </table>
-      </div>`:'';
-    // Comparaison plan
-    const compHtml=week?`
-      <div style="margin-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px">
-          <span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span>
-          <span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span>
-        </div>
-      </div>`:'';
-    // Commentaire
+    const kmHtml=s.kmRows&&s.kmRows.length?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div><table class="km-table"><thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead><tbody>${s.kmRows.map((r,i)=>`<tr><td style="font-weight:600;color:var(--text3)">${i+1}</td><td>${r.pace||'—'}</td><td>${r.dplus?r.dplus+'m':'—'}</td><td style="color:var(--text2)">${r.note||''}</td></tr>`).join('')}</tbody></table></div>`:'';
+    const compHtml=week?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px"><span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span><span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span></div></div>`:'';
     const commentHtml=s.comment?`<div style="margin-top:8px;font-size:12px;color:var(--text2);font-style:italic">"${s.comment}"</div>`:'';
-    // Analyse sauvegardée
-    const analysisHtml=s.claudeAnalysis?`
-      <div style="margin-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div>
-        <div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button>
-      </div>`:`
-      <div style="margin-top:10px">
-        <button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button>
-      </div>`;
+    const analysisHtml=s.claudeAnalysis?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div><div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button></div>`:`<div style="margin-top:10px"><button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button></div>`;
     const aiLoadHtml=`<div id="ai-hist-load-${s.id}" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Analyse en cours…</span></div>`;
-
-    // Carte GPS
-    const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`
-      <div style="margin-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div>
-        <div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div>
-        <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--text3)">
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:16px;height:3px;background:#E8500A;display:inline-block;border-radius:2px"></span>Tracé</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#27AE60;border-radius:50%;display:inline-block"></span>Départ</span>
-          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#C0392B;border-radius:50%;display:inline-block"></span>Arrivée</span>
-        </div>
-      </div>`:'';
-
-    return`<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
+    const mapHtml=s.gpsTrace&&s.gpsTrace.length>2?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺️ Itinéraire GPS</div><div id="map-${s.id}" style="height:220px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div></div>`:'';
+    return `<div class="hist-item" style="flex-direction:column;cursor:pointer" onclick="toggleHistDetail(${s.id})">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
         <div class="hi-l">
           <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+(s.slot?'-'+s.slot.toUpperCase():'')+'</b>':''}</div>
@@ -2967,12 +2952,7 @@ function renderHistory(){
           ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
         </div>
         ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
-        ${commentHtml}
-        ${mapHtml}
-        ${compHtml}
-        ${kmHtml}
-        ${analysisHtml}
-        ${aiLoadHtml}
+        ${commentHtml}${mapHtml}${compHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
         <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:6px">
             <label style="font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap">Type :</label>
@@ -2992,7 +2972,33 @@ function renderHistory(){
         </div>
       </div>
     </div>`;
+  }
+
+  const html=Object.entries(groups).map(([key,group])=>{
+    const isOpen=key===currentKey;
+    const kmStr=Math.round(group.km)>0?` · ${Math.round(group.km)} km`:'';
+    return `<div style="border-radius:var(--r);overflow:hidden;margin-bottom:6px;border:1px solid var(--border)">
+      <div onclick="toggleHistMonth('${key}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--bg2)">
+        <div>
+          <span style="font-size:13px;font-weight:700;color:var(--text)">${group.label}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">${group.sessions.length} séance(s)${kmStr}</span>
+        </div>
+        <span id="chev-month-${key}" style="font-size:11px;color:var(--text3);transition:transform .2s;display:inline-block;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}">▼</span>
+      </div>
+      <div id="hist-month-${key}" style="display:${isOpen?'block':'none'}">${group.sessions.map(sessionCard).join('')}</div>
+    </div>`;
   }).join('');
+
+  list.innerHTML=html;
+}
+
+function toggleHistMonth(key){
+  const el=document.getElementById('hist-month-'+key);
+  const chev=document.getElementById('chev-month-'+key);
+  if(!el)return;
+  const open=el.style.display==='block';
+  el.style.display=open?'none':'block';
+  if(chev)chev.style.transform=open?'rotate(0deg)':'rotate(180deg)';
 }
 
 const mapInstances={};
