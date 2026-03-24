@@ -7,8 +7,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -178,7 +176,6 @@ canvas{display:block;width:100%!important}
 .s-padel{background:var(--pul);color:var(--pu)}
 .s-autre{background:var(--bg3);color:var(--text2)}
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
 <body>
 <div class="shell">
@@ -200,14 +197,9 @@ canvas{display:block;width:100%!important}
   <button class="tab" onclick="sw('plan')">📋 Actif</button>
   <button class="tab" onclick="sw('log')">✏️ Saisir</button>
   <button class="tab" onclick="sw('stats')">📊 Dashboard</button>
-  <button class="tab" onclick="sw('routes')">🗺️ Parcours</button>
   <button class="tab" onclick="sw('settings')">⚙️ Réglages</button>
 </div>
 
-<!-- PARCOURS -->
-<div class="section" id="tab-routes">
-  <div id="routes-content"></div>
-</div>
 
 <!-- PLANS -->
 <div class="section active" id="tab-plans"><div id="plans-content"></div></div>
@@ -568,15 +560,6 @@ canvas{display:block;width:100%!important}
     <p style="font-size:11px;color:var(--text3)">Obtenir une clé : <a href="https://console.anthropic.com" target="_blank" style="color:var(--bl)">console.anthropic.com</a></p>
   </div>
   <div class="card">
-    <div class="card-title"><span class="bar"></span>Clé API GraphHopper (pour les parcours)</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Nécessaire pour générer des tracés de parcours. Gratuit jusqu'à 500 requêtes/jour.</p>
-    <div class="api-key-row">
-      <input type="password" id="gh-key-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-      <button class="btn btn-or" onclick="saveGhKey()">Enregistrer</button>
-    </div>
-    <p style="font-size:11px;color:var(--text3)">Créer un compte : <a href="https://graphhopper.com/dashboard" target="_blank" style="color:var(--bl)">graphhopper.com/dashboard</a></p>
-  </div>
-  <div class="card">
     <div class="card-title"><span class="bar"></span>Ton profil (pour le calcul calories)</div>
     <div class="g2">
       <div class="field"><label class="lbl">Poids (kg)</label><input type="number" id="s-weight" placeholder="75"></div>
@@ -793,13 +776,12 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','routes','settings'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','settings'][i]===t));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='plans')renderPlans();
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
-  if(t==='routes')renderRoutes();
   if(t==='settings')loadSettings();
 }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
@@ -3162,13 +3144,6 @@ function loadSettings(){
   document.getElementById('api-key-input').value=settings.apiKey||'';
   document.getElementById('s-weight').value=settings.weight||75;
   document.getElementById('s-target').value=settings.target||'5:13';
-  const ghEl=document.getElementById('gh-key-input');
-  if(ghEl) ghEl.value=settings.ghKey||'';
-}
-function saveGhKey(){
-  settings.ghKey=document.getElementById('gh-key-input').value.trim();
-  localStorage.setItem('smi_cfg',JSON.stringify(settings));
-  toast('Clé GraphHopper enregistrée ✓');
 }
 function saveApiKey(){
   settings.apiKey=document.getElementById('api-key-input').value.trim();
@@ -4250,351 +4225,6 @@ async function extractStravaData(){
   }
 }
 
-// ── PARCOURS ──────────────────────────────────────────────────────────────
-let savedRoutes = JSON.parse(localStorage.getItem('smi_routes')||'[]');
-let routeMap = null, routePolyline = null, routeMarkers = [];
-
-function saveRoutes(){ localStorage.setItem('smi_routes', JSON.stringify(savedRoutes)); }
-
-function renderRoutes(){
-  const el = document.getElementById('routes-content');
-  if(!el) return;
-
-  // Clé GraphHopper depuis settings
-  const ghKey = settings.ghKey||'';
-
-  let h = `
-    <div class="card">
-      <div class="card-title"><span class="bar"></span>🗺️ Générer un parcours</div>
-
-      <div class="g2" style="margin-bottom:10px">
-        <div class="field">
-          <label class="lbl">Sport</label>
-          <select id="rt-sport" onchange="routeSportChange()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-            <option value="foot">🏃 Course à pied</option>
-            <option value="bike">🚴 Vélo</option>
-            <option value="mtb">🚵 VTT</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="lbl">Type de terrain</label>
-          <select id="rt-terrain" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-            <option value="road">Route / Asphalte</option>
-            <option value="trail">Trail / Sentier</option>
-            <option value="mixed">Mixte</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="g2" style="margin-bottom:10px">
-        <div class="field">
-          <label class="lbl">Distance cible (km)</label>
-          <input type="number" id="rt-dist" value="10" min="1" max="100" step="0.5" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-        </div>
-        <div class="field">
-          <label class="lbl">Type de parcours</label>
-          <select id="rt-loop" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-            <option value="loop">Boucle (retour au départ)</option>
-            <option value="oneway">Aller simple</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="field" style="margin-bottom:10px">
-        <label class="lbl">Point de départ</label>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="rt-start" placeholder="Adresse ou ville (ex: Lyon, France)" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-          <button class="btn btn-ghost" onclick="routeUseMyLocation()" style="white-space:nowrap;font-size:12px">📍 Ma position</button>
-        </div>
-      </div>
-
-      <div class="field" style="margin-bottom:12px">
-        <label class="lbl">Préférences (optionnel)</label>
-        <input type="text" id="rt-prefs" placeholder="ex: éviter les grandes routes, longer la rivière, peu de dénivelé..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
-      </div>
-
-      ${!ghKey?`<div style="background:var(--rel);border:1px solid var(--re);border-radius:var(--r);padding:8px 12px;font-size:11px;color:var(--re);margin-bottom:10px">⚠️ Clé API GraphHopper non renseignée — ajoute-la dans Réglages.</div>`:''}
-
-      <button class="btn btn-or btn-full" onclick="generateRoute()" ${!ghKey?'disabled':''}>🗺️ Générer un parcours</button>
-      <div id="rt-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none"></div>
-    </div>
-
-    <!-- CARTE -->
-    <div id="rt-map-card" style="display:none" class="card" style="padding:0">
-      <div class="card-title"><span class="bar"></span>Parcours généré</div>
-      <div id="rt-map" style="height:320px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)"></div>
-      <div id="rt-info" style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 0;font-size:12px"></div>
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-or" style="flex:1" onclick="saveRoute()">⭐ Sauvegarder</button>
-        <button class="btn btn-ghost" onclick="exportRouteGPX()">⬇️ Export GPX</button>
-      </div>
-      <div id="rt-save-name" style="display:none;margin-top:8px">
-        <input type="text" id="rt-name-input" placeholder="Nom du parcours" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:6px">
-        <button class="btn btn-or btn-full" onclick="confirmSaveRoute()">✅ Enregistrer</button>
-      </div>
-    </div>`;
-
-  // Parcours sauvegardés
-  if(savedRoutes.length){
-    h += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:4px 0 8px">⭐ Mes parcours favoris (${savedRoutes.length})</div>`;
-    savedRoutes.forEach((r,i)=>{
-      h += `<div class="card" style="cursor:pointer" onclick="loadSavedRoute(${i})">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${r.name}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.sport==='foot'?'🏃':r.sport==='bike'?'🚴':'🚵'} ${r.dist}km · ${r.loop?'Boucle':'Aller simple'} · ${r.terrain}</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" style="color:var(--re)" onclick="event.stopPropagation();deleteRoute(${i})">🗑️</button>
-        </div>
-      </div>`;
-    });
-  }
-
-  el.innerHTML = h;
-}
-
-function routeSportChange(){
-  const sport = document.getElementById('rt-sport')?.value;
-  const terrain = document.getElementById('rt-terrain');
-  if(!terrain) return;
-  if(sport==='bike'){
-    terrain.innerHTML = '<option value="road">Route / Asphalte</option><option value="mixed">Mixte</option>';
-  } else if(sport==='mtb'){
-    terrain.innerHTML = '<option value="trail">Trail / Sentier</option><option value="mixed">Mixte</option>';
-  } else {
-    terrain.innerHTML = '<option value="road">Route / Asphalte</option><option value="trail">Trail / Sentier</option><option value="mixed">Mixte</option>';
-  }
-}
-
-function routeUseMyLocation(){
-  const statusEl = document.getElementById('rt-status');
-  if(statusEl){ statusEl.textContent='📍 Récupération de ta position…'; statusEl.style.display='block'; }
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const {latitude:lat, longitude:lng} = pos.coords;
-    document.getElementById('rt-start').value = `${lat.toFixed(5)},${lng.toFixed(5)}`;
-    if(statusEl){ statusEl.textContent='✅ Position récupérée'; setTimeout(()=>statusEl.style.display='none',2000); }
-  }, err=>{
-    if(statusEl){ statusEl.textContent='❌ Impossible d\'accéder à ta position'; }
-  });
-}
-
-// Géocoder une adresse → coordonnées via Nominatim (OpenStreetMap gratuit)
-async function geocode(address){
-  const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
-  const data = await resp.json();
-  if(!data.length) throw new Error('Adresse non trouvée');
-  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-}
-
-// Générer un point d'arrivée pour une boucle approximative
-function generateLoopWaypoints(startLat, startLng, distKm){
-  const R = 6371;
-  const d = (distKm/2) / R; // rayon approximatif en radians
-  // Point opposé à ~45° pour faire une boucle naturelle
-  const angles = [45, 90, 135]; // plusieurs directions possibles
-  const angle = angles[Math.floor(Math.random()*angles.length)] * Math.PI/180;
-  const lat2 = Math.asin(Math.sin(startLat*Math.PI/180)*Math.cos(d) + Math.cos(startLat*Math.PI/180)*Math.sin(d)*Math.cos(angle));
-  const lng2 = startLng*Math.PI/180 + Math.atan2(Math.sin(angle)*Math.sin(d)*Math.cos(startLat*Math.PI/180), Math.cos(d)-Math.sin(startLat*Math.PI/180)*Math.sin(lat2));
-  return { lat: lat2*180/Math.PI, lng: lng2*180/Math.PI };
-}
-
-let currentRoute = null;
-
-async function generateRoute(){
-  const sport = document.getElementById('rt-sport')?.value||'foot';
-  const terrain = document.getElementById('rt-terrain')?.value||'road';
-  const dist = parseFloat(document.getElementById('rt-dist')?.value)||10;
-  const isLoop = document.getElementById('rt-loop')?.value==='loop';
-  const startInput = document.getElementById('rt-start')?.value?.trim();
-  const prefs = document.getElementById('rt-prefs')?.value?.trim();
-  const ghKey = settings.ghKey||'';
-
-  if(!ghKey){ toast('Clé GraphHopper manquante — ajoute-la dans Réglages'); return; }
-  if(!startInput){ toast('Indique un point de départ'); return; }
-
-  const statusEl = document.getElementById('rt-status');
-  statusEl.style.display='block';
-  statusEl.textContent='🔍 Recherche du point de départ…';
-
-  try {
-    // 1. Géocoder le point de départ
-    let startCoord;
-    if(/^-?\d+\.\d+,-?\d+\.\d+$/.test(startInput)){
-      const [lat,lng] = startInput.split(',').map(Number);
-      startCoord = {lat, lng};
-    } else {
-      startCoord = await geocode(startInput);
-    }
-
-    // 2. Déterminer le profil GraphHopper
-    const profileMap = {
-      'foot-road': 'foot', 'foot-trail': 'hike', 'foot-mixed': 'hike',
-      'bike-road': 'bike', 'bike-mixed': 'bike',
-      'mtb-trail': 'mtb', 'mtb-mixed': 'mtb'
-    };
-    const profile = profileMap[`${sport}-${terrain}`]||'foot';
-
-    statusEl.textContent='🗺️ Calcul du tracé…';
-
-    let points, routeCoords, totalDist, totalTime, elevation;
-
-    if(isLoop){
-      // Boucle : on génère un waypoint intermédiaire et on revient au départ
-      const mid = generateLoopWaypoints(startCoord.lat, startCoord.lng, dist);
-      points = [
-        [startCoord.lat, startCoord.lng],
-        [mid.lat, mid.lng],
-        [startCoord.lat, startCoord.lng]
-      ];
-    } else {
-      // Aller simple : on génère un point d'arrivée à ~dist km
-      const end = generateLoopWaypoints(startCoord.lat, startCoord.lng, dist);
-      points = [
-        [startCoord.lat, startCoord.lng],
-        [end.lat, end.lng]
-      ];
-    }
-
-    // 3. Appel GraphHopper
-    const pointsParam = points.map(p=>`point=${p[0]},${p[1]}`).join('&');
-    const ghUrl = `https://graphhopper.com/api/1/route?${pointsParam}&profile=${profile}&locale=fr&calc_points=true&instructions=false&points_encoded=false&key=${ghKey}`;
-    const ghResp = await fetch(ghUrl);
-    const ghData = await ghResp.json();
-
-    if(ghData.message){ throw new Error(ghData.message); }
-    if(!ghData.paths?.length){ throw new Error('Aucun itinéraire trouvé'); }
-
-    const path = ghData.paths[0];
-    routeCoords = path.points.coordinates.map(c=>([c[1],c[0]])); // [lng,lat] → [lat,lng]
-    totalDist = Math.round(path.distance/100)/10; // en km
-    totalTime = Math.round(path.time/60000); // en minutes
-    elevation = path.ascend ? Math.round(path.ascend) : 0;
-
-    // Stocker le tracé courant
-    currentRoute = {
-      sport, terrain, dist: totalDist, loop: isLoop,
-      start: startInput, prefs,
-      coords: routeCoords,
-      time: totalTime, elevation,
-      ghProfile: profile
-    };
-
-    statusEl.textContent=`✅ Parcours généré — ${totalDist} km`;
-
-    // 4. Afficher la carte
-    document.getElementById('rt-map-card').style.display='block';
-    document.getElementById('rt-info').innerHTML = `
-      <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">📏 ${totalDist} km</span>
-      <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">⏱️ ~${totalTime} min</span>
-      ${elevation?`<span style="background:var(--bg2);padding:4px 10px;border-radius:20px">⛰️ +${elevation}m</span>`:''}
-      <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">${isLoop?'🔄 Boucle':'➡️ Aller simple'}</span>`;
-
-    // Initialiser ou mettre à jour la carte Leaflet
-    setTimeout(()=>{
-      if(!window.L){ toast('Chargement carte…'); return; }
-      if(routeMap){
-        routeMap.remove();
-        routeMap=null;
-      }
-      routeMap = L.map('rt-map');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-        attribution:'© OpenStreetMap', maxZoom:19
-      }).addTo(routeMap);
-
-      // Tracé
-      if(routePolyline) routePolyline.remove();
-      routePolyline = L.polyline(routeCoords, {color:'#E8500A', weight:4, opacity:0.85}).addTo(routeMap);
-
-      // Marqueurs départ/arrivée
-      routeMarkers.forEach(m=>m.remove());
-      routeMarkers = [];
-      const startIcon = L.divIcon({html:'<div style="background:#27AE60;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[14,14]});
-      const endIcon = L.divIcon({html:'<div style="background:#E8500A;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[14,14]});
-      routeMarkers.push(L.marker(routeCoords[0], {icon:startIcon}).addTo(routeMap).bindPopup('Départ'));
-      if(!isLoop) routeMarkers.push(L.marker(routeCoords[routeCoords.length-1], {icon:endIcon}).addTo(routeMap).bindPopup('Arrivée'));
-
-      routeMap.fitBounds(routePolyline.getBounds(), {padding:[20,20]});
-    }, 200);
-
-  } catch(e){
-    statusEl.textContent='❌ '+e.message;
-    console.error('Route generation error:', e);
-  }
-}
-
-function saveRoute(){
-  document.getElementById('rt-save-name').style.display='block';
-  const sport = document.getElementById('rt-sport')?.value||'foot';
-  const dist = currentRoute?.dist||0;
-  document.getElementById('rt-name-input').value = `${sport==='foot'?'Course':sport==='bike'?'Vélo':'VTT'} ${dist}km`;
-  document.getElementById('rt-name-input').focus();
-}
-
-function confirmSaveRoute(){
-  if(!currentRoute){ toast('Génère d\'abord un parcours'); return; }
-  const name = document.getElementById('rt-name-input')?.value?.trim() || 'Parcours';
-  savedRoutes.unshift({...currentRoute, name, savedAt: new Date().toISOString()});
-  saveRoutes();
-  document.getElementById('rt-save-name').style.display='none';
-  renderRoutes();
-  toast('⭐ Parcours sauvegardé !');
-}
-
-function deleteRoute(i){
-  if(!confirm('Supprimer ce parcours ?')) return;
-  savedRoutes.splice(i,1);
-  saveRoutes();
-  renderRoutes();
-  toast('Parcours supprimé');
-}
-
-function loadSavedRoute(i){
-  const r = savedRoutes[i];
-  if(!r) return;
-  currentRoute = r;
-  document.getElementById('rt-map-card').style.display='block';
-  document.getElementById('rt-info').innerHTML = `
-    <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">📏 ${r.dist} km</span>
-    <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">⏱️ ~${r.time||'?'} min</span>
-    ${r.elevation?`<span style="background:var(--bg2);padding:4px 10px;border-radius:20px">⛰️ +${r.elevation}m</span>`:''}
-    <span style="background:var(--bg2);padding:4px 10px;border-radius:20px">${r.loop?'🔄 Boucle':'➡️ Aller simple'}</span>
-    <span style="font-weight:600;color:var(--text)">${r.name}</span>`;
-
-  document.getElementById('tab-routes').scrollTop=0;
-
-  setTimeout(()=>{
-    if(!window.L) return;
-    if(routeMap){ routeMap.remove(); routeMap=null; }
-    routeMap = L.map('rt-map');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(routeMap);
-    routePolyline = L.polyline(r.coords,{color:'#E8500A',weight:4,opacity:0.85}).addTo(routeMap);
-    const startIcon=L.divIcon({html:'<div style="background:#27AE60;width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
-    L.marker(r.coords[0],{icon:startIcon}).addTo(routeMap).bindPopup('Départ');
-    routeMap.fitBounds(routePolyline.getBounds(),{padding:[20,20]});
-  },200);
-}
-
-function exportRouteGPX(){
-  if(!currentRoute||!currentRoute.coords){ toast('Aucun parcours à exporter'); return; }
-  const coords = currentRoute.coords;
-  const now = new Date().toISOString();
-  let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Mon Coach Running" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>${currentRoute.name||'Parcours'}</name>
-    <trkseg>
-${coords.map(c=>`      <trkpt lat="${c[0]}" lon="${c[1]}"></trkpt>`).join('\n')}
-    </trkseg>
-  </trk>
-</gpx>`;
-  const blob = new Blob([gpx],{type:'application/gpx+xml'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download=`parcours-${currentRoute.dist}km.gpx`;
-  a.click(); URL.revokeObjectURL(url);
-  toast('✅ GPX exporté');
-}
-
 // ── INIT ──────────────────────────────────────────────────────────────────
 renderPlans();
 renderPlan();
@@ -5052,6 +4682,5 @@ try {
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
 </script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
