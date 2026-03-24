@@ -195,15 +195,19 @@ canvas{display:block;width:100%!important}
 </div>
 
 <div class="tabs">
-  <button class="tab active" onclick="sw('plan')">📋 Plan</button>
+  <button class="tab active" onclick="sw('plans')">🗂️ Plans</button>
+  <button class="tab" onclick="sw('plan')">📋 Actif</button>
   <button class="tab" onclick="sw('log')">✏️ Saisir</button>
   <button class="tab" onclick="sw('stats')">📊 Dashboard</button>
   <button class="tab" onclick="sw('zones')">🏃 Zones</button>
   <button class="tab" onclick="sw('settings')">⚙️ Réglages</button>
 </div>
 
-<!-- PLAN -->
-<div class="section active" id="tab-plan"><div id="plan-content"></div></div>
+<!-- PLANS -->
+<div class="section active" id="tab-plans"><div id="plans-content"></div></div>
+
+<!-- PLAN ACTIF -->
+<div class="section" id="tab-plan"><div id="plan-content"></div></div>
 
 <!-- LOG -->
 <div class="section" id="tab-log">
@@ -660,8 +664,50 @@ const SPORT_CLASSES={'plan':'s-run','natation-plan':'s-nat','course-libre':'s-ru
 let sessions=JSON.parse(localStorage.getItem('smi_s')||'[]');
 let kmRows=[];
 let settings=JSON.parse(localStorage.getItem('smi_cfg')||'{"weight":75,"target":"5:13","apiKey":""}');
-// Modifications du plan par le Coach IA — stockées séparément pour pouvoir revenir au plan original
 let planOverrides=JSON.parse(localStorage.getItem('smi_plan_overrides')||'{}');
+
+// ── STRUCTURE MULTI-PLANS ─────────────────────────────────────────────────
+// plans : tableau de plans d'entraînement (actif + archivés)
+// Chaque plan : { id, name, type, goal, raceDate, startDate, status, weeks[] }
+// Chaque session a un planId (null = hors plan)
+
+const PLAN_SEMI_ID = 'plan_semi_2026';
+
+let plans = JSON.parse(localStorage.getItem('smi_plans') || 'null');
+
+// ── MIGRATION AUTOMATIQUE ─────────────────────────────────────────────────
+// Si pas encore migré, on crée la structure multi-plans à partir des données existantes
+if(!plans){
+  plans = [{
+    id: PLAN_SEMI_ID,
+    name: 'Semi-marathon 1h50',
+    type: 'semi',
+    goal: '1h50',
+    goalPace: '5:13',
+    raceDate: '2026-10-04',
+    startDate: '2026-03-16',
+    status: 'active', // active | archived | completed
+    color: '#E8500A',
+    weeksCount: 30,
+    createdAt: '2026-03-16'
+  }];
+  // Associer toutes les séances existantes au plan semi
+  sessions = sessions.map(s => ({
+    ...s,
+    planId: (s.sport==='plan'||s.sport==='natation-plan') ? PLAN_SEMI_ID : null
+  }));
+  localStorage.setItem('smi_s', JSON.stringify(sessions));
+  localStorage.setItem('smi_plans', JSON.stringify(plans));
+  console.log('Migration multi-plans effectuée');
+}
+
+// Plan actif courant
+function getActivePlan(){ return plans.find(p=>p.status==='active')||null; }
+function getPlanById(id){ return plans.find(p=>p.id===id)||null; }
+
+function savePlans(){
+  localStorage.setItem('smi_plans', JSON.stringify(plans));
+}
 
 // Applique les overrides sur une semaine
 function getWeekWithOverride(n){
@@ -678,9 +724,11 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plan','log','stats','zones','settings'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','zones','settings'][i]===t));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
+  if(t==='plans')renderPlans();
+  if(t==='plan')renderPlan();
   if(t==='stats')renderStats();
   if(t==='zones')renderZones();
   if(t==='settings')loadSettings();
@@ -700,11 +748,166 @@ function badgeHtml(b){
   const[c,l]=map[b]||['bvc',b];return`<span class="badge ${c}">${l}</span>`;
 }
 
-// ── PLAN ──────────────────────────────────────────────────────────────────
+// ── PLANS ─────────────────────────────────────────────────────────────────
+function renderPlans(){
+  const activePlan = getActivePlan();
+  const archivedPlans = plans.filter(p=>p.status==='archived'||p.status==='completed');
+
+  // Calculer la progression du plan actif
+  function planProgress(plan){
+    if(!plan) return {pct:0, done:0, total:0};
+    const planSessions = sessions.filter(s=>s.planId===plan.id&&['plan','natation-plan'].includes(s.sport)&&s.week&&s.slot);
+    const uniqueSlots = new Set(planSessions.map(s=>`${s.week}-${s.slot}`));
+    const done = uniqueSlots.size;
+    const total = (plan.weeksCount||30) * 2;
+    return {pct: Math.round(done/total*100), done, total};
+  }
+
+  function planTypeIcon(type){
+    return {semi:'🏃',marathon:'🏃',10:'🏃',5:'🏃',trail:'⛰️',velo:'🚴',tri:'🏊'}[type]||'🏅';
+  }
+
+  function planStats(plan){
+    const s = sessions.filter(s=>s.planId===plan.id&&['plan','course-libre','natation-plan','natation-libre'].includes(s.sport));
+    const km = s.reduce((a,x)=>a+(x.dist||0),0);
+    const seances = s.length;
+    return {km: Math.round(km), seances};
+  }
+
+  let h = '';
+
+  // ── Plan actif ──
+  h += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Plan actif</div>`;
+
+  if(activePlan){
+    const prog = planProgress(activePlan);
+    const stats = planStats(activePlan);
+    const weeksLeft = Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000));
+    h += `<div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="width:44px;height:44px;border-radius:var(--r);background:${activePlan.color||'#E8500A'}22;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${planTypeIcon(activePlan.type)}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${activePlan.name}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${activePlan.raceDate} · Objectif ${activePlan.goal}</div>
+        </div>
+        <span style="background:#E9F7EF;color:#27AE60;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">Actif</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--or)">${prog.pct}%</div>
+          <div style="font-size:10px;color:var(--text3)">complété</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--or)">${weeksLeft>0?weeksLeft:'J-'+Math.abs(weeksLeft)}</div>
+          <div style="font-size:10px;color:var(--text3)">${weeksLeft>0?'sem. restantes':'semaines'}</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--or)">${stats.km}</div>
+          <div style="font-size:10px;color:var(--text3)">km courus</div>
+        </div>
+      </div>
+      <div style="background:var(--bg3);border-radius:4px;height:6px;margin-bottom:10px">
+        <div style="background:var(--or);border-radius:4px;height:6px;width:${prog.pct}%"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-or" style="flex:1" onclick="sw('plan')">📋 Voir le plan</button>
+        <button class="btn btn-ghost" onclick="archivePlan('${activePlan.id}')">Archiver</button>
+      </div>
+    </div>`;
+  } else {
+    h += `<div class="card" style="text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:8px">🎯</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Aucun plan actif</div>
+      <button class="btn btn-or btn-full" onclick="createNewPlan()">+ Créer un nouveau plan</button>
+    </div>`;
+  }
+
+  // ── Nouveau plan ──
+  if(activePlan){
+    h += `<button class="btn btn-ghost btn-full" style="margin-bottom:16px" onclick="createNewPlan()">+ Créer un nouveau plan</button>`;
+  }
+
+  // ── Plans archivés ──
+  if(archivedPlans.length){
+    h += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:4px 0 8px">Plans archivés</div>`;
+    archivedPlans.forEach(plan=>{
+      const stats = planStats(plan);
+      h += `<div class="card" style="opacity:.85">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:var(--r);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${planTypeIcon(plan.type)}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${plan.name}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">${plan.raceDate} · ${stats.km} km · ${stats.seances} séances</div>
+          </div>
+          <span style="background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">${plan.status==='completed'?'✓ Terminé':'Archivé'}</span>
+        </div>
+      </div>`;
+    });
+  }
+
+  document.getElementById('plans-content').innerHTML = h;
+}
+
+function archivePlan(planId){
+  if(!confirm('Archiver ce plan ? Il restera accessible en lecture seule.')) return;
+  const idx = plans.findIndex(p=>p.id===planId);
+  if(idx>=0){ plans[idx].status='archived'; plans[idx].archivedAt=new Date().toISOString(); }
+  savePlans();
+  renderPlans();
+  toast('Plan archivé');
+}
+
+function createNewPlan(){
+  // Pour l'instant : modal simple, Coach IA générera le plan dans une prochaine étape
+  const name = prompt('Nom du plan (ex: Semi-marathon Lyon 2027) :');
+  if(!name) return;
+  const raceDate = prompt('Date de la course (YYYY-MM-DD) :');
+  if(!raceDate) return;
+  const goal = prompt('Objectif de temps (ex: 1h45) :');
+  if(!goal) return;
+
+  // Archiver le plan actif si existant
+  const active = getActivePlan();
+  if(active){ active.status='archived'; active.archivedAt=new Date().toISOString(); }
+
+  const newPlan = {
+    id: 'plan_'+Date.now(),
+    name,
+    type: 'semi',
+    goal,
+    goalPace: '5:13',
+    raceDate,
+    startDate: new Date().toISOString().slice(0,10),
+    status: 'active',
+    color: '#E8500A',
+    weeksCount: 30,
+    createdAt: new Date().toISOString()
+  };
+  plans.push(newPlan);
+  savePlans();
+  renderPlans();
+  toast('✅ Nouveau plan créé !');
+}
 function renderPlan(){
+  const activePlan = getActivePlan();
   const done=sessions.map(s=>s.week);
   const cur=todayWeek();
   let h='';
+
+  // En-tête avec nom du plan actif
+  if(activePlan){
+    const weeksLeft = Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
+    h+=`<div style="background:${activePlan.color||'#E8500A'};color:#fff;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:13px;font-weight:700">${activePlan.name}</div>
+        <div style="font-size:11px;opacity:.85;margin-top:2px">${activePlan.raceDate} · ${weeksLeft} semaines restantes</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;opacity:.85">Objectif</div>
+        <div style="font-size:15px;font-weight:700">${activePlan.goal}</div>
+      </div>
+    </div>`;
+  }
   PLAN.forEach(ph=>{
     h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color}"></span>${ph.phase}</div>`;
     ph.weeks.forEach(baseW=>{
@@ -1063,10 +1266,15 @@ function saveAndAnalyze(){
   let compPace='';
   if(dist&&dur){const a=dur/dist;compPace=Math.floor(a)+':'+(Math.round((a%1)*60)<10?'0':'')+Math.round((a%1)*60)}
 
+  // Associer au plan actif si c'est une séance du plan
+  const activePlan = getActivePlan();
+  const sessionPlanId = (sport==='plan'||sport==='natation-plan') && activePlan ? activePlan.id : null;
+
   const session={
     id:Date.now(),sport,week:wn,slot,date,dist,dur,dplus:d,hr,hrmax,
     pace:pace||compPace,paceok,comment,
     kmRows:[...kmRows],intensity,calEst,
+    planId: sessionPlanId,
     gpsTrace:pendingGpsTrace.length?[...pendingGpsTrace]:[],
     savedAt:new Date().toISOString()
   };
@@ -2911,7 +3119,7 @@ function resetPlanOverrides(){
     toast('Plan restauré à la version originale');
   }
 }
-function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');localStorage.removeItem('smi_coach');sessions=[];renderPlan();renderStats();toast('Données effacées')}}
+function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');localStorage.removeItem('smi_coach');localStorage.removeItem('smi_plans');sessions=[];plans=null;renderPlans();renderPlan();renderStats();toast('Données effacées')}}
 
 // ── IMPORT MODE ───────────────────────────────────────────────────────────
 let stravaImageB64='';
@@ -3338,6 +3546,7 @@ async function extractStravaData(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
+renderPlans();
 renderPlan();
 populateWeekSelect();
 onSportChange();
@@ -3534,14 +3743,14 @@ try {
       const snap = await fbDb.collection('users').doc(fbUser.uid).get();
       if(snap.exists){
         const d = snap.data();
-        // Lire les champs JSON string
         if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
         else if(d.sessions){ sessions=d.sessions; localStorage.setItem('smi_s',JSON.stringify(sessions)); }
+        if(d.plans_json){ plans=JSON.parse(d.plans_json); localStorage.setItem('smi_plans',d.plans_json); }
         if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
         else if(d.planOverrides){ planOverrides=d.planOverrides; localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides)); }
         if(d.coach_json && d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
         if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-        renderPlan(); renderStats(); loadCoachCard();
+        renderPlans(); renderPlan(); renderStats(); loadCoachCard();
         toast('☁️ Données synchronisées');
       } else {
         await fbSaveData();
@@ -3559,6 +3768,7 @@ try {
       IDB.set('smi_updated_at', String(now));
       await fbDb.collection('users').doc(fbUser.uid).set({
         sessions_json: JSON.stringify(sessions),
+        plans_json: JSON.stringify(plans),
         planOverrides_json: JSON.stringify(planOverrides),
         settings_json: JSON.stringify({...settings, apiKey:''}),
         coach_json: coachRaw || 'null',
@@ -3694,6 +3904,7 @@ try {
       const body = {
         fields: {
           sessions_json:      { stringValue: JSON.stringify(sessions) },
+          plans_json:         { stringValue: JSON.stringify(plans) },
           planOverrides_json: { stringValue: JSON.stringify(planOverrides) },
           settings_json:      { stringValue: JSON.stringify({...settings,apiKey:''}) },
           coach_json:         { stringValue: coachRaw||'null' },
@@ -3701,7 +3912,7 @@ try {
         }
       };
       await fetch(
-        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
+        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=plans_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
         { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
       );
       fbSetSyncStatus('✓ Synchronisé');
