@@ -1808,6 +1808,11 @@ function buildPrompt(s,week){
   if(s.paceok)msg+=`- Respect allures : ${s.paceok}\n`;
   if(s.calEst)msg+=`- Calories estimées : ${s.calEst} kcal\n`;
   if(s.comment)msg+=`- Commentaire : ${s.comment}\n`;
+  if(s.laps&&s.laps.length>1){
+    msg+=`\nLAPS / FRACTIONNÉS (${s.laps.length} répétitions marquées sur montre) :\n`;
+    s.laps.forEach(l=>msg+=`  Lap ${l.n} : ${l.dist}m en ${l.dur}s → ${l.pace}/km${l.hr?' · FC moy '+l.hr+' bpm':''}\n`);
+    msg+=`→ Analyse les variations d'allure entre laps pour évaluer la régularité et la fatigue.\n`;
+  }
   if(s.kmRows&&s.kmRows.length){
     msg+=`\nDÉTAIL KM PAR KM :\n`;
     s.kmRows.forEach((r,i)=>msg+=`  km ${i+1} : allure ${r.pace||'?'}/km, D+ ${r.dplus||0}m${r.note?' ('+r.note+')':''}\n`);
@@ -2927,6 +2932,7 @@ function renderHistory(){
     const sportCls=SPORT_CLASSES[s.sport]||'s-autre';
     const week=s.week?getWeek(s.week):null;
     const kmHtml=s.kmRows&&s.kmRows.length?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Détail km par km</div><table class="km-table"><thead><tr><th>Km</th><th>Allure</th><th>D+</th><th>Note</th></tr></thead><tbody>${s.kmRows.map((r,i)=>`<tr><td style="font-weight:600;color:var(--text3)">${i+1}</td><td>${r.pace||'—'}</td><td>${r.dplus?r.dplus+'m':'—'}</td><td style="color:var(--text2)">${r.note||''}</td></tr>`).join('')}</tbody></table></div>`:'';
+    const lapsHtml=s.laps&&s.laps.length>1?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">⚡ Laps / Fractionnés (${s.laps.length})</div><table class="km-table"><thead><tr><th>Lap</th><th>Dist</th><th>Durée</th><th>Allure</th><th>FC</th></tr></thead><tbody>${s.laps.map(l=>`<tr><td style="font-weight:600;color:var(--text3)">${l.n}</td><td>${l.dist}m</td><td>${l.dur}s</td><td style="font-weight:600;color:var(--or)">${l.pace}</td><td>${l.hr?l.hr+' bpm':'—'}</td></tr>`).join('')}</tbody></table></div>`:'';
     const compHtml=week?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Plan prévu (S${s.week})</div><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px"><span style="color:var(--text2)">Distance prévue : <b>${week.dist} km</b></span><span style="color:var(--text2)">Durée estimée : <b>~${Math.floor(week.dur/60)}h${String(week.dur%60).padStart(2,'0')}</b></span></div></div>`:'';
     const commentHtml=s.comment?`<div style="margin-top:8px;font-size:12px;color:var(--text2);font-style:italic">"${s.comment}"</div>`:'';
     const analysisHtml=s.claudeAnalysis?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">🤖 Analyse Claude</div><div style="background:var(--orl);border:1px solid var(--or);border-radius:var(--r);padding:10px;font-size:12px;line-height:1.7;color:var(--text);white-space:pre-wrap">${s.claudeAnalysis}</div><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="event.stopPropagation();resetAndReanalyze(${s.id})">🔄 Relancer l'analyse</button></div>`:`<div style="margin-top:10px"><button id="ai-hist-btn-${s.id}" class="btn btn-or btn-sm" onclick="event.stopPropagation();analyzeFromHistory(${s.id})">🤖 Analyser avec Claude</button></div>`;
@@ -2954,7 +2960,7 @@ function renderHistory(){
           ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
         </div>
         ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
-        ${commentHtml}${mapHtml}${compHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
+        ${commentHtml}${mapHtml}${compHtml}${lapsHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
         <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between">
           <div style="display:flex;align-items:center;gap:6px">
             <label style="font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap">Type :</label>
@@ -3646,17 +3652,18 @@ async function stravaConfirmImport(){
   for(const p of toImport){
     let gpsTrace=[], kmDetails=[];
 
-    // Récupérer les streams GPS + cadence + FC km par km
+    // Récupérer les streams GPS + laps (fractionnés)
     if(token && p.act.id){
       try {
-        if(statusEl) statusEl.textContent=`⏳ Récupération GPS : ${p.comment||p.date}…`;
+        if(statusEl) statusEl.textContent=`⏳ Récupération GPS & laps : ${p.comment||p.date}…`;
+
+        // 1. Streams GPS
         const streamResp = await fetch(
           `https://www.strava.com/api/v3/activities/${p.act.id}/streams?keys=latlng,distance,time,altitude,heartrate&key_by_type=true`,
           { headers:{'Authorization':'Bearer '+token} }
         );
         const streams = await streamResp.json();
 
-        // Construire le tracé GPS (sous-échantillonné à 500 points max)
         if(streams.latlng?.data){
           const pts = streams.latlng.data;
           const step = Math.max(1, Math.floor(pts.length/500));
@@ -3669,12 +3676,11 @@ async function stravaConfirmImport(){
             hr: hrData[i*step]||0
           }));
 
-          // Construire le détail km par km
+          // Détail km par km
           if(distData.length && distData[distData.length-1]>0){
             const totalKm = Math.floor(distData[distData.length-1]/1000);
             const timeData = streams.time?.data||[];
             for(let km=1; km<=totalKm; km++){
-              // Trouver l'index où on franchit km*1000m
               const targetDist = km*1000;
               const prevTarget = (km-1)*1000;
               const idxEnd = distData.findIndex(d=>d>=targetDist);
@@ -3682,14 +3688,12 @@ async function stravaConfirmImport(){
               if(idxEnd<0) break;
               const timeSec = timeData.length ? (timeData[idxEnd]-(timeData[idxStart]||0)) : 0;
               const pace = timeSec>0 ? secToPace(timeSec) : '';
-              // Dénivelé sur ce km
               let dplus=0;
               if(altData.length){
                 for(let i=idxStart+1;i<=idxEnd;i++){
                   if(altData[i]>altData[i-1]) dplus+=altData[i]-altData[i-1];
                 }
               }
-              // FC moyenne sur ce km
               let hrKm=0;
               if(hrData.length){
                 const slice=hrData.slice(idxStart,idxEnd+1).filter(Boolean);
@@ -3699,7 +3703,29 @@ async function stravaConfirmImport(){
             }
           }
         }
-      } catch(e){ console.warn('Stream fetch error:', e.message); }
+
+        // 2. Laps (segments/fractionnés marqués sur la montre)
+        if(statusEl) statusEl.textContent=`⏳ Récupération des laps : ${p.comment||p.date}…`;
+        const lapsResp = await fetch(
+          `https://www.strava.com/api/v3/activities/${p.act.id}/laps`,
+          { headers:{'Authorization':'Bearer '+token} }
+        );
+        const lapsData = await lapsResp.json();
+        if(Array.isArray(lapsData) && lapsData.length > 1){
+          // Stocker les laps comme note dans kmDetails si c'est un fractionné
+          // ET stocker séparément pour l'analyse Claude
+          p.laps = lapsData.map((lap, i) => ({
+            n: i+1,
+            dist: Math.round(lap.distance),
+            dur: Math.round(lap.elapsed_time),
+            pace: lap.distance>0 ? secToPace(Math.round(lap.elapsed_time/(lap.distance/1000))) : '',
+            hr: Math.round(lap.average_heartrate||0),
+            hrmax: Math.round(lap.max_heartrate||0),
+            name: lap.name||`Lap ${i+1}`
+          }));
+        }
+
+      } catch(e){ console.warn('Stream/laps fetch error:', e.message); }
     }
 
     sessions.push({
@@ -3707,6 +3733,7 @@ async function stravaConfirmImport(){
       sport: p.sport, date: p.date, dist: p.dist, dur: p.dur,
       dplus: p.dplus||0, pace: p.pace||'', hr: p.hr||0, hrmax: p.hrmax||0,
       comment: p.comment||'', kmDetails, kmRows:kmDetails, gpsTrace,
+      laps: p.laps||[],
       week: p.week||0, slot: p.slot||'s1',
       planId: (p.sport==='plan'||p.sport==='natation-plan')&&activePlan?activePlan.id:null,
       stravaId: p.act.id
