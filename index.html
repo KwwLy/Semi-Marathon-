@@ -756,7 +756,16 @@ function renderPlans(){
   // Calculer la progression du plan actif
   function planProgress(plan){
     if(!plan) return {pct:0, done:0, total:0};
-    const planSessions = sessions.filter(s=>s.planId===plan.id&&['plan','natation-plan'].includes(s.sport)&&s.week&&s.slot);
+    // Compatibilité : inclure les séances avec planId correspondant OU sans planId (migrées)
+    const planSessions = sessions.filter(s => {
+      if(!['plan','natation-plan'].includes(s.sport)) return false;
+      if(!s.week || !s.slot) return false;
+      // Séance explicitement liée à ce plan
+      if(s.planId === plan.id) return true;
+      // Séance sans planId (avant migration) → appartient au plan actif par défaut
+      if(!s.planId) return true;
+      return false;
+    });
     const uniqueSlots = new Set(planSessions.map(s=>`${s.week}-${s.slot}`));
     const done = uniqueSlots.size;
     const total = (plan.weeksCount||30) * 2;
@@ -768,10 +777,14 @@ function renderPlans(){
   }
 
   function planStats(plan){
-    const s = sessions.filter(s=>s.planId===plan.id&&['plan','course-libre','natation-plan','natation-libre'].includes(s.sport));
+    const s = sessions.filter(s => {
+      if(!['plan','course-libre','natation-plan','natation-libre'].includes(s.sport)) return false;
+      if(s.planId === plan.id) return true;
+      if(!s.planId && plan.status === 'active') return true;
+      return false;
+    });
     const km = s.reduce((a,x)=>a+(x.dist||0),0);
-    const seances = s.length;
-    return {km: Math.round(km), seances};
+    return {km: Math.round(km), seances: s.length};
   }
 
   let h = '';
