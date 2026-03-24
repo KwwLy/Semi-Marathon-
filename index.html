@@ -889,7 +889,7 @@ function renderPlans(){
     h += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:4px 0 8px">Plans archivés</div>`;
     archivedPlans.forEach(plan=>{
       const stats = planStats(plan);
-      h += `<div class="card" style="opacity:.85">
+      h += `<div class="card" style="opacity:.85;cursor:pointer" onclick="showArchivedPlan('${plan.id}')">
         <div style="display:flex;align-items:center;gap:12px">
           <div style="width:36px;height:36px;border-radius:var(--r);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${planTypeIcon(plan.type)}</div>
           <div style="flex:1">
@@ -898,9 +898,84 @@ function renderPlans(){
           </div>
           <span style="background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">${plan.status==='completed'?'✓ Terminé':'Archivé'}</span>
         </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;text-align:right">Appuie pour voir le détail →</div>
       </div>`;
     });
   }
+
+  document.getElementById('plans-content').innerHTML = h;
+}
+
+function showArchivedPlan(planId){
+  const plan = getPlanById(planId);
+  if(!plan) return;
+
+  // Séances liées au plan
+  const planSess = sessions.filter(s => {
+    if(s.planId === planId) return true;
+    // Fallback : séances plan sans planId si c'est le seul plan archivé
+    if(!s.planId && plans.filter(p=>p.status!=='active').length===1) return ['plan','natation-plan'].includes(s.sport);
+    return false;
+  }).sort((a,b)=>{ const da=parseDate(a.date),db=parseDate(b.date); return da&&db?da-db:0; });
+
+  const runSess = planSess.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0);
+  const totalKm = Math.round(runSess.reduce((a,s)=>a+(s.dist||0),0));
+  const totalDur = Math.round(runSess.reduce((a,s)=>a+(s.dur||0),0));
+  const avgPaceSec = runSess.filter(s=>s.pace).map(s=>paceToSec(s.pace)).filter(Boolean);
+  const avgPace = avgPaceSec.length ? secToPace(Math.round(avgPaceSec.reduce((a,b)=>a+b,0)/avgPaceSec.length)) : '—';
+  const bestRun = runSess.reduce((b,s)=>(!b||s.dist>b.dist)?s:b, null);
+
+  // Progression réalisée
+  const uniqueSlots = new Set(planSess.filter(s=>s.week&&s.slot).map(s=>`${s.week}-${s.slot}`));
+  const progPct = plan.weeksCount ? Math.round(uniqueSlots.size/(plan.weeksCount*2)*100) : 0;
+
+  let h = `
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <button class="btn btn-ghost" onclick="renderPlans()" style="padding:6px 10px;font-size:12px">← Retour</button>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">${plan.name}</div>
+      <span style="background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;margin-left:auto">${plan.status==='completed'?'✓ Terminé':'Archivé'}</span>
+    </div>
+
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--or)">${totalKm}</div>
+          <div style="font-size:10px;color:var(--text3)">km courus</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--or)">${runSess.length}</div>
+          <div style="font-size:10px;color:var(--text3)">séances course</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--or)">${avgPace}</div>
+          <div style="font-size:10px;color:var(--text3)">allure moyenne</div>
+        </div>
+        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--or)">${progPct}%</div>
+          <div style="font-size:10px;color:var(--text3)">complété</div>
+        </div>
+      </div>
+      ${bestRun?`<div style="background:var(--orl);border-radius:var(--r);padding:8px 12px;font-size:12px;color:var(--or)">
+        🏆 Meilleure sortie : <strong>${bestRun.dist} km</strong> en ${bestRun.dur} min (${bestRun.pace}/km) le ${bestRun.date}
+      </div>`:''}
+    </div>
+
+    <div class="card" style="padding:0 14px">
+      <div style="padding:10px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Séances du plan (${planSess.length})</div>
+      ${planSess.length ? planSess.map(s=>{
+        const sportLabel = {'plan':'🏃 Course plan','course-libre':'🏃 Course','natation-plan':'🏊 Natation plan','natation-libre':'🏊 Natation','velo':'🚴 Vélo','krav':'🥋 Krav','padel':'🎾 Padel','autre':'⚡ Autre'}[s.sport]||s.sport;
+        const distStr = ['krav','padel'].includes(s.sport) ? '' : s.dist ? s.dist+'km' : '';
+        const paceStr = s.pace ? ' · '+s.pace+'/km' : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+          <div style="font-size:11px;color:var(--text3);min-width:60px">${s.date||''}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500;color:var(--text)">${sportLabel}</div>
+            <div style="font-size:10px;color:var(--text3)">${distStr}${distStr&&s.dur?' · ':''}${s.dur?s.dur+' min':''}${paceStr}${s.comment?' · "'+s.comment+'"':''}</div>
+          </div>
+          ${s.week?`<span style="font-size:10px;color:var(--text3)">S${s.week}${s.slot?'/'+s.slot.toUpperCase():''}</span>`:''}
+        </div>`;
+      }).join('') : '<div style="padding:12px 0;font-size:12px;color:var(--text3);text-align:center">Aucune séance enregistrée pour ce plan</div>'}
+    </div>`;
 
   document.getElementById('plans-content').innerHTML = h;
 }
