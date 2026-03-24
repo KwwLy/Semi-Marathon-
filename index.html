@@ -239,6 +239,9 @@ canvas{display:block;width:100%!important}
 <!-- PLAN ACTIF -->
 <div class="section" id="tab-plan">
 
+  <!-- BANDEAU PLAN (rempli par renderPlan) -->
+  <div id="plan-banner"></div>
+
   <!-- COACH IA -->
   <div class="card" id="coach-card">
     <div class="card-title"><span class="bar"></span>🤖 Analyse Coach IA — Plan &amp; Prédiction</div>
@@ -1341,11 +1344,12 @@ function renderPlan(){
   const done=sessions.map(s=>s.week);
   const cur=todayWeek();
   let h='';
+  let bannerH='';
 
-  // En-tête avec nom du plan actif — bandeau bleu en haut
+  // Bandeau plan — injecté dans #plan-banner (tout en haut de l'onglet)
   if(activePlan){
     const weeksLeft = Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
-    h+=`<div style="background:var(--or);color:#fff;padding:12px 14px;margin:-14px -14px 14px -14px;display:flex;align-items:center;justify-content:space-between">
+    bannerH=`<div style="background:var(--or);color:#fff;padding:12px 14px;margin:-14px -14px 14px -14px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:14px;font-weight:700">${activePlan.name}</div>
         <div style="font-size:11px;opacity:.85;margin-top:2px">${activePlan.raceDate} · ${weeksLeft} sem. restantes</div>
@@ -1356,6 +1360,8 @@ function renderPlan(){
       </div>
     </div>`;
   }
+  const bannerEl = document.getElementById('plan-banner');
+  if(bannerEl) bannerEl.innerHTML = bannerH;
 
   // Phases dépliables
   const renderPhases = (phases, getColorFn) => {
