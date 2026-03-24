@@ -543,6 +543,8 @@ canvas{display:block;width:100%!important}
           </div>
         </div>
         <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="stravaSync()">🔄 Importer les nouvelles activités</button>
+        <button class="btn btn-ghost btn-full" style="margin-bottom:8px;font-size:11px" onclick="stravaForceResync()">↺ Resync depuis 7 jours</button>
+        <div id="strava-last-sync-label" style="font-size:10px;color:var(--text3);margin-bottom:4px"></div>
         <button class="btn btn-ghost btn-full" onclick="stravaDisconnect()">Se déconnecter de Strava</button>
       </div>
       <div id="strava-sync-status" style="font-size:11px;color:var(--text3);margin-top:8px;display:none"></div>
@@ -3408,10 +3410,25 @@ function stravaUpdateUI(){
       const av=document.getElementById('strava-avatar');
       av.src=athlete.profile; av.style.display='block';
     }
+    // Afficher la date de dernière sync
+    const lastSync = parseInt(localStorage.getItem('strava_last_sync')||'0');
+    const lbl = document.getElementById('strava-last-sync-label');
+    if(lbl && lastSync){
+      const d = new Date(lastSync*1000);
+      lbl.textContent = 'Dernière sync : '+d.toLocaleDateString('fr-FR')+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    }
   } else {
     document.getElementById('strava-logged-out').style.display='block';
     document.getElementById('strava-logged-in').style.display='none';
   }
+}
+
+function stravaForceResync(){
+  // Remettre le last_sync à 7 jours en arrière
+  const sevenDaysAgo = Math.floor(Date.now()/1000) - 7*24*3600;
+  localStorage.setItem('strava_last_sync', String(sevenDaysAgo));
+  stravaUpdateUI();
+  toast('Resync depuis 7 jours — clique "Importer" maintenant');
 }
 
 async function stravaExchangeCode(code){
