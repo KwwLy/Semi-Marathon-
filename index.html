@@ -3383,11 +3383,11 @@ const STRAVA_REDIRECT = 'https://kwwly.github.io/Semi-Marathon-/';
 const STRAVA_SCOPE = 'read,activity:read_all';
 
 function stravaConnect(){
-  // OAuth2 PKCE flow
   const state = Math.random().toString(36).slice(2);
   localStorage.setItem('strava_state', state);
-  const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT)}&response_type=code&scope=${STRAVA_SCOPE}&state=${state}&approval_prompt=auto`;
-  window.location.href = url;
+  const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT)}&response_type=code&scope=${STRAVA_SCOPE}&state=${state}&approval_prompt=force`;
+  // Utiliser window.location.assign pour une meilleure compatibilité PWA
+  window.location.assign(url);
 }
 
 function stravaDisconnect(){
