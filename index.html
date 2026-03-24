@@ -3502,6 +3502,9 @@ async function stravaGetToken(){
   return localStorage.getItem('strava_token');
 }
 
+
+let stravaPending = [];
+
 async function stravaSync(){
   const token = await stravaGetToken();
   if(!token){ toast('Reconnecte-toi à Strava'); return; }
@@ -3510,98 +3513,150 @@ async function stravaSync(){
   if(statusEl){ statusEl.textContent='🔄 Récupération des activités…'; statusEl.style.display='block'; }
 
   try {
-    // Récupérer les activités depuis la dernière sync (ou depuis aujourd'hui si première fois)
     const lastSync = parseInt(localStorage.getItem('strava_last_sync')||'0');
     const after = lastSync || Math.floor(Date.now()/1000);
     const resp = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=50`, {
       headers: { 'Authorization': 'Bearer '+token }
     });
     const activities = await resp.json();
-    if(!Array.isArray(activities)){ toast('Erreur Strava API'); return; }
+    if(!Array.isArray(activities)){
+      if(statusEl){ statusEl.textContent='❌ Erreur API Strava'; }
+      toast('Erreur Strava API'); return;
+    }
 
-    let imported = 0, duplicates = 0;
+    const sportMap = {
+      'Run':'course-libre','TrailRun':'course-libre',
+      'Ride':'velo','VirtualRide':'velo',
+      'Swim':'natation-libre'
+    };
+
+    stravaPending = [];
+    let skipped = 0;
+
     for(const act of activities){
-      // Filtrer : course à pied, vélo, natation seulement
-      const sportMap = {
-        'Run':'course-libre', 'TrailRun':'course-libre',
-        'Ride':'velo', 'VirtualRide':'velo',
-        'Swim':'natation-libre'
-      };
       const sport = sportMap[act.type];
-      if(!sport) continue;
-
-      // Convertir la date
+      if(!sport){ skipped++; continue; }
       const date = new Date(act.start_date_local);
       const dateStr = date.toLocaleDateString('fr-FR');
-
-      // Détecter doublon
-      const isDup = sessions.some(s => {
-        if(s.date !== dateStr) return false;
-        return Math.abs((s.dist||0) - (act.distance/1000)) < 0.5;
-      });
-      if(isDup){ duplicates++; continue; }
-
-      // Construire la séance
-      const session = {
-        id: Date.now() + Math.random(),
-        sport,
-        date: dateStr,
+      const isDup = sessions.some(s => s.date===dateStr && Math.abs((s.dist||0)-(act.distance/1000))<0.5);
+      stravaPending.push({
+        act, date:dateStr,
         dist: Math.round(act.distance/10)/100,
         dur: Math.round(act.moving_time/60),
-        dplus: act.total_elevation_gain||0,
         pace: act.moving_time>0&&act.distance>0 ? secToPace(Math.round(act.moving_time/(act.distance/1000))) : '',
         hr: act.average_heartrate||0,
         hrmax: act.max_heartrate||0,
+        dplus: act.total_elevation_gain||0,
+        sport, week:0, slot:'s1',
         comment: act.name||'',
-        kmDetails: [],
-        gpsTrace: [],
-        week: 0,
-        slot: 's1',
-        stravaId: act.id
-      };
-      sessions.push(session);
-      imported++;
+        duplicate: isDup, selected: !isDup
+      });
     }
 
-    // Trier par date
-    sessions.sort((a,b)=>{
-      const da=parseDate(a.date),db=parseDate(b.date);
-      return da&&db?da-db:0;
-    });
+    if(!stravaPending.length){
+      const msg = skipped ? `Aucune nouvelle activité (${skipped} type(s) non supporté(s))` : 'Aucune nouvelle activité';
+      if(statusEl){ statusEl.textContent=msg; }
+      toast(msg); return;
+    }
 
-    localStorage.setItem('smi_s', JSON.stringify(sessions));
-    localStorage.setItem('strava_last_sync', String(Math.floor(Date.now()/1000)));
-    renderPlan(); renderStats();
-
-    const msg = imported>0
-      ? `✅ ${imported} activité(s) importée(s)${duplicates?' · '+duplicates+' doublon(s) ignoré(s)':''}`
-      : duplicates>0 ? `✓ Tout est à jour (${duplicates} doublon(s))` : '✓ Aucune nouvelle activité';
-    if(statusEl){ statusEl.textContent=msg; }
-    toast(msg);
+    stravaRenderPending(statusEl);
 
   } catch(e){
-    if(statusEl){ statusEl.textContent='❌ Erreur : '+e.message; }
+    if(statusEl){ statusEl.textContent='Erreur : '+e.message; }
     toast('Erreur Strava : '+e.message);
   }
 }
 
-// Gérer le retour OAuth Strava (code dans l'URL)
-(function stravaHandleCallback(){
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const state = params.get('state');
-  const savedState = localStorage.getItem('strava_state');
-  if(code && state && state === savedState){
-    localStorage.removeItem('strava_state');
-    // Nettoyer l'URL
-    window.history.replaceState({}, document.title, window.location.pathname);
-    // Échanger le code
-    stravaExchangeCode(code);
-  }
-})();
+function stravaRenderPending(statusEl){
+  const newCount = stravaPending.filter(p=>p.selected).length;
+  const dupCount = stravaPending.filter(p=>p.duplicate).length;
+  const activePlan = getActivePlan();
 
-// Init UI Strava au démarrage
-stravaUpdateUI();
+  let h = `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+    ${stravaPending.length} activité(s) · <span style="color:#27AE60">${newCount} à importer</span>
+    ${dupCount?`· <span style="color:var(--am)">${dupCount} doublon(s)</span>`:''}
+  </div>`;
+
+  stravaPending.forEach((p,i)=>{
+    const col = p.duplicate?'var(--am)':'#27AE60';
+    const lbl = p.duplicate?'⚠️ Doublon':'✅ Nouveau';
+    const weeksOpts = activePlan ? allWeeks().map(w=>`<option value="${w.n}" ${p.week===w.n?'selected':''}>${'S'+w.n+' ('+w.dates+')'}</option>`).join('') : '';
+    const showPlanSel = (p.sport==='plan'||p.sport==='natation-plan') && activePlan;
+
+    h += `<div style="background:var(--bg2);border-radius:var(--r);padding:8px;margin-bottom:6px;font-size:11px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input type="checkbox" ${p.selected?'checked':''} onchange="stravaPendingToggle(${i},this.checked)">
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--text)">${p.act.name||'Activité'}</div>
+          <div style="color:var(--text2)">${p.date} · ${p.dist}km · ${p.dur}min${p.pace?' · '+p.pace+'/km':''}${p.hr?' · ❤️'+p.hr:''}${p.dplus?' · +'+p.dplus+'m':''}</div>
+        </div>
+        <span style="color:${col};font-weight:600">${lbl}</span>
+      </div>
+      <select onchange="stravaPendingSetSport(${i},this.value)" style="width:100%;margin-bottom:4px;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+        <option value="course-libre" ${p.sport==='course-libre'?'selected':''}>🏃 Course libre (hors plan)</option>
+        <option value="plan" ${p.sport==='plan'?'selected':''}>🏃 Course (plan)</option>
+        <option value="natation-plan" ${p.sport==='natation-plan'?'selected':''}>🏊 Natation (plan)</option>
+        <option value="natation-libre" ${p.sport==='natation-libre'?'selected':''}>🏊 Natation libre</option>
+        <option value="velo" ${p.sport==='velo'?'selected':''}>🚴 Vélo</option>
+      </select>
+      ${showPlanSel?`<div style="display:flex;gap:6px;margin-bottom:4px">
+        <select onchange="stravaPendingSetWeek(${i},this.value)" style="flex:1;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+          <option value="0">— Semaine du plan —</option>${weeksOpts}
+        </select>
+        <select onchange="stravaPendingSetSlot(${i},this.value)" style="width:65px;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+          <option value="s1" ${p.slot==='s1'?'selected':''}>S1</option>
+          <option value="s2" ${p.slot==='s2'?'selected':''}>S2</option>
+        </select>
+      </div>`:''}
+      <input type="text" value="${(p.comment||'').replace(/"/g,'&quot;')}" placeholder="Commentaire (optionnel)" onchange="stravaPendingSetComment(${i},this.value)" style="width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+    </div>`;
+  });
+
+  h += `<div style="display:flex;gap:8px;margin-top:8px">
+    <button class="btn btn-or" style="flex:1" onclick="stravaConfirmImport()">✅ Importer ${newCount} activité(s)</button>
+    <button class="btn btn-ghost" onclick="stravaCancelImport()">Annuler</button>
+  </div>`;
+
+  if(statusEl){ statusEl.innerHTML=h; statusEl.style.display='block'; }
+}
+
+function stravaPendingToggle(i,v){ stravaPending[i].selected=v; stravaRenderPending(document.getElementById('strava-sync-status')); }
+function stravaPendingSetSport(i,v){ stravaPending[i].sport=v; if(v!=='plan'&&v!=='natation-plan') stravaPending[i].week=0; stravaRenderPending(document.getElementById('strava-sync-status')); }
+function stravaPendingSetWeek(i,v){ stravaPending[i].week=parseInt(v)||0; }
+function stravaPendingSetSlot(i,v){ stravaPending[i].slot=v; }
+function stravaPendingSetComment(i,v){ stravaPending[i].comment=v; }
+
+function stravaCancelImport(){
+  stravaPending=[];
+  const el=document.getElementById('strava-sync-status');
+  if(el){ el.style.display='none'; el.innerHTML=''; }
+}
+
+function stravaConfirmImport(){
+  const toImport=stravaPending.filter(p=>p.selected);
+  if(!toImport.length){ toast('Aucune activité sélectionnée'); return; }
+  const activePlan=getActivePlan();
+  let added=0;
+  toImport.forEach(p=>{
+    sessions.push({
+      id: Date.now()+Math.random(),
+      sport: p.sport, date: p.date, dist: p.dist, dur: p.dur,
+      dplus: p.dplus||0, pace: p.pace||'', hr: p.hr||0, hrmax: p.hrmax||0,
+      comment: p.comment||'', kmDetails:[], gpsTrace:[],
+      week: p.week||0, slot: p.slot||'s1',
+      planId: (p.sport==='plan'||p.sport==='natation-plan')&&activePlan?activePlan.id:null,
+      stravaId: p.act.id
+    });
+    added++;
+  });
+  sessions.sort((a,b)=>{ const da=parseDate(a.date),db=parseDate(b.date); return da&&db?da-db:0; });
+  localStorage.setItem('smi_s',JSON.stringify(sessions));
+  localStorage.setItem('strava_last_sync',String(Math.floor(Date.now()/1000)));
+  stravaUpdateUI(); renderPlan(); renderStats();
+  stravaCancelImport();
+  toast(`✅ ${added} activité(s) importée(s)`);
+}
+
 
 function exportData(){
   const data={
