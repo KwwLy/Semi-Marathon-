@@ -239,7 +239,7 @@ canvas{display:block;width:100%!important}
       <div id="plan-slot-title" style="font-size:11px;color:var(--or);margin-top:5px;font-weight:500"></div>
     </div>
     <div class="g2">
-      <div class="field"><label class="lbl">Date</label><input type="text" id="lg-date" placeholder="ex: 16/03/2026"></div>
+      <div class="field"><label class="lbl">Date</label><input type="date" id="lg-date" placeholder="ex: 16/03/2026"></div>
       <div class="field"><label class="lbl">Durée (min)</label><input type="number" id="lg-dur" placeholder="82"></div>
     </div>
     <div id="running-fields">
@@ -262,7 +262,7 @@ canvas{display:block;width:100%!important}
             <option value="hard">Intense (compétition, sparring)</option>
           </select>
         </div>
-        <div class="field"><label class="lbl">Poids (kg) pour calorie</label><input type="number" id="lg-weight" placeholder="75"></div>
+        <div class="field" style="display:none"><label class="lbl">Poids (kg) pour calorie</label><input type="number" id="lg-weight" placeholder="75"></div>
       </div>
       <div id="calories-estimate" style="display:none" class="field">
         <div style="background:var(--tll);border-radius:var(--r);padding:9px 12px;font-size:12px;color:var(--tl);">
@@ -997,7 +997,9 @@ function resetForm(){
   document.getElementById('lg-week').value=todayWeek();
   const slotEl=document.getElementById('lg-slot');
   if(slotEl)slotEl.value='s1';
-  document.getElementById('lg-date').value='';
+  // Pré-remplir la date avec aujourd'hui au format YYYY-MM-DD (input type=date)
+  const today=new Date();
+  document.getElementById('lg-date').value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   document.getElementById('lg-dur').value='';
   document.getElementById('lg-dist').value='';
   document.getElementById('lg-d').value='';
@@ -1046,9 +1048,13 @@ function saveAndAnalyze(){
   const pace=document.getElementById('lg-pace').value;
   const paceok=document.getElementById('lg-paceok').value;
   const comment=document.getElementById('lg-comment').value;
-  const date=document.getElementById('lg-date').value;
+  // Convertir la date du format YYYY-MM-DD (input type=date) en DD/MM/YYYY
+  const rawDate=document.getElementById('lg-date').value;
+  const date = rawDate.includes('-') && rawDate.length===10
+    ? rawDate.split('-').reverse().join('/')
+    : rawDate;
   const intensity=document.getElementById('lg-intensity')?.value||'moderate';
-  const w=parseFloat(document.getElementById('lg-weight').value)||settings.weight||75;
+  const w=settings.weight||75; // toujours depuis les réglages
   const met=MET[sport]?.[intensity]||6;
   const calEst=dur&&w?Math.round(met*w*(dur/60)):0;
 
@@ -2224,7 +2230,7 @@ function renderHistory(){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
         <div class="hi-l">
           <div class="hi-t"><span class="badge ${sportCls}" style="margin-right:5px">${sportLbl}</span>${s.week&&['plan','natation-plan'].includes(s.sport)?'<b>S'+s.week+(s.slot?'-'+s.slot.toUpperCase():'')+'</b>':''}</div>
-          <div class="hi-s">${s.date||''} · ${s.dist||'?'} km · ${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
+          <div class="hi-s">${s.date||''} · ${['krav','padel'].includes(s.sport)?'':(s.dist||'?')+' km · '}${s.dur||'?'} min${s.dplus?' · +'+s.dplus+'m':''}${s.calEst?' · ~'+s.calEst+' kcal':''}${s.gpsTrace&&s.gpsTrace.length?' · 🗺️':''}</div>
         </div>
         <div class="hi-r">
           <div class="hi-sub">${s.pace?s.pace+'/km':''}</div>
@@ -3225,7 +3231,16 @@ function applyExtractedData(data, filename){
   // Sauvegarder la trace GPS pour l'enregistrement
   pendingGpsTrace=data.gpsTrace||[];
 
-  if(data.date) document.getElementById('lg-date').value=data.date;
+  if(data.date){
+    // Convertir DD/MM/YYYY en YYYY-MM-DD pour input type=date
+    const d=data.date;
+    if(d.includes('/')){
+      const p=d.split('/');
+      document.getElementById('lg-date').value=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    } else {
+      document.getElementById('lg-date').value=d;
+    }
+  }
   if(data.distance_km) document.getElementById('lg-dist').value=data.distance_km;
   if(data.duree_min) document.getElementById('lg-dur').value=data.duree_min;
   if(data.allure_moy) document.getElementById('lg-pace').value=data.allure_moy;
