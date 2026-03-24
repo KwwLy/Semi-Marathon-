@@ -10,36 +10,55 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#fff;--bg2:#f6f6f6;--bg3:#ededee;
-  --text:#1a1a2e;--text2:#555;--text3:#999;
-  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.18);
-  --or:#E8500A;--orl:#FFF0E8;
+  --or:#3B82F6;--orl:#EFF6FF;
   --bl:#2980B9;--bll:#EBF5FB;
   --gr:#27AE60;--grl:#E9F7EF;
   --pu:#8E44AD;--pul:#F4ECF7;
   --re:#C0392B;--rel:#FDEDEC;
   --am:#B8860B;--aml:#FFF9E6;
   --tl:#16A085;--tll:#E0F5F0;
-  --r:8px;--rl:12px;--sh:0 1px 4px rgba(0,0,0,0.07)
+  --bg:#fff;--bg2:#f6f6f6;--bg3:#ededee;
+  --text:#1a1a2e;--text2:#555;--text3:#999;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.18);
+  --r:8px;--rl:12px;--sh:0 1px 4px rgba(0,0,0,0.07);
+  --sidebar-w:56px;--sidebar-w-open:180px
 }
 @media(prefers-color-scheme:dark){:root{
   --bg:#18182a;--bg2:#20203a;--bg3:#2a2a40;
   --text:#f0f0f4;--text2:#aaa;--text3:#666;
   --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.18);
-  --orl:#3a1808;--bll:#0a2030;--grl:#0a2018;--pul:#1e0a30;--rel:#2a0808;--aml:#281800;--tll:#0a2820;
+  --orl:#0f1f3d;--bll:#0a2030;--grl:#0a2018;--pul:#1e0a30;--rel:#2a0808;--aml:#281800;--tll:#0a2820;
   --sh:0 1px 4px rgba(0,0,0,0.3)
 }}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
-.shell{max-width:820px;margin:0 auto;padding-bottom:50px}
-.topbar{background:var(--or);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
-.topbar-ic{width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.topbar h1{font-size:15px;font-weight:600;color:#fff}
-.topbar p{font-size:11px;color:rgba(255,255,255,0.8);margin-top:1px}
-.tabs{background:var(--bg);border-bottom:1px solid var(--border);display:flex;position:sticky;top:64px;z-index:199;overflow-x:auto}
-.tab{flex:1;min-width:70px;padding:11px 6px;font-size:12px;border:none;background:transparent;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;font-family:inherit;white-space:nowrap}
-.tab.active{color:var(--or);border-bottom-color:var(--or);font-weight:600}
-.section{display:none;padding:14px}
+
+/* ── LAYOUT ── */
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;margin:0}
+.app-layout{display:flex;min-height:100vh}
+.main-content{flex:1;min-width:0;margin-left:var(--sidebar-w);transition:margin-left .25s}
+.main-content.expanded{margin-left:var(--sidebar-w-open)}
+.shell{max-width:820px;margin:0 auto;padding:14px 14px 60px}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:300;transition:width .25s;overflow:hidden}
+.sidebar.open{width:var(--sidebar-w-open)}
+.sidebar-header{display:flex;align-items:center;gap:10px;padding:14px 12px;cursor:pointer;border-bottom:1px solid var(--border);min-height:56px}
+.sidebar-logo{font-size:22px;flex-shrink:0;width:32px;text-align:center}
+.sidebar-title{font-size:13px;font-weight:700;color:var(--or);white-space:nowrap;opacity:0;transition:opacity .2s;overflow:hidden}
+.sidebar.open .sidebar-title{opacity:1}
+.sidebar-toggle{margin-left:auto;font-size:14px;color:var(--text3);transition:transform .25s;flex-shrink:0}
+.sidebar.open .sidebar-toggle{transform:rotate(180deg)}
+.nav-item{display:flex;align-items:center;gap:12px;padding:13px 12px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;width:100%;text-align:left;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{background:var(--bg2);color:var(--text)}
+.nav-item.active{color:var(--or);background:var(--orl);border-left-color:var(--or);font-weight:600}
+.nav-icon{font-size:18px;flex-shrink:0;width:32px;text-align:center}
+.nav-label{white-space:nowrap;opacity:0;transition:opacity .2s;font-size:13px;overflow:hidden}
+.sidebar.open .nav-label{opacity:1}
+.sidebar-sync{display:flex;align-items:center;gap:8px;padding:10px 12px;margin-top:auto;border-top:1px solid var(--border);min-height:40px}
+
+/* ── SECTIONS ── */
+.section{display:none}
 .section.active{display:block}
+
 
 /* CARDS */
 .card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);padding:14px;box-shadow:var(--sh);margin-bottom:12px}
@@ -178,28 +197,40 @@ canvas{display:block;width:100%!important}
 </style>
 </head>
 <body>
-<div class="shell">
-<div class="topbar">
-  <div class="topbar-ic">🏃</div>
-  <div><h1>Semi-Marathon 1h50</h1><p>Plan personnalisé · 4 octobre 2026</p></div>
-</div>
-<!-- FIREBASE SYNC BANNER -->
-<div id="fb-banner" style="display:none;align-items:center;justify-content:space-between;padding:8px 14px;font-size:12px;background:var(--bg2);border-bottom:1px solid var(--border)">
-  <div id="fb-status" style="display:flex;align-items:center;gap:6px;color:var(--text2)">
-    <span id="fb-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);display:inline-block"></span>
-    <span id="fb-label">Non connecté</span>
-  </div>
-  <button id="fb-btn" onclick="fbToggleAuth()" class="btn btn-ghost btn-sm" style="font-size:11px">Se connecter avec Google</button>
-</div>
+<div class="app-layout">
 
-<div class="tabs">
-  <button class="tab active" onclick="sw('plans')">🗂️ Plans</button>
-  <button class="tab" onclick="sw('plan')">📋 Actif</button>
-  <button class="tab" onclick="sw('log')">✏️ Saisir</button>
-  <button class="tab" onclick="sw('stats')">📊 Dashboard</button>
-  <button class="tab" onclick="sw('settings')">⚙️ Réglages</button>
-</div>
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header" onclick="toggleSidebar()">
+      <span class="sidebar-logo">🏃</span>
+      <span class="sidebar-title">Mon Coach</span>
+      <span class="sidebar-toggle" id="sidebar-toggle">›</span>
+    </div>
+    <button class="nav-item active" id="nav-plans" onclick="sw('plans')">
+      <span class="nav-icon">🗂️</span><span class="nav-label">Plans</span>
+    </button>
+    <button class="nav-item" id="nav-plan" onclick="sw('plan')">
+      <span class="nav-icon">📋</span><span class="nav-label">Actif</span>
+    </button>
+    <button class="nav-item" id="nav-log" onclick="sw('log')">
+      <span class="nav-icon">✏️</span><span class="nav-label">Saisir</span>
+    </button>
+    <button class="nav-item" id="nav-stats" onclick="sw('stats')">
+      <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-item" id="nav-settings" onclick="sw('settings')">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span>
+    </button>
+    <!-- Sync status in sidebar -->
+    <div class="sidebar-sync" id="fb-banner">
+      <span id="fb-dot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0"></span>
+      <span id="fb-label" class="nav-label" style="font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Non connecté</span>
+    </div>
+  </nav>
 
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <div class="shell">
 
 <!-- PLANS -->
 <div class="section active" id="tab-plans"><div id="plans-content"></div></div>
@@ -531,7 +562,7 @@ canvas{display:block;width:100%!important}
     <div id="strava-auth-section">
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte ton compte Strava pour importer automatiquement tes activités sans exporter de fichiers GPX.</p>
       <div id="strava-logged-out">
-        <button class="btn btn-full" style="background:#FC4C02;color:#fff" onclick="stravaConnect()">🟠 Se connecter avec Strava</button>
+        <button class="btn btn-full" style="background:#3B82F6;color:#fff" onclick="stravaConnect()">🟠 Se connecter avec Strava</button>
       </div>
       <div id="strava-logged-in" style="display:none">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -596,7 +627,9 @@ canvas{display:block;width:100%!important}
     <button class="btn btn-full" style="background:var(--re);color:#fff" onclick="clearAll()">🗑️ Effacer toutes les données</button>
   </div>
 </div>
-</div>
+    </div><!-- end shell -->
+  </div><!-- end main-content -->
+</div><!-- end app-layout -->
 
 <div class="toast" id="toast"></div>
 
@@ -634,7 +667,7 @@ const PLAN=[{phase:'Phase 1 — Maintien & Transition',color:'#2980B9',weeks:[
 {n:10,dates:'18-24 mai',title:'Blocs 3×3 km Z3',badges:['z3'],dist:13,dur:65,
  s1:{title:'3×3 km à 5:15-5:20/km',steps:[['Échauffement','15 min progressif Z1→Z2'],['Corps','3 × 3 km à 5:15-5:20/km'],['Récup','4 min Z1 entre chaque bloc'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h21 · 13 km']]},
  s2:{title:'Repos',steps:[['Conseil','Repos ou marche légère 30 min']]}}
-]},{phase:'Phase 3 — Préparation Spécifique',color:'#E8500A',weeks:[
+]},{phase:'Phase 3 — Préparation Spécifique',color:'#3B82F6',weeks:[
 {n:11,dates:'25-31 mai',title:'17 km spécifique + Natation',badges:['z3','sw'],dist:17,dur:100,
  s1:{title:'17 km avec 10 km à allure semi',steps:[['Échauffement','10 min Z1 + 5 min Z2'],['Corps','3 km Z2, 10 km à Z3 (5:13-5:20/km), 2 km Z2'],['Ravito','Gel km 8 et km 14'],['Retour','10 min Z1 + étirements'],['Durée / distance','~1h46 · 17 km']]},
  s2:{title:'Natation 45 min',steps:[['Échauffement','5 min crawl lent'],['Corps','35 min endurance douce'],['Retour','5 min brasse + étirements']]}},
@@ -739,7 +772,7 @@ if(!plans){
     raceDate: '2026-10-04',
     startDate: '2026-03-16',
     status: 'active', // active | archived | completed
-    color: '#E8500A',
+    color: '#3B82F6',
     weeksCount: 30,
     createdAt: '2026-03-16'
   }];
@@ -776,13 +809,24 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plans','plan','log','stats','settings'][i]===t));
+  // Mettre à jour les nav-items
+  ['plans','plan','log','stats','settings'].forEach(id=>{
+    const el=document.getElementById('nav-'+id);
+    if(el) el.classList.toggle('active', id===t);
+  });
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='plans')renderPlans();
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
   if(t==='settings')loadSettings();
+}
+
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const mc = document.querySelector('.main-content');
+  sb.classList.toggle('open');
+  mc.classList.toggle('expanded');
 }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 function allWeeks(){return PLAN.flatMap(p=>p.weeks)}
@@ -849,7 +893,7 @@ function renderPlans(){
     const weeksLeft = Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000));
     h += `<div class="card">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <div style="width:44px;height:44px;border-radius:var(--r);background:${activePlan.color||'#E8500A'}22;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${planTypeIcon(activePlan.type)}</div>
+        <div style="width:44px;height:44px;border-radius:var(--r);background:${activePlan.color||'#3B82F6'}22;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${planTypeIcon(activePlan.type)}</div>
         <div style="flex:1">
           <div style="font-size:14px;font-weight:700;color:var(--text)">${activePlan.name}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">${activePlan.raceDate} · Objectif ${activePlan.goal}</div>
@@ -1244,7 +1288,7 @@ function confirmSavePlan(){
     raceDate: date,
     startDate: new Date().toISOString().slice(0,10),
     status: 'active',
-    color: '#E8500A',
+    color: '#3B82F6',
     weeksCount: weeksAvail,
     phases: planData.phases,
     createdAt: new Date().toISOString()
@@ -1259,7 +1303,7 @@ function confirmSavePlan(){
 }
 function renderWeekCard(w, cls, isModified, phColor){
   const cur = todayWeek();
-  const color = phColor || w.color || '#E8500A';
+  const color = phColor || w.color || '#3B82F6';
   return `<div class="${cls}">
     <div class="wsumm" onclick="toggleW(${w.n},this)">
       <span class="wn">S${w.n}</span>
@@ -1300,7 +1344,7 @@ function renderPlan(){
   // En-tête avec nom du plan actif
   if(activePlan){
     const weeksLeft = Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
-    h+=`<div style="background:${activePlan.color||'#E8500A'};color:#fff;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+    h+=`<div style="background:${activePlan.color||'#3B82F6'};color:#fff;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:13px;font-weight:700">${activePlan.name}</div>
         <div style="font-size:11px;opacity:.85;margin-top:2px">${activePlan.raceDate} · ${weeksLeft} semaines restantes</div>
@@ -1316,7 +1360,7 @@ function renderPlan(){
   const planPhases = activePlan?.phases;
   if(planPhases && planPhases.length){
     planPhases.forEach(ph=>{
-      h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color||'#E8500A'}"></span>${ph.phase}</div>`;
+      h+=`<div class="phase-block"><div class="phase-lbl"><span class="pdot" style="background:${ph.color||'#3B82F6'}"></span>${ph.phase}</div>`;
       ph.weeks.forEach(baseW=>{
         const w = getWeekWithOverride(baseW.n) || baseW;
         const isModified=!!planOverrides[baseW.n];
@@ -2533,7 +2577,7 @@ function renderZones(){
     ${zoneBlock('#27AE60',2,'Endurance fondamentale',z2lo,z2hi,70,80,
       'Allure confortable mais tonique. Tu peux parler mais pas chanter. Base de toute préparation — développe l\'endurance aérobie, brûle les graisses, construit le volume.',
       'Sorties longues (16-20 km) · Base d\'endurance · Volume hebdomadaire')}
-    ${zoneBlock('#E8500A',3,'Allure semi ⭐',z3lo,z3hi,80,88,
+    ${zoneBlock('#3B82F6',3,'Allure semi ⭐',z3lo,z3hi,80,88,
       `C'est <b>ton allure cible pour le 4 octobre</b> (${fmt(targetPaceSec)}/km = ${targetLabel}). Effort soutenu, tu peux prononcer quelques mots mais plus tenir une vraie conversation. Zone spécifique à apprivoiser.`,
       'Blocs spécifiques semi · Fractions 2-3 km · Finales de sortie longue')}
     ${zoneBlock('#C0392B',4,'Seuil lactique',z4lo,z4hi,88,93,
@@ -2559,7 +2603,7 @@ function renderZones(){
           ${[
             ['#2980B9','Z1','Récup',z1lo,z1hi,'60','70'],
             ['#27AE60','Z2','Endurance',z2lo,z2hi,'70','80'],
-            ['#E8500A','Z3 ⭐','Semi',z3lo,z3hi,'80','88'],
+            ['#3B82F6','Z3 ⭐','Semi',z3lo,z3hi,'80','88'],
             ['#C0392B','Z4','Seuil',z4lo,z4hi,'88','93'],
             ['#8E44AD','Z5','VMA',z5lo,z5hi,'93','100'],
           ].map((r,i)=>`<tr style="${i%2?'background:var(--bg2)':''}border-top:1px solid var(--border)">
@@ -2597,7 +2641,7 @@ const SPORT_ICONS={
   'velo':'🚴','padel':'🎾','krav':'🥋','autre':'⚡'
 };
 const SPORT_COLORS={
-  'plan':'#E8500A','course-libre':'#E8500A','natation-plan':'#2980B9','natation-libre':'#2980B9',
+  'plan':'#3B82F6','course-libre':'#3B82F6','natation-plan':'#2980B9','natation-libre':'#2980B9',
   'velo':'#16A085','padel':'#8E44AD','krav':'#C0392B','autre':'#888'
 };
 
@@ -2881,7 +2925,7 @@ function renderZoneChart(){
   const total=Object.values(zones).reduce((a,b)=>a+b,0);
   if(!total){document.getElementById('zone-card').style.display='none';return}
   document.getElementById('zone-card').style.display='block';
-  const colors={Z1:'#2980B9',Z2:'#27AE60',Z3:'#E8500A',Z4:'#C0392B',Z5:'#8E44AD'};
+  const colors={Z1:'#2980B9',Z2:'#27AE60',Z3:'#3B82F6',Z4:'#C0392B',Z5:'#8E44AD'};
   document.getElementById('zone-chart').innerHTML=Object.entries(zones).map(([z,km])=>{
     const pct=total?Math.round(km/total*100):0;
     return pct>3?`<div class="zc-seg" style="flex:${pct};background:${colors[z]}">${z}</div>`:'';
@@ -3047,18 +3091,18 @@ function renderMap(id){
     // Segments colorés selon FC
     for(let i=0;i<pts.length-1;i++){
       const hr=hrVals[i]||hrVals[i+1]||0;
-      let color='#E8500A';
+      let color='#3B82F6';
       if(hr>0){
         const ratio=(hr-minHr)/Math.max(1,maxHr-minHr);
         // Bleu (repos) → orange (modéré) → rouge (intense)
         if(ratio<0.33) color=`#2980B9`;
-        else if(ratio<0.66) color=`#E8500A`;
+        else if(ratio<0.66) color=`#3B82F6`;
         else color=`#C0392B`;
       }
       L.polyline([pts[i],pts[i+1]],{color,weight:3.5,opacity:.85}).addTo(map);
     }
   } else {
-    L.polyline(pts,{color:'#E8500A',weight:3.5,opacity:.85}).addTo(map);
+    L.polyline(pts,{color:'#3B82F6',weight:3.5,opacity:.85}).addTo(map);
   }
 
   // Marqueurs départ / arrivée
@@ -3077,7 +3121,7 @@ function renderMap(id){
       while(ptIdx<s.gpsTrace.length-1&&(s.gpsTrace[ptIdx].dist||0)<targetDist) ptIdx++;
       if(ptIdx<pts.length){
         const kmIcon=L.divIcon({
-          html:`<div style="background:white;border:1.5px solid #E8500A;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;color:#E8500A;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)">${i+1}</div>`,
+          html:`<div style="background:white;border:1.5px solid #3B82F6;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;color:#3B82F6;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)">${i+1}</div>`,
           className:'',iconAnchor:[12,10]
         });
         L.marker(pts[ptIdx],{icon:kmIcon}).addTo(map)
@@ -3092,7 +3136,7 @@ function renderMap(id){
     legend.onAdd=()=>{
       const d=L.DomUtil.create('div','');
       d.style.cssText='background:rgba(255,255,255,.85);padding:5px 8px;border-radius:6px;font-size:10px;line-height:1.6;box-shadow:0 1px 3px rgba(0,0,0,.2)';
-      d.innerHTML=`<b>Fréquence cardiaque</b><br><span style="color:#2980B9">■</span> Modérée<br><span style="color:#E8500A">■</span> Élevée<br><span style="color:#C0392B">■</span> Intense`;
+      d.innerHTML=`<b>Fréquence cardiaque</b><br><span style="color:#2980B9">■</span> Modérée<br><span style="color:#3B82F6">■</span> Élevée<br><span style="color:#C0392B">■</span> Intense`;
       return d;
     };
     legend.addTo(map);
