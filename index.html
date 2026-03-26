@@ -1989,6 +1989,11 @@ async function runCoachAnalysis(lastSession){
     .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
     .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
 
+  // Séances complémentaires (natation, vélo, autres)
+  const crossSessions=sessions
+    .filter(s=>['natation-plan','natation-libre','velo','krav','padel','autre'].includes(s.sport)&&s.dur>0)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
+
   if(!runSessions.length){
     toast('Aucune séance de course enregistrée.');
     btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
@@ -2015,10 +2020,16 @@ async function runCoachAnalysis(lastSession){
   const vo2Trend=vo2First&&vo2Last?vo2Last-vo2First:0;
   const vo2Summary=vo2Last?`${vo2Last.toFixed(1)} ml/kg/min (tendance ${vo2Trend>=0?'+':''}${vo2Trend.toFixed(1)} depuis 1ère mesure)`:'non calculable';
 
-  // Résumé de toutes les séances
+  // Résumé de toutes les séances de course
   const allSummary=runSessions.map(s=>
     `  ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.dplus?' D+'+s.dplus+'m':''}${s.hr?' FC'+s.hr:''}${s.comment?' "'+s.comment+'"':''}`
   ).join('\n');
+
+  // Résumé séances complémentaires
+  const crossSportLabels={'natation-plan':'Natation plan','natation-libre':'Natation','velo':'Vélo','krav':'Krav Maga','padel':'Padel','autre':'Autre'};
+  const crossSummary=crossSessions.length?crossSessions.slice(-20).map(s=>
+    `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment+'"':''}`
+  ).join('\n'):'Aucune';
 
   // Semaines restantes avant la course
   const raceDate=new Date('2026-10-04');
@@ -2042,8 +2053,12 @@ PROFIL : Coureur intermédiaire. 20 km en 1h58 (5:54/km). Entraînement régulie
 
 IMPORTANT — COMMENTAIRES DES SÉANCES : Chaque séance peut contenir un commentaire entre guillemets. Ces commentaires donnent du contexte crucial pour l'analyse. Exemples : "couru avec la poussette (35kg)" signifie que la performance réelle est bien meilleure que l'allure indiquée ; "mal dormi", "fatigue" ou "blessure" signalent des conditions dégradées ; "très facile" ou "bon ressenti" indiquent une forme ascendante. Tiens-en compte dans ton évaluation du potentiel réel et dans tes prédictions — une sortie avec contrainte physique majeure (poussette, blessure, chaleur extrême) doit être pondérée à la hausse dans l'estimation du niveau réel.
 
-TOUTES LES SÉANCES (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
+TOUTES LES SÉANCES DE COURSE (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
 ${allSummary}
+
+SÉANCES COMPLÉMENTAIRES (natation, vélo, autres — ${crossSessions.length} séances) :
+${crossSummary}
+→ Tiens compte de la charge d'entraînement totale incluant les activités complémentaires. La natation favorise la récupération active et la capacité cardio. Le vélo développe l'endurance sans impact. Ces séances font partie intégrante de la préparation.
 
 PRÉDICTIONS ALGORITHMIQUES (depuis la meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
 - Riegel (T2=T1×(D2/D1)^1.06) : ${riegelDetail}
