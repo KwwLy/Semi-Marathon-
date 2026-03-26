@@ -2079,6 +2079,7 @@ Réponds en JSON STRICT, sans texte avant ni après :
 {
   "prediction_direction": "up",
   "prediction_comment": "phrase courte sur la trajectoire vers l'objectif",
+  "target_time": "1h50 ou 1h45 selon le potentiel — le temps cible qui doit servir de base aux zones d'allure",
   "plan_adjustment_needed": true,
   "plan_adjustment": "résumé en 1-2 phrases de ce qui change et pourquoi",
   "analysis": "analyse en 5-6 phrases : progression, points forts, axe de travail, probabilité 1h50 ou mieux, conseil clé pour les prochaines semaines",
@@ -2155,12 +2156,24 @@ Règles :
     }
 
     // ── Injecter les valeurs algorithmiques déterministes ──
-    // La prédiction de temps et la VO2max sont calculées par nos algorithmes,
-    // pas par Claude, pour garantir la reproductibilité entre les appels.
     if(medianPred) json.prediction_time=minsToHMS(medianPred);
     if(vo2Last){
       json.vo2max=Math.round(vo2Last*10)/10;
       json.vo2max_trend=Math.round(vo2Trend*10)/10;
+    }
+
+    // Si Claude propose un target_time plus ambitieux que la prédiction algo,
+    // on l'utilise pour les zones d'allure
+    if(json.target_time){
+      const m=json.target_time.match(/(\d+)h(\d+)/);
+      if(m){
+        const targetMin=parseInt(m[1])*60+parseInt(m[2]);
+        const targetPaceSec=Math.round(targetMin*60/21.1);
+        // Utiliser si plus rapide que 1h50 (313 sec/km) et raisonnable (> 1h40 = 285 sec/km)
+        if(targetPaceSec>=285 && targetPaceSec<313){
+          json.prediction_time = json.target_time;
+        }
+      }
     }
 
     const coachData={...json,savedAt:new Date().toISOString()};
@@ -2175,6 +2188,17 @@ Règles :
         toast(`✅ Plan mis à jour : ${count} semaine${count>1?'s':''} modifiée${count>1?'s':''} par le Coach IA`);
       }
     }
+
+    // Si Claude a modifié le plan avec des allures plus ambitieuses,
+    // mettre à jour prediction_time si le JSON contient un champ target_time
+    if(json.target_time && !json.prediction_time){
+      json.prediction_time = json.target_time;
+      localStorage.setItem('smi_coach', JSON.stringify({...json, savedAt:new Date().toISOString()}));
+    }
+
+    // Re-render zones si elles sont affichées
+    const zonesInline = document.getElementById('zones-inline');
+    if(zonesInline && zonesInline.style.display==='block') renderZones();
   }catch(e){
     document.getElementById('coach-loading').style.display='none';
     btn.disabled=false;btn.textContent='🔍 Analyser l\'ensemble de mes séances';
