@@ -225,6 +225,9 @@ canvas{display:block;width:100%!important}
     <button class="nav-item" id="nav-journal" onclick="sw('journal')">
       <span class="nav-icon">📒</span><span class="nav-label">Journal</span>
     </button>
+    <button class="nav-item" id="nav-renfo" onclick="sw('renfo')">
+      <span class="nav-icon">💪</span><span class="nav-label">Renfo</span>
+    </button>
     <button class="nav-item" id="nav-settings" onclick="sw('settings')">
       <span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span>
     </button>
@@ -558,6 +561,11 @@ canvas{display:block;width:100%!important}
   <div id="zones-content"></div>
 </div>
 
+<!-- RENFO -->
+<div class="section" id="tab-renfo">
+  <div id="renfo-content"></div>
+</div>
+
 <!-- SETTINGS -->
 <div class="section" id="tab-settings">
   <div class="card" id="fb-settings-card">
@@ -869,7 +877,7 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  ['home','plans','plan','log','stats','journal','settings'].forEach(id=>{
+  ['home','plans','plan','log','stats','journal','renfo','settings'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.classList.toggle('active', id===t);
   });
@@ -880,6 +888,7 @@ function sw(t){
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
   if(t==='journal'){populateJournalPlanFilter();renderJournal();}
+  if(t==='renfo')renderRenfo();
   if(t==='settings')loadSettings();
 }
 
@@ -4484,6 +4493,288 @@ async function extractStravaData(){
     document.getElementById('strava-extract-btn').style.display='block';
     toast('Erreur réseau');
   }
+}
+
+// ── RENFORCEMENT MUSCULAIRE ───────────────────────────────────────────────
+let savedRenfoSessions = JSON.parse(localStorage.getItem('smi_renfo')||'[]');
+
+function renderRenfo(){
+  const el = document.getElementById('renfo-content');
+  if(!el) return;
+  const apiKey = settings.apiKey||'';
+
+  // Récupérer fatigue depuis dernières séances
+  const lastRun = sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?db-da:0;})[0];
+  const daysSinceRun = lastRun ? Math.round((new Date()-parseDate(lastRun.date))/(86400000)) : 99;
+
+  let h = `
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>💪 Séance express à la maison</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Claude génère une séance de renforcement musculaire adaptée à ta disponibilité — cardio + muscu sans matériel.</p>
+
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field">
+        <label class="lbl">Durée disponible</label>
+        <select id="renfo-duration" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="10">10 minutes</option>
+          <option value="15" selected>15 minutes</option>
+          <option value="20">20 minutes</option>
+          <option value="30">30 minutes</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">Type de séance</label>
+        <select id="renfo-type" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="hiit">HIIT (cardio intense)</option>
+          <option value="tabata">Tabata (20s/10s)</option>
+          <option value="circuit">Circuit training</option>
+          <option value="gainage">Gainage & core</option>
+          <option value="surprise">Surprise !</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field">
+        <label class="lbl">Niveau de fatigue</label>
+        <select id="renfo-fatigue" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="fresh">Frais — je peux donner tout</option>
+          <option value="moderate" selected>Modéré — séance raisonnable</option>
+          <option value="tired">Fatigué — séance légère</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">Focus musculaire</label>
+        <select id="renfo-focus" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="full">Corps entier</option>
+          <option value="lower">Jambes / fessiers</option>
+          <option value="upper">Haut du corps</option>
+          <option value="core">Abdos / gainage</option>
+          <option value="cardio">Cardio pur</option>
+        </select>
+      </div>
+    </div>
+
+    ${!apiKey?`<div style="background:var(--rel);border:1px solid var(--re);border-radius:var(--r);padding:8px 12px;font-size:11px;color:var(--re);margin-bottom:10px">⚠️ Clé API Anthropic requise — ajoute-la dans Réglages.</div>`:''}
+    <button class="btn btn-or btn-full" onclick="generateRenfo()" ${!apiKey?'disabled':''}>⚡ Générer ma séance</button>
+    <div id="renfo-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none"></div>
+  </div>
+
+  <div id="renfo-session-card" style="display:none"></div>
+
+  ${savedRenfoSessions.length?`
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:4px 0 8px">Séances sauvegardées (${savedRenfoSessions.length})</div>
+  ${savedRenfoSessions.slice(0,5).map((s,i)=>`
+  <div class="card" style="cursor:pointer;opacity:.85" onclick="displayRenfoSession(${i})">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${s.name}</div>
+        <div style="font-size:11px;color:var(--text3)">${s.duration}min · ${s.type} · ${s.savedAt?.slice(0,10)||''}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--re)" onclick="event.stopPropagation();deleteRenfo(${i})">🗑️</button>
+    </div>
+  </div>`).join('')}`:''}`;
+
+  el.innerHTML = h;
+}
+
+async function generateRenfo(){
+  const duration = document.getElementById('renfo-duration')?.value||'15';
+  const type     = document.getElementById('renfo-type')?.value||'hiit';
+  const fatigue  = document.getElementById('renfo-fatigue')?.value||'moderate';
+  const focus    = document.getElementById('renfo-focus')?.value||'full';
+  const apiKey   = settings.apiKey||'';
+  if(!apiKey){ toast('Clé API manquante'); return; }
+
+  const statusEl = document.getElementById('renfo-status');
+  statusEl.style.display='block';
+  statusEl.textContent='⏳ Génération de ta séance…';
+
+  // Contexte running depuis l'historique
+  const lastRun = sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0)
+    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?db-da:0;})[0];
+  const runContext = lastRun ? `Dernière course : ${lastRun.dist}km le ${lastRun.date}` : 'Coureur en préparation semi-marathon';
+  const daysSince = lastRun ? Math.round((new Date()-parseDate(lastRun.date))/(86400000)) : 5;
+
+  const typeLabels = {hiit:'HIIT',tabata:'Tabata (20s effort/10s repos)',circuit:'Circuit training',gainage:'Gainage & core',surprise:'libre'};
+  const focusLabels = {full:'corps entier',lower:'jambes et fessiers',upper:'haut du corps',core:'abdos et gainage',cardio:'cardio pur'};
+  const fatigueLabels = {fresh:'frais (peut aller à fond)',moderate:'modéré (séance équilibrée)',tired:'fatigué (séance légère, récupération active)'};
+
+  const prompt = `Tu es coach fitness et running. Génère une séance de renforcement musculaire express adaptée à un coureur en préparation semi-marathon.
+
+CONTEXTE ATHLÈTE :
+- ${runContext}
+- Jours depuis la dernière course : ${daysSince}
+- Fatigue : ${fatigueLabels[fatigue]}
+- Objectif running : Semi-marathon 1h50 le 4 octobre 2026
+
+PARAMÈTRES SÉANCE :
+- Durée totale : ${duration} minutes
+- Type : ${typeLabels[type]}
+- Focus : ${focusLabels[focus]}
+- Matériel : AUCUN (maison, corps uniquement)
+- Objectif : cardio + renforcement musculaire complémentaire au running
+
+RÈGLES :
+- Exercices sans matériel (poids de corps uniquement)
+- Inclure échauffement (1-2 min) et récupération (1-2 min)
+- Adapter l'intensité à la fatigue
+- Privilégier les exercices qui renforcent les muscles utiles au running (fessiers, ischios, core, mollets)
+- Pour Tabata : cycles de 20s effort / 10s repos, 8 rounds par exercice
+- Pour HIIT : intervalles 30-45s effort / 15-20s repos
+- Pour circuit : enchainement fluide sans pause
+
+Réponds UNIQUEMENT en JSON strict :
+{
+  "name": "nom court et motivant de la séance",
+  "duration": ${duration},
+  "type": "${type}",
+  "description": "description en 1 phrase",
+  "warmup": [
+    {"exercise": "nom exercice", "duration": "30s", "description": "comment faire"}
+  ],
+  "blocks": [
+    {
+      "name": "nom du bloc (ex: Bloc 1 - Force)",
+      "rounds": 3,
+      "exercises": [
+        {"exercise": "nom", "duration": "40s", "rest": "20s", "description": "comment faire", "muscles": "muscles ciblés", "tip": "conseil running"}
+      ]
+    }
+  ],
+  "cooldown": [
+    {"exercise": "nom étirement", "duration": "30s", "description": "comment faire"}
+  ],
+  "running_benefit": "comment cette séance améliore spécifiquement la course à pied"
+}`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,temperature:0.7,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text||'';
+    const clean = text.replace(/```json|```/g,'').trim();
+    const session = JSON.parse(clean);
+
+    statusEl.style.display='none';
+    displayRenfoSessionData(session);
+
+  } catch(e){
+    statusEl.textContent = '❌ Erreur : '+e.message;
+    console.error(e);
+  }
+}
+
+function displayRenfoSessionData(session){
+  const card = document.getElementById('renfo-session-card');
+  if(!card) return;
+
+  const typeColors = {hiit:'#E53E3E',tabata:'#DD6B20',circuit:'#3B82F6',gainage:'#38A169',surprise:'#805AD5'};
+  const color = typeColors[session.type]||'var(--or)';
+
+  let h = `
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">${session.name}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${session.description}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:22px;font-weight:700;color:${color}">${session.duration}'</div>
+        <div style="font-size:10px;color:var(--text3)">minutes</div>
+      </div>
+    </div>
+
+    <!-- Échauffement -->
+    <div style="background:var(--grl);border-radius:var(--r);padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:#27AE60;text-transform:uppercase;margin-bottom:6px">🔥 Échauffement</div>
+      ${(session.warmup||[]).map(e=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:0.5px solid rgba(39,174,96,.2)">
+        <span style="font-size:11px;font-weight:700;color:#27AE60;min-width:36px">${e.duration}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${e.exercise}</div>
+          <div style="font-size:10px;color:var(--text2)">${e.description}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Blocs -->
+    ${(session.blocks||[]).map((bloc,bi)=>`
+    <div style="border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden">
+      <div style="background:${color}22;padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:12px;font-weight:700;color:var(--text)">${bloc.name}</div>
+        ${bloc.rounds>1?`<span style="font-size:10px;background:${color};color:#fff;padding:2px 8px;border-radius:10px">${bloc.rounds} rounds</span>`:''}
+      </div>
+      ${(bloc.exercises||[]).map(e=>`
+      <div style="padding:10px 12px;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">${e.exercise}</div>
+            <div style="font-size:10px;color:var(--text3)">${e.muscles||''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:13px;font-weight:700;color:${color}">${e.duration}</div>
+            ${e.rest?`<div style="font-size:10px;color:var(--text3)">repos ${e.rest}</div>`:''}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text2)">${e.description}</div>
+        ${e.tip?`<div style="font-size:10px;color:var(--or);margin-top:3px">🏃 ${e.tip}</div>`:''}
+      </div>`).join('')}
+    </div>`).join('')}
+
+    <!-- Récupération -->
+    <div style="background:var(--bll);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;margin-bottom:6px">❄️ Récupération</div>
+      ${(session.cooldown||[]).map(e=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+        <span style="font-size:11px;font-weight:700;color:var(--bl);min-width:36px">${e.duration}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${e.exercise}</div>
+          <div style="font-size:10px;color:var(--text2)">${e.description}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Bénéfice running -->
+    ${session.running_benefit?`<div style="background:var(--orl);border-left:3px solid var(--or);border-radius:0 var(--r) var(--r) 0;padding:8px 12px;font-size:11px;color:var(--text2)">🏃 <b>Bénéfice running :</b> ${session.running_benefit}</div>`:''}
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-or" style="flex:1" onclick="saveRenfoSession(${JSON.stringify(JSON.stringify(session)).replace(/'/g,'&#39;')})">⭐ Sauvegarder</button>
+      <button class="btn btn-ghost" onclick="generateRenfo()">↺ Regénérer</button>
+    </div>
+  </div>`;
+
+  card.style.display='block';
+  card.innerHTML = h;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function displayRenfoSession(i){
+  const s = savedRenfoSessions[i];
+  if(s) displayRenfoSessionData(s);
+}
+
+function saveRenfoSession(jsonStr){
+  try {
+    const session = JSON.parse(jsonStr);
+    session.savedAt = new Date().toISOString();
+    savedRenfoSessions.unshift(session);
+    if(savedRenfoSessions.length>10) savedRenfoSessions=savedRenfoSessions.slice(0,10);
+    localStorage.setItem('smi_renfo', JSON.stringify(savedRenfoSessions));
+    toast('⭐ Séance sauvegardée !');
+    renderRenfo();
+  } catch(e){ toast('Erreur sauvegarde'); }
+}
+
+function deleteRenfo(i){
+  savedRenfoSessions.splice(i,1);
+  localStorage.setItem('smi_renfo', JSON.stringify(savedRenfoSessions));
+  renderRenfo();
+  toast('Séance supprimée');
 }
 
 // ── ACCUEIL ───────────────────────────────────────────────────────────────
