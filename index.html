@@ -5441,54 +5441,77 @@ try {
 
   async function fbAutoSyncOnStart(){
     if(fbUser) return;
-    // Lire l'UID depuis IDB (persistant) puis localStorage (fallback)
     const uid = await getStoredUid();
     if(!uid) return;
-    const doc = await fbRestRead(uid);
-    if(!doc||!doc.fields) return;
-    const get = f => doc.fields[f]?.stringValue||'';
-    const cloudUpdatedAt = parseInt(doc.fields.updated_at?.integerValue||0);
-    const localUpdatedAt = parseInt(await IDB.get('smi_updated_at') || localStorage.getItem('smi_updated_at')||0);
 
-    // Sync si le cloud est plus récent que le local
-    if(cloudUpdatedAt <= localUpdatedAt) return;
+    // Toujours rafraîchir toutes les sources de persistance au démarrage
+    localStorage.setItem('smi_fb_uid', uid);
+    IDB.set('smi_fb_uid', uid);
+    document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
 
-    const sJson = get('sessions_json');
-    const pJson = get('planOverrides_json');
-    const cJson = get('coach_json');
-    if(sJson){
-      sessions = JSON.parse(sJson);
-      localStorage.setItem('smi_s', sJson);
-      IDB.set('smi_updated_at', String(cloudUpdatedAt));
-      localStorage.setItem('smi_updated_at', String(cloudUpdatedAt));
-    }
-    if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
-    if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
-    renderPlan(); renderStats(); loadCoachCard();
-    document.getElementById('fb-dot').style.background='#27AE60';
-    document.getElementById('fb-label').textContent='✓ Synchronisé automatiquement';
-    toast('☁️ Données mises à jour depuis le cloud');
+    // Indicateur sidebar
+    document.getElementById('fb-dot').style.background='#3B82F6';
+    document.getElementById('fb-label').textContent='☁️ Connecté';
+
+    try {
+      const doc = await fbRestRead(uid);
+      if(!doc||!doc.fields) return;
+      const get = f => doc.fields[f]?.stringValue||'';
+      const cloudUpdatedAt = parseInt(doc.fields.updated_at?.integerValue||0);
+      const localUpdatedAt = parseInt(await IDB.get('smi_updated_at') || localStorage.getItem('smi_updated_at')||0);
+
+      if(cloudUpdatedAt > localUpdatedAt){
+        const sJson = get('sessions_json');
+        const pJson = get('planOverrides_json');
+        const plJson = get('plans_json');
+        const cJson = get('coach_json');
+        if(sJson){
+          sessions = JSON.parse(sJson);
+          localStorage.setItem('smi_s', sJson);
+          IDB.set('smi_updated_at', String(cloudUpdatedAt));
+          localStorage.setItem('smi_updated_at', String(cloudUpdatedAt));
+        }
+        if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
+        if(plJson){ plans=JSON.parse(plJson); localStorage.setItem('smi_plans',plJson); }
+        if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
+        renderHome(); renderPlan(); renderStats(); loadCoachCard();
+        document.getElementById('fb-dot').style.background='#27AE60';
+        document.getElementById('fb-label').textContent='✓ Synchronisé';
+        toast('☁️ Données mises à jour depuis le cloud');
+      } else {
+        // Données locales à jour — on pousse vers le cloud pour garder le timestamp frais
+        await fbRestWrite(uid);
+        document.getElementById('fb-dot').style.background='#27AE60';
+        document.getElementById('fb-label').textContent='✓ Synchronisé';
+      }
+    } catch(e){ console.warn('Sync error:', e); }
   }
 
-  // Patch localStorage : sync dans les deux sens
-  // - Si authentifié → fbSaveData (SDK)
-  // - Si PWA avec UID stocké → fbRestWrite (REST)
-  const _orig=localStorage.setItem.bind(localStorage);
-  localStorage.setItem=function(key,value){
-    _orig(key,value);
-    if(['smi_s','smi_plan_overrides','smi_coach'].includes(key)){
-      clearTimeout(localStorage._fbTimer);
-      localStorage._fbTimer=setTimeout(async ()=>{
-        if(fbUser) fbSaveData();
-        else {
-          const uid = await getStoredUid();
-          if(uid) fbRestWrite(uid);
-        }
-      },1500);
-    }
-  };
+  // Sync périodique toutes les 30 min — maintient le cookie et l'UID actifs
+  function startPeriodicSync(){
+    setInterval(async ()=>{
+      if(fbUser){ if(window.fbSaveData) fbSaveData(); return; }
+      const uid = await getStoredUid();
+      if(!uid) return;
+      localStorage.setItem('smi_fb_uid', uid);
+      IDB.set('smi_fb_uid', uid);
+      document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+      fbRestWrite(uid);
+    }, 30 * 60 * 1000);
+  }
+
+  // Rafraîchir à chaque retour au premier plan (iOS background → foreground)
+  document.addEventListener('visibilitychange', async ()=>{
+    if(document.visibilityState !== 'visible') return;
+    const uid = await getStoredUid();
+    if(!uid) return;
+    localStorage.setItem('smi_fb_uid', uid);
+    IDB.set('smi_fb_uid', uid);
+    document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+  });
 
   setTimeout(fbAutoSyncOnStart, 2000);
+  startPeriodicSync();
 
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
