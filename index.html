@@ -318,6 +318,7 @@ canvas{display:block;width:100%!important}
           <option value="padel">Padel</option>
           <option value="krav">Krav Maga</option>
           <option value="natation-libre">Natation libre</option>
+          <option value="renfo">💪 Renforcement musculaire</option>
           <option value="autre">Autre sport</option>
         </optgroup>
       </select>
@@ -535,6 +536,7 @@ canvas{display:block;width:100%!important}
         <option value="velo">🚴 Vélo</option>
         <option value="padel">🎾 Padel</option>
         <option value="krav">🥋 Krav Maga</option>
+        <option value="renfo">💪 Renforcement</option>
         <option value="autre">⚡ Autre</option>
       </select>
       <select id="jf-plan" onchange="renderJournal()" style="flex:1;min-width:110px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px">
@@ -794,8 +796,8 @@ const MET={
   'natation-libre':{light:5,moderate:7,hard:9},
   'autre':{light:4,moderate:6,hard:8}
 };
-const SPORT_LABELS={'plan':'Course (plan)','natation-plan':'Natation (plan)','course-libre':'Course libre','velo':'Vélo','padel':'Padel','krav':'Krav Maga','natation-libre':'Natation libre','autre':'Autre sport'};
-const SPORT_CLASSES={'plan':'s-run','natation-plan':'s-nat','course-libre':'s-run','velo':'s-velo','padel':'s-padel','krav':'s-krav','natation-libre':'s-nat','autre':'s-autre'};
+const SPORT_LABELS={'plan':'Course (plan)','natation-plan':'Natation (plan)','course-libre':'Course libre','velo':'Vélo','padel':'Padel','krav':'Krav Maga','natation-libre':'Natation libre','renfo':'Renforcement musculaire','autre':'Autre sport'};
+const SPORT_CLASSES={'plan':'s-run','natation-plan':'s-nat','course-libre':'s-run','velo':'s-velo','padel':'s-padel','krav':'s-krav','natation-libre':'s-nat','renfo':'s-krav','autre':'s-autre'};
 
 let sessions=JSON.parse(localStorage.getItem('smi_s')||'[]');
 let kmRows=[];
@@ -1689,21 +1691,18 @@ function onSportChange(){
   const isPlan=v==='plan'||v==='natation-plan';
   const isRun=['plan','course-libre'].includes(v);
   const isRunOrCycleOrSwim=['plan','course-libre','velo','natation-plan','natation-libre'].includes(v);
+  const isRenfo=v==='renfo';
   document.getElementById('plan-week-row').style.display=isPlan?'block':'none';
   document.getElementById('plan-slot-row').style.display=isPlan?'block':'none';
   document.getElementById('running-fields').style.display=isRunOrCycleOrSwim?'block':'none';
-  document.getElementById('other-sport-fields').style.display=isRunOrCycleOrSwim?'none':'block';
+  document.getElementById('other-sport-fields').style.display=(!isRunOrCycleOrSwim&&!isRenfo)?'block':'none';
   document.getElementById('km-detail-card').style.display=isRun?'block':'none';
-  // Mettre à jour le sélecteur de slot dynamiquement
   if(isPlan){
     const slotEl=document.getElementById('lg-slot');
-    if(slotEl){
-      const cur=slotEl.value||'s1';
-      slotEl.innerHTML=getSlotOptions(cur);
-    }
+    if(slotEl){ const cur=slotEl.value||'s1'; slotEl.innerHTML=getSlotOptions(cur); }
     onWeekChange();
   }
-  if(!isRunOrCycleOrSwim)updateCalEst();
+  if(!isRunOrCycleOrSwim&&!isRenfo)updateCalEst();
 }
 
 function onWeekChange(){
@@ -2035,7 +2034,7 @@ async function runCoachAnalysis(lastSession){
   ).join('\n');
 
   // Résumé séances complémentaires
-  const crossSportLabels={'natation-plan':'Natation plan','natation-libre':'Natation','velo':'Vélo','krav':'Krav Maga','padel':'Padel','autre':'Autre'};
+  const crossSportLabels={'natation-plan':'Natation plan','natation-libre':'Natation','velo':'Vélo','krav':'Krav Maga','padel':'Padel','renfo':'Renfo muscu','autre':'Autre'};
   const crossSummary=crossSessions.length?crossSessions.slice(-20).map(s=>
     `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment+'"':''}`
   ).join('\n'):'Aucune';
@@ -3145,6 +3144,7 @@ function sessionCard(s){
             <option value="velo" ${s.sport==='velo'?'selected':''}>Vélo</option>
             <option value="padel" ${s.sport==='padel'?'selected':''}>Padel</option>
             <option value="krav" ${s.sport==='krav'?'selected':''}>Krav Maga</option>
+            <option value="renfo" ${s.sport==='renfo'?'selected':''}>💪 Renforcement musculaire</option>
             <option value="autre" ${s.sport==='autre'?'selected':''}>Autre sport</option>
           </select>
           <button class="btn btn-or btn-sm" onclick="event.stopPropagation();updateSport(${s.id})">✓ Ok</button>
@@ -3803,7 +3803,11 @@ async function stravaSync(){
     const sportMap = {
       'Run':'course-libre','TrailRun':'course-libre',
       'Ride':'velo','VirtualRide':'velo',
-      'Swim':'natation-libre'
+      'Swim':'natation-libre',
+      'WeightTraining':'renfo','Workout':'renfo',
+      'Crossfit':'renfo','HIIT':'renfo',
+      'Yoga':'renfo','Pilates':'renfo',
+      'Elliptical':'renfo','StairStepper':'renfo'
     };
 
     stravaPending = [];
@@ -3814,7 +3818,10 @@ async function stravaSync(){
       if(!sport){ skipped++; continue; }
       const date = new Date(act.start_date_local);
       const dateStr = date.toLocaleDateString('fr-FR');
-      const isDup = sessions.some(s => s.date===dateStr && Math.abs((s.dist||0)-(act.distance/1000))<0.5);
+      // Détection doublons : pour renfo, on compare date + durée (pas distance)
+      const isDup = sport==='renfo'
+        ? sessions.some(s=>s.date===dateStr&&s.sport==='renfo'&&Math.abs((s.dur||0)-Math.round(act.moving_time/60))<=2)
+        : sessions.some(s=>s.date===dateStr&&Math.abs((s.dist||0)-(act.distance/1000))<0.5);
       stravaPending.push({
         act, date:dateStr,
         dist: Math.round(act.distance/10)/100,
@@ -3874,6 +3881,7 @@ function stravaRenderPending(statusEl){
         <option value="natation-plan" ${p.sport==='natation-plan'?'selected':''}>🏊 Natation (plan)</option>
         <option value="natation-libre" ${p.sport==='natation-libre'?'selected':''}>🏊 Natation libre</option>
         <option value="velo" ${p.sport==='velo'?'selected':''}>🚴 Vélo</option>
+        <option value="renfo" ${p.sport==='renfo'?'selected':''}>💪 Renforcement musculaire</option>
       </select>
       ${showPlanSel?`<div style="display:flex;gap:6px;margin-bottom:4px">
         <select onchange="stravaPendingSetWeek(${i},this.value)" style="flex:1;padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
@@ -3923,10 +3931,26 @@ async function stravaConfirmImport(){
 
     // Récupérer les streams GPS + laps (fractionnés)
     if(token && p.act.id){
-      try {
-        if(statusEl) statusEl.textContent=`⏳ Récupération GPS & laps : ${p.comment||p.date}…`;
-
-        // 1. Streams GPS
+      // Renfo : pas besoin de GPS, juste récupérer les laps pour la FC
+      if(p.sport==='renfo'){
+        try {
+          if(statusEl) statusEl.textContent=`⏳ Récupération FC : ${p.comment||p.date}…`;
+          const lapsResp = await fetch(
+            `https://www.strava.com/api/v3/activities/${p.act.id}/laps`,
+            { headers:{'Authorization':'Bearer '+token} }
+          );
+          const lapsData = await lapsResp.json();
+          if(Array.isArray(lapsData) && lapsData.length > 1){
+            p.laps = lapsData.map((lap,i)=>({
+              n:i+1, dist:Math.round(lap.distance), dur:Math.round(lap.elapsed_time),
+              pace: lap.distance>0?secToPace(Math.round(lap.elapsed_time/(lap.distance/1000))):'',
+              hr:Math.round(lap.average_heartrate||0), hrmax:Math.round(lap.max_heartrate||0),
+              name:lap.name||`Lap ${i+1}`
+            }));
+          }
+        } catch(e){ console.warn('Renfo laps error:', e.message); }
+      } else {
+        try {
         const streamResp = await fetch(
           `https://www.strava.com/api/v3/activities/${p.act.id}/streams?keys=latlng,distance,time,altitude,heartrate&key_by_type=true`,
           { headers:{'Authorization':'Bearer '+token} }
@@ -3995,6 +4019,7 @@ async function stravaConfirmImport(){
         }
 
       } catch(e){ console.warn('Stream/laps fetch error:', e.message); }
+      } // end else (non-renfo)
     }
 
     sessions.push({
