@@ -572,25 +572,28 @@ canvas{display:block;width:100%!important}
   <!-- Overlay suivi plein écran -->
   <div id="parcours-tracking-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#000">
     <!-- Header -->
-    <div style="position:absolute;top:0;left:0;right:0;z-index:20;padding:12px 16px;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:space-between">
+    <div style="position:absolute;top:0;left:0;right:0;z-index:1001;padding:12px 16px;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:space-between">
       <div>
         <div id="tracking-name" style="font-size:14px;font-weight:700;color:#fff"></div>
         <div id="tracking-status" style="font-size:11px;color:#aaa;margin-top:2px">📍 Localisation…</div>
       </div>
     </div>
-    <!-- Carte -->
-    <div id="tracking-map" style="position:absolute;top:0;left:0;right:0;bottom:120px"></div>
-    <!-- Bouton recentrer — flottant au-dessus de la barre -->
-    <button onclick="recenterTracking()" id="tracking-recenter-btn"
-      style="position:absolute;right:16px;bottom:130px;z-index:30;width:48px;height:48px;border-radius:50%;background:#fff;border:2px solid #ddd;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;line-height:1">📍</button>
-    <!-- Barre stats + boutons -->
-    <div style="position:absolute;bottom:0;left:0;right:0;z-index:20;background:rgba(0,0,0,.85);padding:12px 16px">
-      <div style="display:flex;gap:0;justify-content:space-around;margin-bottom:12px">
+    <!-- Carte Leaflet -->
+    <div id="tracking-map" style="position:absolute;top:0;left:0;right:0;bottom:120px;z-index:1000"></div>
+    <!-- Couche UI au-dessus de la carte -->
+    <div style="position:absolute;top:0;left:0;right:0;bottom:120px;z-index:1002;pointer-events:none">
+      <!-- Bouton recentrer -->
+      <button onclick="recenterTracking()" id="tracking-recenter-btn"
+        style="pointer-events:all;position:absolute;right:12px;bottom:12px;width:48px;height:48px;border-radius:50%;background:#fff;border:2px solid #ccc;font-size:20px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.5)">📍</button>
+    </div>
+    <!-- Barre stats + bouton stop -->
+    <div style="position:absolute;bottom:0;left:0;right:0;z-index:1001;background:rgba(0,0,0,.85);padding:12px 16px">
+      <div style="display:flex;justify-content:space-around;margin-bottom:12px">
         <div style="text-align:center"><div id="tracking-dist" style="font-size:20px;font-weight:700;color:#fff">—</div><div style="font-size:10px;color:#aaa">parcouru</div></div>
         <div style="text-align:center"><div id="tracking-deviation" style="font-size:20px;font-weight:700;color:#27AE60">✓</div><div style="font-size:10px;color:#aaa">sur le tracé</div></div>
         <div style="text-align:center"><div id="tracking-progress" style="font-size:20px;font-weight:700;color:#fff">0%</div><div style="font-size:10px;color:#aaa">progression</div></div>
       </div>
-      <button onclick="stopTracking()" style="width:100%;background:#E53E3E;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">■ Arrêter le suivi</button>
+      <button onclick="stopTracking()" style="width:100%;background:#E53E3E;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer">■ Arrêter le suivi</button>
     </div>
   </div>
 </div>
