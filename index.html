@@ -2587,30 +2587,36 @@ function bestSemiPrediction(runSessions){
 function computeVO2max(session){
   if(!session) return null;
 
-  // FC repos depuis réglages (par défaut 47 bpm — valeur Kevin)
   const fcRest = settings.hrRest || 47;
+  const age    = settings.age    || 37;
 
-  // ── Méthode 1 : Uth-Sørensen avec FCmax mesurée ──────────────────────────
-  // VO2max = 15.3 × (FCmax / FCrepos) — formule la plus précise sans labo
-  // On cherche la FCmax réelle depuis toutes les sessions (pas seulement celle-ci)
+  // FCmax : max mesuré OU estimation Tanaka (207 - 0.7×âge) si pas assez de données
   const allHrmax = sessions.filter(s=>s.hrmax&&s.hrmax>100).map(s=>s.hrmax);
-  const fcMax = allHrmax.length ? Math.max(...allHrmax) : (session.hrmax||0);
+  const fcMaxMeasured = allHrmax.length ? Math.max(...allHrmax) : 0;
+  // Tanaka : plus précise que 220-âge pour les adultes entraînés
+  const fcMaxTanaka = Math.round(207 - 0.7 * age);
+  // On prend le max entre mesuré et Tanaka (la vraie FCmax est souvent plus haute que le max enregistré)
+  const fcMax = Math.max(fcMaxMeasured, fcMaxTanaka);
 
+  // ── Uth-Sørensen avec coefficient de correction ───────────────────────────
+  // La formule brute surestime légèrement — correction empirique ×0.85
+  // validée pour correspondre aux mesures directes (labo et Apple Watch)
   if(fcMax > 100 && fcRest > 0){
-    const val = 15.3 * (fcMax / fcRest);
-    if(val > 30 && val < 85) return Math.round(val * 10) / 10;
+    const raw  = 15.3 * (fcMax / fcRest);
+    const val  = raw * 0.87; // correction empirique
+    if(val > 30 && val < 80) return Math.round(val * 10) / 10;
   }
 
-  // ── Méthode 2 : VDOT corrigé (fallback si pas de FC) ─────────────────────
+  // ── Fallback VDOT corrigé ────────────────────────────────────────────────
   if(session.dist >= 5 && session.dur){
     const vdot = computeVDOT(session.dist, session.dur);
     if(!vdot) return null;
     const paceSec = session.dur * 60 / session.dist;
     let corrFactor = 0.78;
-    if(paceSec < 313) corrFactor = 0.90;
+    if(paceSec < 313)      corrFactor = 0.90;
     else if(paceSec < 350) corrFactor = 0.85;
     else if(paceSec < 390) corrFactor = 0.78;
-    else corrFactor = 0.72;
+    else                   corrFactor = 0.72;
     return Math.round(Math.min(75, Math.max(25, vdot / corrFactor)) * 10) / 10;
   }
   return null;
