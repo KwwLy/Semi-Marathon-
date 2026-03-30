@@ -4570,7 +4570,18 @@ let trackingMap = null;
 let trackingMarker = null;
 let currentTrackingParcours = null;
 
-function saveParcoursList(){ localStorage.setItem('smi_parcours', JSON.stringify(savedParcours)); }
+function saveParcoursList(){
+  localStorage.setItem('smi_parcours', JSON.stringify(savedParcours));
+  // Déclencher sync Firebase
+  clearTimeout(window._parcoursTimer);
+  window._parcoursTimer = setTimeout(async ()=>{
+    if(window.fbSaveData && window.fbUser) window.fbSaveData();
+    else if(window.fbRestWrite && window.getStoredUid){
+      const uid = await window.getStoredUid();
+      if(uid) window.fbRestWrite(uid);
+    }
+  }, 1000);
+}
 
 function renderParcours(){
   const el = document.getElementById('parcours-content');
@@ -5619,6 +5630,7 @@ try {
         if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
         else if(d.sessions){ sessions=d.sessions; localStorage.setItem('smi_s',JSON.stringify(sessions)); }
         if(d.plans_json){ plans=JSON.parse(d.plans_json); localStorage.setItem('smi_plans',d.plans_json); }
+        if(d.parcours_json){ savedParcours=JSON.parse(d.parcours_json); localStorage.setItem('smi_parcours',d.parcours_json); }
         if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
         else if(d.planOverrides){ planOverrides=d.planOverrides; localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides)); }
         if(d.coach_json && d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
@@ -5645,6 +5657,7 @@ try {
         const d = snap.data();
         if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
         if(d.plans_json){ plans=JSON.parse(d.plans_json); localStorage.setItem('smi_plans',d.plans_json); }
+        if(d.parcours_json){ savedParcours=JSON.parse(d.parcours_json); localStorage.setItem('smi_parcours',d.parcours_json); }
         if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
         if(d.coach_json&&d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
         if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
@@ -5667,6 +5680,7 @@ try {
       const sJson = get('sessions_json');
       const pJson = get('planOverrides_json');
       const plJson = get('plans_json');
+      const prcJson = get('parcours_json');
       const cJson = get('coach_json');
       const setJson = get('settings_json');
       if(sJson){ sessions=JSON.parse(sJson); localStorage.setItem('smi_s',sJson); }
@@ -5694,6 +5708,7 @@ try {
       await fbDb.collection('users').doc(fbUser.uid).set({
         sessions_json: JSON.stringify(sessions),
         plans_json: JSON.stringify(plans),
+        parcours_json: JSON.stringify(savedParcours),
         planOverrides_json: JSON.stringify(planOverrides),
         settings_json: JSON.stringify({...settings, apiKey:''}),
         coach_json: coachRaw || 'null',
@@ -5866,6 +5881,7 @@ try {
         fields: {
           sessions_json:      { stringValue: JSON.stringify(sessions) },
           plans_json:         { stringValue: JSON.stringify(plans) },
+          parcours_json:      { stringValue: JSON.stringify(savedParcours) },
           planOverrides_json: { stringValue: JSON.stringify(planOverrides) },
           settings_json:      { stringValue: JSON.stringify({...settings,apiKey:''}) },
           coach_json:         { stringValue: coachRaw||'null' },
@@ -5873,7 +5889,7 @@ try {
         }
       };
       await fetch(
-        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=plans_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
+        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=plans_json&updateMask.fieldPaths=parcours_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
         { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
       );
       fbSetSyncStatus('✓ Synchronisé');
@@ -5905,6 +5921,7 @@ try {
         const sJson = get('sessions_json');
         const pJson = get('planOverrides_json');
         const plJson = get('plans_json');
+        const prcJson = get('parcours_json');
         const cJson = get('coach_json');
         if(sJson){
           sessions = JSON.parse(sJson);
