@@ -228,6 +228,9 @@ canvas{display:block;width:100%!important}
     <button class="nav-item" id="nav-renfo" onclick="sw('renfo')">
       <span class="nav-icon">💪</span><span class="nav-label">Renfo</span>
     </button>
+    <button class="nav-item" id="nav-parcours" onclick="sw('parcours')">
+      <span class="nav-icon">🗺️</span><span class="nav-label">Parcours</span>
+    </button>
     <button class="nav-item" id="nav-settings" onclick="sw('settings')">
       <span class="nav-icon">⚙️</span><span class="nav-label">Réglages</span>
     </button>
@@ -563,6 +566,27 @@ canvas{display:block;width:100%!important}
   <div id="zones-content"></div>
 </div>
 
+<!-- PARCOURS -->
+<div class="section" id="tab-parcours">
+  <div id="parcours-content"></div>
+  <!-- Overlay suivi plein écran -->
+  <div id="parcours-tracking-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#000;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,.7);position:absolute;top:0;left:0;right:0;z-index:10">
+      <div>
+        <div id="tracking-name" style="font-size:14px;font-weight:700;color:#fff"></div>
+        <div id="tracking-status" style="font-size:11px;color:#aaa;margin-top:2px">📍 Localisation…</div>
+      </div>
+      <button onclick="stopTracking()" style="background:var(--re);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">✕ Arrêter</button>
+    </div>
+    <div id="tracking-map" style="width:100%;height:100%"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(0,0,0,.7);display:flex;gap:16px;justify-content:center">
+      <div style="text-align:center"><div id="tracking-dist" style="font-size:20px;font-weight:700;color:#fff">—</div><div style="font-size:10px;color:#aaa">distance</div></div>
+      <div style="text-align:center"><div id="tracking-deviation" style="font-size:20px;font-weight:700;color:#27AE60">✓</div><div style="font-size:10px;color:#aaa">sur le tracé</div></div>
+      <div style="text-align:center"><div id="tracking-progress" style="font-size:20px;font-weight:700;color:#fff">0%</div><div style="font-size:10px;color:#aaa">progression</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- RENFO -->
 <div class="section" id="tab-renfo">
   <div id="renfo-content"></div>
@@ -888,7 +912,7 @@ function getWeekWithOverride(n){
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function sw(t){
-  ['home','plans','plan','log','stats','journal','renfo','settings'].forEach(id=>{
+  ['home','plans','plan','log','stats','journal','parcours','renfo','settings'].forEach(id=>{
     const el=document.getElementById('nav-'+id);
     if(el) el.classList.toggle('active', id===t);
   });
@@ -899,6 +923,7 @@ function sw(t){
   if(t==='plan'){renderPlan();loadCoachCard();renderStats();}
   if(t==='stats')renderStats();
   if(t==='journal'){populateJournalPlanFilter();renderJournal();}
+  if(t==='parcours')renderParcours();
   if(t==='renfo')renderRenfo();
   if(t==='settings')loadSettings();
 }
@@ -4535,6 +4560,319 @@ async function extractStravaData(){
     document.getElementById('strava-extract-btn').style.display='block';
     toast('Erreur réseau');
   }
+}
+
+// ── PARCOURS ──────────────────────────────────────────────────────────────
+let savedParcours = JSON.parse(localStorage.getItem('smi_parcours')||'[]');
+let parcoursMapInstance = null;
+let trackingWatchId = null;
+let trackingMap = null;
+let trackingMarker = null;
+let currentTrackingParcours = null;
+
+function saveParcoursList(){ localStorage.setItem('smi_parcours', JSON.stringify(savedParcours)); }
+
+function renderParcours(){
+  const el = document.getElementById('parcours-content');
+  if(!el) return;
+
+  let h = `
+  <div class="card">
+    <div class="card-title"><span class="bar"></span>🗺️ Importer un parcours GPX</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Importe un fichier GPX depuis Komoot, Strava ou Garmin pour visualiser le tracé et l'enregistrer en favori.</p>
+    <button class="btn btn-or btn-full" onclick="document.getElementById('parcours-file-input').click()">📂 Choisir un fichier GPX</button>
+    <input type="file" id="parcours-file-input" accept=".gpx" style="display:none" onchange="importParcoursGPX(this)">
+    <div id="parcours-import-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none"></div>
+  </div>
+
+  <div id="parcours-preview-card" style="display:none" class="card">
+    <div class="card-title"><span class="bar"></span>Aperçu du parcours</div>
+    <div id="parcours-map-preview" style="height:280px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);margin-bottom:12px"></div>
+    <div id="parcours-stats-preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="text" id="parcours-name-input" placeholder="Nom du parcours (ex: Boucle des Crêtes)" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-or" style="flex:1" onclick="saveCurrentParcours()">⭐ Sauvegarder</button>
+      <button class="btn btn-ghost" onclick="clearParcoursPreview()">✕ Effacer</button>
+    </div>
+  </div>`;
+
+  if(savedParcours.length){
+    h += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:4px 0 8px">⭐ Mes parcours (${savedParcours.length})</div>`;
+    savedParcours.forEach((p,i)=>{
+      h += `<div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">${p.name}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              ${p.sport==='velo'?'🚴':'🏃'} ${p.distKm} km · D+ ${p.dplus}m · Alt max ${p.altMax}m
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="color:var(--re)" onclick="deleteParcours(${i})">🗑️</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-or btn-sm" style="flex:1" onclick="viewParcours(${i})">🗺️ Voir</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="startTracking(${i})">📍 Suivre</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = h;
+}
+
+// ── Parse GPX ────────────────────────────────────────────────────────────
+function parseGPXFile(text){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+  const trkpts = doc.querySelectorAll('trkpt');
+  const rtepts = doc.querySelectorAll('rtept');
+  const pts = trkpts.length ? trkpts : rtepts;
+  if(!pts.length) return null;
+
+  const coords = [];
+  let dplus = 0, prevAlt = null;
+  let altMin = Infinity, altMax = -Infinity;
+
+  pts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    const eleEl = pt.querySelector('ele');
+    const alt = eleEl ? parseFloat(eleEl.textContent) : null;
+    if(isNaN(lat)||isNaN(lon)) return;
+    coords.push({lat, lon, alt});
+    if(alt !== null){
+      if(prevAlt !== null && alt > prevAlt) dplus += alt - prevAlt;
+      prevAlt = alt;
+      if(alt < altMin) altMin = alt;
+      if(alt > altMax) altMax = alt;
+    }
+  });
+
+  if(coords.length < 2) return null;
+
+  // Calculer distance totale (Haversine)
+  let distM = 0;
+  for(let i=1; i<coords.length; i++){
+    distM += haversineM(coords[i-1].lat, coords[i-1].lon, coords[i].lat, coords[i].lon);
+  }
+
+  // Nom depuis le GPX
+  const nameEl = doc.querySelector('name, trk > name');
+  const gpxName = nameEl ? nameEl.textContent.trim() : '';
+
+  return {
+    coords,
+    distKm: Math.round(distM/100)/10,
+    dplus: Math.round(dplus),
+    altMin: altMin===Infinity ? 0 : Math.round(altMin),
+    altMax: altMax===-Infinity ? 0 : Math.round(altMax),
+    gpxName
+  };
+}
+
+function haversineM(lat1,lon1,lat2,lon2){
+  const R=6371000;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+let _currentParcoursData = null;
+
+function importParcoursGPX(input){
+  const file = input.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('parcours-import-status');
+  statusEl.style.display='block';
+  statusEl.textContent='⏳ Lecture du fichier…';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = parseGPXFile(e.target.result);
+    if(!data){ statusEl.textContent='❌ Fichier GPX invalide ou vide'; return; }
+    statusEl.style.display='none';
+    _currentParcoursData = data;
+    showParcoursPreview(data);
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function showParcoursPreview(data){
+  const card = document.getElementById('parcours-preview-card');
+  card.style.display='block';
+
+  // Pré-remplir le nom
+  if(data.gpxName) document.getElementById('parcours-name-input').value = data.gpxName;
+
+  // Stats
+  document.getElementById('parcours-stats-preview').innerHTML = `
+    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">📏 ${data.distKm} km</span>
+    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">⛰️ D+ ${data.dplus}m</span>
+    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">🏔️ Alt max ${data.altMax}m</span>
+    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">🔻 Alt min ${data.altMin}m</span>
+    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">📍 ${data.coords.length} points</span>`;
+
+  // Carte
+  card.scrollIntoView({behavior:'smooth'});
+  setTimeout(()=>{
+    if(parcoursMapInstance){ parcoursMapInstance.remove(); parcoursMapInstance=null; }
+    if(!window.L) return;
+    parcoursMapInstance = L.map('parcours-map-preview');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(parcoursMapInstance);
+    const latLngs = data.coords.map(c=>[c.lat,c.lon]);
+    const poly = L.polyline(latLngs,{color:'#3B82F6',weight:4,opacity:0.85}).addTo(parcoursMapInstance);
+    // Marqueurs départ/arrivée
+    const startIcon=L.divIcon({html:'<div style="background:#27AE60;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12]});
+    const endIcon=L.divIcon({html:'<div style="background:#E53E3E;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12]});
+    L.marker(latLngs[0],{icon:startIcon}).addTo(parcoursMapInstance).bindPopup('Départ');
+    L.marker(latLngs[latLngs.length-1],{icon:endIcon}).addTo(parcoursMapInstance).bindPopup('Arrivée');
+    parcoursMapInstance.fitBounds(poly.getBounds(),{padding:[20,20]});
+  },300);
+}
+
+function clearParcoursPreview(){
+  document.getElementById('parcours-preview-card').style.display='none';
+  _currentParcoursData=null;
+  if(parcoursMapInstance){ parcoursMapInstance.remove(); parcoursMapInstance=null; }
+}
+
+function saveCurrentParcours(){
+  if(!_currentParcoursData){ toast('Aucun parcours à sauvegarder'); return; }
+  const name = document.getElementById('parcours-name-input')?.value?.trim() || 'Parcours';
+  savedParcours.unshift({
+    ..._currentParcoursData,
+    name,
+    sport: 'course',
+    savedAt: new Date().toISOString()
+  });
+  saveParcoursList();
+  clearParcoursPreview();
+  renderParcours();
+  toast('⭐ Parcours sauvegardé !');
+}
+
+function deleteParcours(i){
+  if(!confirm('Supprimer ce parcours ?')) return;
+  savedParcours.splice(i,1);
+  saveParcoursList();
+  renderParcours();
+  toast('Parcours supprimé');
+}
+
+function viewParcours(i){
+  const p = savedParcours[i];
+  if(!p) return;
+  _currentParcoursData = p;
+  document.getElementById('parcours-name-input').value = p.name;
+  showParcoursPreview(p);
+  document.getElementById('parcours-content').scrollTop=0;
+}
+
+// ── SUIVI EN TEMPS RÉEL ──────────────────────────────────────────────────
+function startTracking(i){
+  const p = savedParcours[i];
+  if(!p){ toast('Parcours introuvable'); return; }
+  if(!navigator.geolocation){ toast('GPS non disponible sur cet appareil'); return; }
+
+  currentTrackingParcours = p;
+  document.getElementById('tracking-name').textContent = p.name;
+  document.getElementById('tracking-status').textContent = '📍 Acquisition GPS…';
+
+  const overlay = document.getElementById('parcours-tracking-overlay');
+  overlay.style.display='flex';
+
+  // Init carte suivi
+  setTimeout(()=>{
+    if(!window.L) return;
+    if(trackingMap){ trackingMap.remove(); trackingMap=null; }
+    trackingMap = L.map('tracking-map',{zoomControl:false,attributionControl:false});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(trackingMap);
+
+    // Tracé du parcours
+    const latLngs = p.coords.map(c=>[c.lat,c.lon]);
+    L.polyline(latLngs,{color:'#3B82F6',weight:5,opacity:0.8}).addTo(trackingMap);
+
+    // Marqueurs départ/arrivée
+    const startIcon=L.divIcon({html:'<div style="background:#27AE60;width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
+    const endIcon=L.divIcon({html:'<div style="background:#E53E3E;width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
+    L.marker(latLngs[0],{icon:startIcon}).addTo(trackingMap);
+    L.marker(latLngs[latLngs.length-1],{icon:endIcon}).addTo(trackingMap);
+    trackingMap.fitBounds(L.polyline(latLngs).getBounds(),{padding:[30,30]});
+
+    // Icône position GPS
+    const posIcon=L.divIcon({html:'<div style="background:#3B82F6;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>',className:'',iconSize:[18,18]});
+    trackingMarker = L.marker([0,0],{icon:posIcon,zIndexOffset:1000});
+
+    // Démarrer le watch GPS
+    trackingWatchId = navigator.geolocation.watchPosition(
+      pos => updateTrackingPosition(pos, p),
+      err => { document.getElementById('tracking-status').textContent='⚠️ GPS : '+err.message; },
+      {enableHighAccuracy:true, timeout:10000, maximumAge:3000}
+    );
+  },400);
+}
+
+function updateTrackingPosition(pos, parcours){
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+
+  // Afficher la position sur la carte
+  if(trackingMarker && trackingMap){
+    trackingMarker.setLatLng([lat,lon]).addTo(trackingMap);
+    trackingMap.setView([lat,lon], Math.max(trackingMap.getZoom()||15, 15));
+  }
+
+  // Trouver le point du parcours le plus proche
+  let minDist = Infinity, nearestIdx = 0;
+  parcours.coords.forEach((c,i)=>{
+    const d = haversineM(lat,lon,c.lat,c.lon);
+    if(d<minDist){ minDist=d; nearestIdx=i; }
+  });
+
+  // Distance au tracé
+  const deviationM = Math.round(minDist);
+  const onTrack = deviationM < 50;
+  const devEl = document.getElementById('tracking-deviation');
+  if(devEl){
+    devEl.textContent = onTrack ? '✓' : deviationM+'m';
+    devEl.style.color = onTrack ? '#27AE60' : deviationM < 100 ? '#E67E22' : '#E53E3E';
+  }
+
+  // Alerte si hors tracé
+  if(!onTrack && deviationM > 100){
+    if(navigator.vibrate) navigator.vibrate([200,100,200]);
+    document.getElementById('tracking-status').textContent = `⚠️ ${deviationM}m du tracé`;
+  } else {
+    document.getElementById('tracking-status').textContent = '✓ Sur le tracé';
+  }
+
+  // Progression (% des points parcourus)
+  const progress = Math.round(nearestIdx / parcours.coords.length * 100);
+  const progEl = document.getElementById('tracking-progress');
+  if(progEl) progEl.textContent = progress+'%';
+
+  // Distance depuis le départ
+  let distCovered = 0;
+  for(let i=1; i<=nearestIdx && i<parcours.coords.length; i++){
+    distCovered += haversineM(parcours.coords[i-1].lat,parcours.coords[i-1].lon,parcours.coords[i].lat,parcours.coords[i].lon);
+  }
+  const distEl = document.getElementById('tracking-dist');
+  if(distEl) distEl.textContent = (Math.round(distCovered/100)/10)+'km';
+}
+
+function stopTracking(){
+  if(trackingWatchId !== null){
+    navigator.geolocation.clearWatch(trackingWatchId);
+    trackingWatchId = null;
+  }
+  if(trackingMap){ trackingMap.remove(); trackingMap=null; }
+  trackingMarker = null;
+  currentTrackingParcours = null;
+  document.getElementById('parcours-tracking-overlay').style.display='none';
 }
 
 // ── RENFORCEMENT MUSCULAIRE ───────────────────────────────────────────────
