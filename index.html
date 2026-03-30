@@ -5141,22 +5141,31 @@ try {
   });
 
   function fbSetConnected(user){
-    document.getElementById('fb-dot').style.background = '#27AE60';
-    document.getElementById('fb-label').textContent = user.displayName||user.email;
-    document.getElementById('fb-btn').textContent = 'Se déconnecter';
-    document.getElementById('fb-settings-logged-out').style.display = 'none';
-    document.getElementById('fb-settings-logged-in').style.display = 'block';
-    document.getElementById('fb-username').textContent = user.displayName||'';
-    document.getElementById('fb-useremail').textContent = user.email||'';
-    if(user.photoURL){ const av=document.getElementById('fb-avatar'); av.src=user.photoURL; av.style.display='block'; }
+    const dot = document.getElementById('fb-dot');
+    const label = document.getElementById('fb-label');
+    if(dot) dot.style.background = '#27AE60';
+    if(label) label.textContent = user.displayName||user.email;
+    const lo = document.getElementById('fb-settings-logged-out');
+    const li = document.getElementById('fb-settings-logged-in');
+    const un = document.getElementById('fb-username');
+    const ue = document.getElementById('fb-useremail');
+    const av = document.getElementById('fb-avatar');
+    if(lo) lo.style.display = 'none';
+    if(li) li.style.display = 'block';
+    if(un) un.textContent = user.displayName||'';
+    if(ue) ue.textContent = user.email||'';
+    if(av && user.photoURL){ av.src=user.photoURL; av.style.display='block'; }
   }
 
   function fbSetDisconnected(){
-    document.getElementById('fb-dot').style.background = 'var(--text3)';
-    document.getElementById('fb-label').textContent = 'Non connecté — données locales uniquement';
-    document.getElementById('fb-btn').textContent = 'Se connecter';
-    document.getElementById('fb-settings-logged-out').style.display = 'block';
-    document.getElementById('fb-settings-logged-in').style.display = 'none';
+    const dot = document.getElementById('fb-dot');
+    const label = document.getElementById('fb-label');
+    if(dot) dot.style.background = 'var(--text3)';
+    if(label) label.textContent = 'Non connecté';
+    const lo = document.getElementById('fb-settings-logged-out');
+    const li = document.getElementById('fb-settings-logged-in');
+    if(lo) lo.style.display = 'block';
+    if(li) li.style.display = 'none';
   }
 
   window.fbToggleAuth = function(){
@@ -5164,18 +5173,8 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      // Essayer popup d'abord (plus fiable sur PC/GitHub Pages)
-      // Fallback sur redirect si popup bloquée
-      fbAuth.signInWithPopup(provider)
-        .catch(err => {
-          if(err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user'){
-            // Popup bloquée → essayer redirect
-            fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
-          } else {
-            toast('Erreur connexion : '+err.message);
-            console.error('Auth error:', err.code, err.message);
-          }
-        });
+      // GitHub Pages bloque les popups COOP → utiliser redirect uniquement
+      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur : '+e.message));
     }
   };
 
@@ -5457,6 +5456,7 @@ try {
     const match = document.cookie.match(/smi_uid=([^;]+)/);
     return match ? match[1] : null;
   }
+  window.getCookieUid = getCookieUid;
 
   async function getStoredUid(){
     return localStorage.getItem('smi_fb_uid')
@@ -5464,6 +5464,7 @@ try {
       || getCookieUid()
       || null;
   }
+  window.getStoredUid = getStoredUid;
 
   async function fbRestRead(uid){
     try {
@@ -5472,6 +5473,7 @@ try {
       return await resp.json();
     } catch(e){ return null; }
   }
+  window.fbRestRead = fbRestRead;
 
   async function fbRestWrite(uid){
     try {
