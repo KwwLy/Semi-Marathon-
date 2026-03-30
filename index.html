@@ -647,15 +647,17 @@ canvas{display:block;width:100%!important}
     </div>
     <p style="font-size:11px;color:var(--text3)">Obtenir une clé : <a href="https://console.anthropic.com" target="_blank" style="color:var(--bl)">console.anthropic.com</a></p>
   </div>
-  <div class="card">
-    <div class="card-title"><span class="bar"></span>Ton profil (pour le calcul calories)</div>
+    <div class="card-title"><span class="bar"></span>Ton profil</div>
     <div class="g2">
       <div class="field"><label class="lbl">Poids (kg)</label><input type="number" id="s-weight" placeholder="75"></div>
       <div class="field"><label class="lbl">Objectif allure (/km)</label><input type="text" id="s-target" placeholder="5:13"></div>
     </div>
+    <div class="g2" style="margin-top:8px">
+      <div class="field"><label class="lbl">FC repos (bpm)</label><input type="number" id="s-hrrest" placeholder="55" min="30" max="80"></div>
+      <div class="field"><label class="lbl">Âge</label><input type="number" id="s-age" placeholder="30" min="15" max="80"></div>
+    </div>
     <button class="btn btn-or" onclick="saveSettings()">Enregistrer</button>
   </div>
-
   <div class="card">
     <div class="card-title"><span class="bar"></span>📂 Import en masse — GPX / FIT</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Sélectionne plusieurs fichiers GPX ou FIT d'un coup. L'app les analyse, détecte les doublons et te montre un récapitulatif avant d'importer.</p>
@@ -807,7 +809,7 @@ let sessions=JSON.parse(localStorage.getItem('smi_s')||'[]');
 // Nettoyer les dplus float → entier
 sessions = sessions.map(s=>({...s, dplus: s.dplus ? Math.round(s.dplus) : 0}));
 let kmRows=[];
-let settings=JSON.parse(localStorage.getItem('smi_cfg')||'{"weight":75,"target":"5:13","apiKey":""}');
+let settings=JSON.parse(localStorage.getItem('smi_cfg')||'{"weight":75,"target":"5:13","apiKey":"","hrRest":47,"age":37}');
 let planOverrides=JSON.parse(localStorage.getItem('smi_plan_overrides')||'{}');
 
 // ── STRUCTURE MULTI-PLANS ─────────────────────────────────────────────────
@@ -2582,37 +2584,33 @@ function bestSemiPrediction(runSessions){
 }
 
 function computeVO2max(session){
-  if(!session)return null;
+  if(!session) return null;
 
-  // ── Méthode 1 : Uth-Sørensen via FC (la plus fiable si FC dispo) ──────────
-  // VO2max = 15 × (FCmax / FCrepos)
-  // FCrepos estimée à 55 bpm (coureur entraîné). Si FC moy disponible on l'utilise
-  // comme proxy repos (sous-estimation intentionnelle pour rester conservateur).
-  if(session.hrmax&&session.hrmax>100){
-    const fcRest=55; // estimation coureur entraîné
-    const val=15*(session.hrmax/fcRest);
-    if(val>30&&val<80)return Math.round(val*10)/10;
+  // FC repos depuis réglages (par défaut 47 bpm — valeur Kevin)
+  const fcRest = settings.hrRest || 47;
+
+  // ── Méthode 1 : Uth-Sørensen avec FCmax mesurée ──────────────────────────
+  // VO2max = 15.3 × (FCmax / FCrepos) — formule la plus précise sans labo
+  // On cherche la FCmax réelle depuis toutes les sessions (pas seulement celle-ci)
+  const allHrmax = sessions.filter(s=>s.hrmax&&s.hrmax>100).map(s=>s.hrmax);
+  const fcMax = allHrmax.length ? Math.max(...allHrmax) : (session.hrmax||0);
+
+  if(fcMax > 100 && fcRest > 0){
+    const val = 15.3 * (fcMax / fcRest);
+    if(val > 30 && val < 85) return Math.round(val * 10) / 10;
   }
 
-  // ── Méthode 2 : VDOT corrigé pour effort d'entraînement ──────────────────
-  // Jack Daniels VDOT suppose un effort MAXIMAL (compétition).
-  // En entraînement Z2, l'effort correspond à ~75-80% du VO2max réel.
-  // On corrige en divisant par 0.77 pour retrouver la VO2max réelle estimée.
-  if(session.dist>=5&&session.dur){
-    const vdot=computeVDOT(session.dist,session.dur);
-    if(!vdot)return null;
-    // Facteur de correction selon l'allure relative
-    // Si allure proche Z3 (5:10-5:20) -> effort ~87% -> correction /0.87
-    // Si allure Z2 (5:50-6:20) -> effort ~78% -> correction /0.78
-    // Si allure Z1 (>6:30) -> effort ~70% -> correction /0.70
-    const paceSec=session.dur*60/session.dist/1000*1000; // sec/km
-    let corrFactor=0.78; // Z2 par défaut
-    if(paceSec<313)corrFactor=0.90;      // Z3+ allure semi ou plus rapide
-    else if(paceSec<350)corrFactor=0.85; // Z2 tonique (5:20-5:50)
-    else if(paceSec<390)corrFactor=0.78; // Z2 (5:50-6:30)
-    else corrFactor=0.72;                // Z1 (>6:30)
-    const vo2maxEst=vdot/corrFactor;
-    return Math.round(Math.min(75,Math.max(25,vo2maxEst))*10)/10;
+  // ── Méthode 2 : VDOT corrigé (fallback si pas de FC) ─────────────────────
+  if(session.dist >= 5 && session.dur){
+    const vdot = computeVDOT(session.dist, session.dur);
+    if(!vdot) return null;
+    const paceSec = session.dur * 60 / session.dist;
+    let corrFactor = 0.78;
+    if(paceSec < 313) corrFactor = 0.90;
+    else if(paceSec < 350) corrFactor = 0.85;
+    else if(paceSec < 390) corrFactor = 0.78;
+    else corrFactor = 0.72;
+    return Math.round(Math.min(75, Math.max(25, vdot / corrFactor)) * 10) / 10;
   }
   return null;
 }
@@ -3421,6 +3419,10 @@ function loadSettings(){
   document.getElementById('api-key-input').value=settings.apiKey||'';
   document.getElementById('s-weight').value=settings.weight||75;
   document.getElementById('s-target').value=settings.target||'5:13';
+  const hrEl=document.getElementById('s-hrrest');
+  const ageEl=document.getElementById('s-age');
+  if(hrEl) hrEl.value=settings.hrRest||47;
+  if(ageEl) ageEl.value=settings.age||37;
 }
 function saveApiKey(){
   settings.apiKey=document.getElementById('api-key-input').value.trim();
@@ -3430,6 +3432,8 @@ function saveApiKey(){
 function saveSettings(){
   settings.weight=parseFloat(document.getElementById('s-weight').value)||75;
   settings.target=document.getElementById('s-target').value||'5:13';
+  settings.hrRest=parseInt(document.getElementById('s-hrrest')?.value)||47;
+  settings.age=parseInt(document.getElementById('s-age')?.value)||37;
   saveApiKey();
   toast('Réglages enregistrés ✓');
 }
