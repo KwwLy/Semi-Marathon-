@@ -4754,8 +4754,13 @@ function clearParcoursPreview(){
 function saveCurrentParcours(){
   if(!_currentParcoursData){ toast('Aucun parcours à sauvegarder'); return; }
   const name = document.getElementById('parcours-name-input')?.value?.trim() || 'Parcours';
+  // Sous-échantillonner les coords à 500 points max pour Firestore
+  const coords = _currentParcoursData.coords;
+  const step = Math.max(1, Math.floor(coords.length / 500));
+  const sampledCoords = coords.filter((_,i) => i % step === 0);
   savedParcours.unshift({
     ..._currentParcoursData,
+    coords: sampledCoords,
     name,
     sport: 'course',
     savedAt: new Date().toISOString()
@@ -5636,7 +5641,7 @@ try {
         if(d.coach_json && d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
         if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
         if(cloudTs){ localStorage.setItem('smi_updated_at', String(cloudTs)); }
-        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard();
+        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
         const activeTab = document.querySelector('.section.active')?.id;
         if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
         toast('☁️ Données synchronisées depuis le cloud');
@@ -5663,7 +5668,7 @@ try {
         if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
         const cloudTs = parseInt(d.updated_at||0);
         if(cloudTs){ localStorage.setItem('smi_updated_at', String(cloudTs)); }
-        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard();
+        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
         const activeTab = document.querySelector('.section.active')?.id;
         if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
         toast('✅ '+sessions.length+' séances chargées depuis le cloud');
@@ -5690,7 +5695,7 @@ try {
       if(setJson){ const s=JSON.parse(setJson); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
       const cloudTs = parseInt(doc.fields.updated_at?.integerValue||0);
       if(cloudTs){ localStorage.setItem('smi_updated_at',String(cloudTs)); IDB.set('smi_updated_at',String(cloudTs)); }
-      renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard();
+      renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
       const activeTab = document.querySelector('.section.active')?.id;
       if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
       toast('✅ '+sessions.length+' séances chargées depuis le cloud');
