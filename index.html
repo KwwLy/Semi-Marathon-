@@ -5164,7 +5164,18 @@ try {
       if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
-      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
+      // Essayer popup d'abord (plus fiable sur PC/GitHub Pages)
+      // Fallback sur redirect si popup bloquée
+      fbAuth.signInWithPopup(provider)
+        .catch(err => {
+          if(err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user'){
+            // Popup bloquée → essayer redirect
+            fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur connexion : '+e.message));
+          } else {
+            toast('Erreur connexion : '+err.message);
+            console.error('Auth error:', err.code, err.message);
+          }
+        });
     }
   };
 
@@ -5225,8 +5236,20 @@ try {
 
   // Récupérer le résultat après redirection Google
   fbAuth.getRedirectResult().then(result => {
-    if(result && result.user) console.log('Connexion redirect OK:', result.user.email);
-  }).catch(e=>{ console.error('Redirect result error:', e); });
+    if(result && result.user){
+      console.log('Connexion redirect OK:', result.user.email);
+      toast('✅ Connecté : '+result.user.email);
+      // onAuthStateChanged va s'en charger, mais on force quand même
+      fbUser = result.user;
+      fbSetConnected(result.user);
+      fbLoadData();
+    }
+  }).catch(e=>{
+    if(e.code !== 'auth/no-auth-event'){
+      console.error('Redirect result error:', e.code, e.message);
+      toast('Erreur connexion : '+e.message);
+    }
+  });
 
   async function fbLoadData(){
     if(!fbUser) return;
