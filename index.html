@@ -570,21 +570,27 @@ canvas{display:block;width:100%!important}
 <div class="section" id="tab-parcours">
   <div id="parcours-content"></div>
   <!-- Overlay suivi plein écran -->
-  <div id="parcours-tracking-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#000;flex-direction:column">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,.7);position:absolute;top:0;left:0;right:0;z-index:10">
+  <div id="parcours-tracking-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#000">
+    <!-- Header -->
+    <div style="position:absolute;top:0;left:0;right:0;z-index:20;padding:12px 16px;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:space-between">
       <div>
         <div id="tracking-name" style="font-size:14px;font-weight:700;color:#fff"></div>
         <div id="tracking-status" style="font-size:11px;color:#aaa;margin-top:2px">📍 Localisation…</div>
       </div>
-      <button onclick="stopTracking()" style="background:var(--re);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer">✕ Arrêter</button>
     </div>
-    <div id="tracking-map" style="width:100%;height:100%"></div>
-    <!-- Bouton recentrer -->
-    <button onclick="recenterTracking()" id="tracking-recenter-btn" style="position:absolute;right:16px;bottom:80px;z-index:20;width:44px;height:44px;border-radius:50%;background:#fff;border:none;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center">📍</button>
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(0,0,0,.7);display:flex;gap:16px;justify-content:center">
-      <div style="text-align:center"><div id="tracking-dist" style="font-size:20px;font-weight:700;color:#fff">—</div><div style="font-size:10px;color:#aaa">distance</div></div>
-      <div style="text-align:center"><div id="tracking-deviation" style="font-size:20px;font-weight:700;color:#27AE60">✓</div><div style="font-size:10px;color:#aaa">sur le tracé</div></div>
-      <div style="text-align:center"><div id="tracking-progress" style="font-size:20px;font-weight:700;color:#fff">0%</div><div style="font-size:10px;color:#aaa">progression</div></div>
+    <!-- Carte -->
+    <div id="tracking-map" style="position:absolute;top:0;left:0;right:0;bottom:120px"></div>
+    <!-- Bouton recentrer — flottant au-dessus de la barre -->
+    <button onclick="recenterTracking()" id="tracking-recenter-btn"
+      style="position:absolute;right:16px;bottom:130px;z-index:30;width:48px;height:48px;border-radius:50%;background:#fff;border:2px solid #ddd;font-size:22px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;line-height:1">📍</button>
+    <!-- Barre stats + boutons -->
+    <div style="position:absolute;bottom:0;left:0;right:0;z-index:20;background:rgba(0,0,0,.85);padding:12px 16px">
+      <div style="display:flex;gap:0;justify-content:space-around;margin-bottom:12px">
+        <div style="text-align:center"><div id="tracking-dist" style="font-size:20px;font-weight:700;color:#fff">—</div><div style="font-size:10px;color:#aaa">parcouru</div></div>
+        <div style="text-align:center"><div id="tracking-deviation" style="font-size:20px;font-weight:700;color:#27AE60">✓</div><div style="font-size:10px;color:#aaa">sur le tracé</div></div>
+        <div style="text-align:center"><div id="tracking-progress" style="font-size:20px;font-weight:700;color:#fff">0%</div><div style="font-size:10px;color:#aaa">progression</div></div>
+      </div>
+      <button onclick="stopTracking()" style="width:100%;background:#E53E3E;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">■ Arrêter le suivi</button>
     </div>
   </div>
 </div>
@@ -4913,7 +4919,10 @@ function stopTracking(){
   if(trackingMap){ trackingMap.remove(); trackingMap=null; }
   trackingMarker = null;
   currentTrackingParcours = null;
+  window._trackingAutoFollow = true;
   document.getElementById('parcours-tracking-overlay').style.display='none';
+  // Revenir sur l'onglet Parcours
+  sw('parcours');
 }
 
 // ── RENFORCEMENT MUSCULAIRE ───────────────────────────────────────────────
