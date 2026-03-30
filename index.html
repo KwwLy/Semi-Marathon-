@@ -597,8 +597,11 @@ canvas{display:block;width:100%!important}
         </div>
         <span id="fb-sync-indicator" style="margin-left:auto;font-size:11px;color:var(--text3)">✓ Synchronisé</span>
       </div>
-      <button class="btn btn-or btn-full" style="margin-bottom:6px" onclick="fbLoadData()">🔄 Charger les données depuis le cloud</button>
       <button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">Se déconnecter</button>
+    </div>
+    <!-- Bouton sync toujours visible -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px">
+      <button class="btn btn-or btn-full" style="margin-bottom:6px" onclick="forceSyncFromCloud()">🔄 Charger les données depuis le cloud</button>
     </div>
     <!-- Génération code transfert — toujours visible -->
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px">
@@ -5238,10 +5241,7 @@ try {
         else if(d.planOverrides){ planOverrides=d.planOverrides; localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides)); }
         if(d.coach_json && d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
         if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-        // Re-render tous les onglets actifs
-        renderHome();
-        renderPlans(); renderPlan(); renderStats(); loadCoachCard();
-        // Re-render journal si visible
+        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard();
         const activeTab = document.querySelector('.section.active')?.id;
         if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
         toast('☁️ Données synchronisées depuis le cloud');
@@ -5250,6 +5250,39 @@ try {
       }
     } catch(e){ console.error('FB LOAD ERROR:', e.code, e.message, e); toast('Erreur chargement : '+(e.code||e.message)); }
   }
+
+  // Sync forcée — fonctionne avec SDK (PC connecté) ET REST (iPhone/PC sans Google)
+  window.forceSyncFromCloud = async function(){
+    toast('⏳ Chargement depuis le cloud…');
+    // Si connecté avec Google → utilise le SDK
+    if(fbUser){ await fbLoadData(); return; }
+    // Sinon → utilise REST avec l'UID stocké
+    const uid = await getStoredUid();
+    if(!uid){ toast('❌ Non connecté — utilise un code de transfert d\'abord'); return; }
+    try {
+      const doc = await fbRestRead(uid);
+      if(!doc||!doc.fields){ toast('❌ Aucune donnée trouvée dans le cloud'); return; }
+      const get = f => doc.fields[f]?.stringValue||'';
+      const sJson = get('sessions_json');
+      const pJson = get('planOverrides_json');
+      const plJson = get('plans_json');
+      const cJson = get('coach_json');
+      const setJson = get('settings_json');
+      if(sJson){ sessions=JSON.parse(sJson); localStorage.setItem('smi_s',sJson); }
+      if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
+      if(plJson){ plans=JSON.parse(plJson); localStorage.setItem('smi_plans',plJson); }
+      if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
+      if(setJson){ const s=JSON.parse(setJson); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
+      const cloudTs = parseInt(doc.fields.updated_at?.integerValue||0);
+      if(cloudTs){ localStorage.setItem('smi_updated_at',String(cloudTs)); IDB.set('smi_updated_at',String(cloudTs)); }
+      renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard();
+      const activeTab = document.querySelector('.section.active')?.id;
+      if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
+      document.getElementById('fb-dot').style.background='#27AE60';
+      document.getElementById('fb-label').textContent='✓ Synchronisé';
+      toast('✅ Données chargées depuis le cloud');
+    } catch(e){ toast('❌ Erreur : '+e.message); console.error(e); }
+  };
 
   async function fbSaveData(){
     if(!fbUser||fbSyncing) return;
