@@ -1417,6 +1417,32 @@ function confirmSavePlan(){
 function renderWeekCard(w, cls, isModified, phColor){
   const cur = todayWeek();
   const color = phColor || w.color || '#3B82F6';
+  const nSlots = getSlotCount();
+  const slotColors = ['#3B82F6','#27AE60','#8E44AD','#E67E22'];
+
+  // Vérifier quels slots sont réalisés
+  const doneSlots = {};
+  for(let i=1; i<=nSlots; i++){
+    const sl = 's'+i;
+    doneSlots[sl] = sessions.some(s=>s.week===w.n&&s.slot===sl&&['plan','natation-plan'].includes(s.sport));
+  }
+
+  // Générer les blocs de séances dynamiquement
+  const slotsHtml = Array.from({length:nSlots},(_,i)=>{
+    const sl = 's'+(i+1);
+    const seance = w[sl];
+    if(!seance) return '';
+    const isDone = doneSlots[sl];
+    const slColor = slotColors[i]||color;
+    return `<div class="sb" style="position:relative">
+      <div class="st" style="color:${slColor};display:flex;align-items:center;gap:6px">
+        <span>${seance.title||''}</span>
+        ${isDone?`<span style="background:#27AE60;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">✓</span>`:''}
+      </div>
+      ${(seance.steps||[]).map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
+    </div>`;
+  }).join('');
+
   return `<div class="${cls}">
     <div class="wsumm" onclick="toggleW(${w.n},this)">
       <span class="wn">S${w.n}</span>
@@ -1425,25 +1451,15 @@ function renderWeekCard(w, cls, isModified, phColor){
       <div class="wright">
         ${(w.badges||[]).map(badgeHtml).join('')}
         ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
-        ${(()=>{const sc=getSlotCount();const bc=["#3B82F6","#27AE60","#8E44AD","#E67E22"];let sb="";for(let i=0;i<sc;i++){const sl="s"+(i+1);if(sessions.filter(s=>s.week===w.n&&s.slot===sl&&["plan","natation-plan"].includes(s.sport)).length)sb+='<span class="badge bdn" style="background:'+bc[i]+'">✓S'+(i+1)+'</span>';}return sb;})()
-        }
+        ${(()=>{const bc=["#3B82F6","#27AE60","#8E44AD","#E67E22"];let sb="";for(let i=0;i<nSlots;i++){const sl="s"+(i+1);if(doneSlots[sl])sb+='<span class="badge bdn" style="background:'+bc[i]+'">✓S'+(i+1)+'</span>';}return sb;})()}
         <span class="chev" id="chev-${w.n}">▼</span>
       </div>
     </div>
     <div class="wdet" id="det-${w.n}">
       ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
-      <div class="sg">
-        <div class="sb">
-          <div class="st" style="color:${color}">${w.s1?.title||''}</div>
-          ${(w.s1?.steps||[]).map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-        </div>
-        <div class="sb">
-          <div class="st" style="color:#27AE60">${w.s2?.title||''}</div>
-          ${(w.s2?.steps||[]).map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
-        </div>
-      </div>
+      <div class="sg">${slotsHtml}</div>
       <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
-      ${Array.from({length:Math.max(0,getSlotCount()-1)},(_,i)=>`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s${i+2}')">✏️ Saisir S${i+2}</button>`).join('')}
+      ${Array.from({length:Math.max(0,nSlots-1)},(_,i)=>`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s${i+2}')">✏️ Saisir S${i+2}</button>`).join('')}
     </div>
   </div>`;
 }
