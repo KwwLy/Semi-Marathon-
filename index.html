@@ -6011,6 +6011,24 @@ try {
   setTimeout(fbAutoSyncOnStart, 2000);
   startPeriodicSync();
 
+  // ── Patch localStorage : sync automatique à chaque sauvegarde ────────────
+  const _origSetItem = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(key, value){
+    _origSetItem(key, value);
+    if(['smi_s','smi_plan_overrides','smi_coach','smi_plans'].includes(key)){
+      clearTimeout(localStorage._fbSyncTimer);
+      localStorage._fbSyncTimer = setTimeout(async ()=>{
+        const fbUser = window._getFbUser ? window._getFbUser() : null;
+        if(window.fbSaveData && fbUser){
+          window.fbSaveData();
+        } else if(window.fbRestWrite && window.getStoredUid){
+          const uid = await window.getStoredUid();
+          if(uid) window.fbRestWrite(uid);
+        }
+      }, 2000); // délai 2s pour grouper les appels multiples
+    }
+  };
+
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
 </script>
