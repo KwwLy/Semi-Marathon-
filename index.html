@@ -2096,9 +2096,11 @@ async function runCoachAnalysis(lastSession){
     .map(w=>`  S${w.n} (${w.dates}) : S1="${w.s1?.title||''}" · S2="${w.s2?.title||''}"`).join('\n');
 
   // Limiter à 25 dernières séances + tronquer commentaires
-  const allSummary=runSessions.slice(-25).map(s=>
-    `  ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.dplus?' D+'+s.dplus+'m':''}${s.hr?' FC'+s.hr:''}${s.comment?' "'+s.comment.slice(0,80)+'"':''}`
-  ).join('\n');
+  const allSummary=runSessions.slice(-25).map(s=>{
+    const wk = s.week ? getWeek(s.week) : null;
+    const slotInfo = wk && s.slot ? (wk[s.slot]?.title||'') : '';
+    return `  ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.dplus?' D+'+s.dplus+'m':''}${s.hr?' FC'+s.hr:''}${slotInfo?' ['+slotInfo+']':''}${s.comment?' "'+s.comment.slice(0,80)+'"':''}`;
+  }).join('\n');
 
   const crossSummary=crossSessions.length?crossSessions.slice(-15).map(s=>
     `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment.slice(0,60)+'"':''}`
