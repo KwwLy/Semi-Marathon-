@@ -2095,58 +2095,80 @@ async function runCoachAnalysis(lastSession){
     `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment+'"':''}`
   ).join('\n'):'Aucune';
 
-  // Semaines restantes avant la course
-  const raceDate=new Date('2026-10-04');
-  const today=new Date();
-  const weeksLeft=Math.max(0,Math.round((raceDate-today)/(7*86400000)));
+  // ── Calcul algorithmique du target_time (reproductible) ──
+  // Si prédiction meilleure que 1h50, on cible cette prédiction arrondie vers le bas
+  // Sinon on reste à 1h50
+  let targetTimeAlgo = '1h50';
+  if(medianPred && medianPred < 110){ // < 1h50
+    // Arrondir à 5 min près et garder le plus ambitieux entre prédiction et 1h45
+    const minutes = Math.max(105, Math.floor(medianPred / 5) * 5);
+    targetTimeAlgo = Math.floor(minutes/60) + 'h' + String(minutes%60).padStart(2,'0');
+  }
 
-  // Semaines restantes non encore réalisées
-  const doneWeeks=new Set(sessions.filter(s=>['plan','natation-plan'].includes(s.sport)&&s.week).map(s=>s.week));
-  const remainingWeeks=allWeeks()
-    .filter(w=>!doneWeeks.has(w.n)&&!w.vacation)
-    .slice(0,8) // les 8 prochaines semaines
-    .map(w=>`  S${w.n} (${w.dates}) : S1="${w.s1.title}" · S2="${w.s2.title}"`).join('\n');
+  // Calculs supplémentaires pour le prompt
+  const runDates = runSessions.map(s => parseDate(s.date)).filter(Boolean);
+  const daysSinceLast = runDates.length ? Math.floor((new Date() - runDates[runDates.length-1]) / 86400000) : 99;
+  const last14Days = runSessions.filter(s => {
+    const d = parseDate(s.date);
+    return d && (new Date() - d) < 14*86400000;
+  });
+  const recentKm = last14Days.reduce((a,s)=>a+(s.dist||0),0);
+  const longestRecent = last14Days.reduce((m,s)=>Math.max(m, s.dist||0), 0);
 
-  const prompt=`Tu es un coach running expert et bienveillant. Analyse la préparation et adapte le plan si nécessaire.
+  const prompt=`Tu es un coach running expert, factuel et précis. Analyse la préparation d'un athlète et adapte le plan si nécessaire.
 
 COURSE CIBLE : Semi-marathon le 4 octobre 2026 (${weeksLeft} semaines restantes)
 OBJECTIF A : 1h50 (5:13/km) · OBJECTIF B : sub 2h00 (5:41/km)
-CONTRAINTES : max 2 séances course/semaine · natation possible en complément
+CONTRAINTES : max ${getSlotCount()} séances course/semaine · natation possible en complément
 
-PROFIL : Coureur intermédiaire. 20 km en 1h58 (5:54/km). Entraînement régulier depuis plusieurs mois.
+PROFIL : Coureur intermédiaire, 37 ans, FC repos 47, FCmax mesurée ~179 bpm.
 
-IMPORTANT — COMMENTAIRES DES SÉANCES : Chaque séance peut contenir un commentaire entre guillemets. Ces commentaires donnent du contexte crucial pour l'analyse. Exemples : "couru avec la poussette (35kg)" signifie que la performance réelle est bien meilleure que l'allure indiquée ; "mal dormi", "fatigue" ou "blessure" signalent des conditions dégradées ; "très facile" ou "bon ressenti" indiquent une forme ascendante. Tiens-en compte dans ton évaluation du potentiel réel et dans tes prédictions — une sortie avec contrainte physique majeure (poussette, blessure, chaleur extrême) doit être pondérée à la hausse dans l'estimation du niveau réel.
+ÉTAT DE FORME RÉCENT (14 derniers jours) :
+- ${last14Days.length} séances de course
+- ${recentKm.toFixed(1)} km cumulés
+- Plus longue sortie : ${longestRecent.toFixed(1)} km
+- Jours depuis dernière course : ${daysSinceLast}
+
+IMPORTANT — COMMENTAIRES DES SÉANCES : Chaque séance peut contenir un commentaire entre guillemets. Ces commentaires donnent du contexte crucial. Exemples : "couru avec la poussette (35kg)" signifie que la performance réelle est bien meilleure que l'allure indiquée ; "mal dormi", "fatigue" ou "blessure" signalent des conditions dégradées ; "très facile" ou "bon ressenti" indiquent une forme ascendante. Tiens-en compte dans ton évaluation du potentiel réel.
 
 TOUTES LES SÉANCES DE COURSE (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
 ${allSummary}
 
 SÉANCES COMPLÉMENTAIRES (natation, vélo, autres — ${crossSessions.length} séances) :
 ${crossSummary}
-→ Tiens compte de la charge d'entraînement totale incluant les activités complémentaires. La natation favorise la récupération active et la capacité cardio. Le vélo développe l'endurance sans impact. Ces séances font partie intégrante de la préparation.
+→ La natation favorise la récupération active et la capacité cardio. Le vélo développe l'endurance sans impact. Intègre-les dans ton évaluation de charge totale.
 
 PRÉDICTIONS ALGORITHMIQUES (depuis la meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
 - Riegel (T2=T1×(D2/D1)^1.06) : ${riegelDetail}
 - Cameron (régression non-linéaire mondiale) : ${cameronDetail}
-- VDOT Jack Daniels (vraie formule) : ${vdotDetail}
-- Médiane des 3 = valeur retenue : ${medianPred?minsToHMS(medianPred):'—'}
+- VDOT Jack Daniels : ${vdotDetail}
+- Médiane des 3 = VALEUR OFFICIELLE : ${medianPred?minsToHMS(medianPred):'—'}
 
 VO2MAX ALGORITHMIQUE : ${vo2Summary}
-(Référence : VO2max ~42 → sub-2h · ~48 → 1h55 · ~52 → 1h50)
+(Référence : VO2max ~42 → sub-2h · ~48 → 1h55 · ~52 → 1h50 · ~56 → 1h45)
+
+TARGET_TIME CALCULÉ : ${targetTimeAlgo}
+(Cette valeur a été calculée depuis les prédictions algorithmiques — tu DOIS la reprendre telle quelle dans ta réponse.)
 
 PROCHAINES SEMAINES DU PLAN (non encore réalisées) :
 ${remainingWeeks||'(toutes réalisées)'}
 
-OBJECTIF MINIMUM : Le plan vise TOUJOURS au minimum 1h50 (5:13/km). Ne jamais proposer un plan moins ambitieux que 1h50.
-OBJECTIF ÉLEVÉ : Si les données montrent un potentiel suffisant (VO2max ≥ 46, allures récentes < 5:50/km, régularité de l'entraînement), propose un plan adapté pour viser 1h45 (4:59/km).
+INSTRUCTIONS POUR UNE ANALYSE PERTINENTE :
+1. Base ton analyse uniquement sur les DONNÉES FOURNIES, pas sur des suppositions
+2. Identifie les TENDANCES réelles (progression, stagnation, régression) en comparant les 5 dernières séances aux 10 précédentes
+3. Mentionne des CHIFFRES PRÉCIS dans ton analyse (ex: "ton allure moyenne est passée de 5:55 à 5:40", "ton volume a augmenté de 20%")
+4. Évalue la CHARGE HEBDOMADAIRE : nombre de séances, km totaux, régularité
+5. Identifie les POINTS FAIBLES concrets : endurance manquante ? séances longues absentes ? fractionné jamais fait ?
+6. Pour les modifications du plan, cible les semaines où il manque un type d'entraînement précis (VMA, seuil, sortie longue)
 
-Réponds en JSON STRICT, sans texte avant ni après :
+RÉPONDS EN JSON STRICT, sans texte avant ni après, sans backticks :
 {
-  "prediction_direction": "up",
-  "prediction_comment": "phrase courte sur la trajectoire vers l'objectif",
-  "target_time": "1h50 ou 1h45 selon le potentiel — le temps cible qui doit servir de base aux zones d'allure",
-  "plan_adjustment_needed": true,
-  "plan_adjustment": "résumé en 1-2 phrases de ce qui change et pourquoi",
-  "analysis": "analyse en 5-6 phrases : progression, points forts, axe de travail, probabilité 1h50 ou mieux, conseil clé pour les prochaines semaines",
+  "prediction_direction": "up ou down selon que la prédiction est meilleure ou moins bonne que 1h50",
+  "prediction_comment": "phrase courte et factuelle avec chiffres (ex: 'Progression de 8 sec/km sur les 5 dernières séances')",
+  "target_time": "${targetTimeAlgo}",
+  "plan_adjustment_needed": true/false selon nécessité,
+  "plan_adjustment": "résumé factuel en 1-2 phrases de ce qui change et pourquoi",
+  "analysis": "analyse en 6-8 phrases FACTUELLES avec chiffres précis : (1) progression quantifiée sur les dernières séances, (2) point fort concret observé, (3) point faible identifié avec données, (4) évaluation de la charge hebdomadaire, (5) probabilité de tenir ${targetTimeAlgo} au semi, (6) conseil actionable pour les 2 prochaines semaines",
   "plan_modifications": [
     {
       "week": 5,
@@ -2163,16 +2185,11 @@ Réponds en JSON STRICT, sans texte avant ni après :
   ]
 }
 
-Règles :
-- prediction_direction : "up" si sub-2h ET progression vers 1h50+ plausible, "down" sinon
-- plan_modifications : tableau des semaines à modifier ([] si aucune modification)
-- Ne modifier QUE les semaines futures non encore réalisées
+Règles modifications :
 - Maximum 5 semaines modifiées par analyse
+- Ne modifier QUE les semaines futures non encore réalisées
 - Respecter la structure steps (tableau de paires ["label","description"])
-- Garder le format "Durée / distance" dans les steps si pertinent
-- RÈGLE ABSOLUE : les modifications visent TOUJOURS 1h50 minimum — ne jamais revoir à la baisse les allures cibles ou la charge
-- Si le potentiel le justifie (VO2max ≥ 46, allures < 5:50/km), intensifier vers 1h45 (5:00/km)
-- Ne modifier que pour progresser, jamais pour faciliter`;
+- Si plan_adjustment_needed=false, retourner plan_modifications=[]`;
 
   try{
     // Timeout 30 secondes avec AbortController
@@ -2194,7 +2211,7 @@ Règles :
       method:'POST',
       signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,temperature:0.2,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2500,temperature:0,messages:[{role:'user',content:prompt}]})
     });
     clearTimeout(timeoutId);
     clearInterval(countdownInterval);
