@@ -2172,7 +2172,39 @@ async function runCoachAnalysis(lastSession){
   const weeklyKm = recentPlanWeeks.map(wn=>planSessions.filter(s=>s.week===wn).reduce((a,s)=>a+(s.dist||0),0));
   const avgWeeklyKm = weeklyKm.length ? (weeklyKm.reduce((a,b)=>a+b,0)/weeklyKm.length).toFixed(1) : '?';
 
-  // ── Calcul algorithmique du target_time (reproductible) ──
+  // ── Analyses individuelles Claude des séances récentes ──
+  const sessionAnalyses = planSessions
+    .filter(s => s.claudeAnalysis)
+    .slice(-8)
+    .map(s => {
+      const wk = s.week ? getWeek(s.week) : null;
+      const title = wk && s.slot ? (wk[s.slot]?.title||'') : '';
+      // Résumer l'analyse à 200 chars pour ne pas alourdir le prompt
+      const summary = s.claudeAnalysis.replace(/\n+/g,' ').slice(0,200);
+      return `  ${s.date} [S${s.week} ${(s.slot||'').toUpperCase()} — ${title}] : "${summary}…"`;
+    }).join('\n');
+
+  // ── Comparaison plan prévu vs réalisé par semaine ──
+  const doneWeekNums = [...new Set(planSessions.map(s=>s.week).filter(Boolean))].sort((a,b)=>b-a).slice(0,8);
+  const planVsActual = doneWeekNums.map(wn => {
+    const wk = getWeek(wn);
+    if(!wk) return null;
+    const nSlots = getSlotCount();
+    const lines = [`  S${wn} (${wk.dates||''}) — "${wk.title||''}"`];
+    for(let i=1; i<=nSlots; i++){
+      const sl = 's'+i;
+      const planned = wk[sl];
+      const done = planSessions.find(s=>s.week===wn&&s.slot===sl);
+      if(planned){
+        if(done){
+          lines.push(`    ✓ ${sl.toUpperCase()} "${planned.title}" → ${done.dist}km en ${done.dur}min${done.pace?' @ '+done.pace+'/km':''}${done.hr?' FC'+done.hr:''}`);
+        } else {
+          lines.push(`    ✗ ${sl.toUpperCase()} "${planned.title}" → NON RÉALISÉE`);
+        }
+      }
+    }
+    return lines.join('\n');
+  }).filter(Boolean).join('\n');
   // Si prédiction meilleure que 1h50, on cible cette prédiction arrondie vers le bas
   // Sinon on reste à 1h50
   let targetTimeAlgo = '1h50';
@@ -2202,6 +2234,12 @@ PROFIL : Coureur intermédiaire, 37 ans, FC repos 47, FCmax ~179 bpm.
 ÉTAT DE FORME RÉCENT (14 derniers jours) :
 - ${last14Days.length} séances de course · ${recentKm.toFixed(1)} km · Jours depuis dernière : ${daysSinceLast}
 - Plus longue sortie récente : ${longestRecent.toFixed(1)} km
+
+
+PLAN VS RÉALISÉ (8 dernières semaines) :
+${planVsActual||'Aucune donnée'}
+
+${sessionAnalyses ? 'ANALYSES INDIVIDUELLES RÉCENTES (résumés) :\n' + sessionAnalyses + '\n\n→ Utilise ces analyses pour identifier des patterns récurrents.' : ''}
 
 MÉTRIQUES PAR TYPE DE SÉANCE (utilise ces données, pas l'allure moyenne brute) :
 - Progression Z2/endurance : ${z2ProgressStr} (comparaison 5 dernières Z2 vs 10 précédentes)
