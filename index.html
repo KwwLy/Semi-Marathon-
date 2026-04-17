@@ -2095,16 +2095,82 @@ async function runCoachAnalysis(lastSession){
     .slice(0,6)
     .map(w=>`  S${w.n} (${w.dates}) : S1="${w.s1?.title||''}" · S2="${w.s2?.title||''}"`).join('\n');
 
-  // Limiter à 25 dernières séances + tronquer commentaires
-  const allSummary=runSessions.slice(-25).map(s=>{
+  // ── Résumé séances — TOUTES les séances plan (pas de limite) + libre récentes
+  // On sépare séances plan et séances libres pour ne pas perdre les fractionnés
+  const planSessions = runSessions.filter(s=>s.sport==='plan');
+  const libreSessions = runSessions.filter(s=>s.sport==='course-libre');
+
+  const formatSession = s => {
     const wk = s.week ? getWeek(s.week) : null;
     const slotInfo = wk && s.slot ? (wk[s.slot]?.title||'') : '';
-    return `  ${s.date||'?'} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.dplus?' D+'+s.dplus+'m':''}${s.hr?' FC'+s.hr:''}${slotInfo?' ['+slotInfo+']':''}${s.comment?' "'+s.comment.slice(0,80)+'"':''}`;
-  }).join('\n');
+    return `  ${s.date||'?'} [${s.slot||'libre'}${slotInfo?' — '+slotInfo:''}] : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.hr?' FC'+s.hr:''}${s.comment?' "'+s.comment.slice(0,80)+'"':''}`;
+  };
+
+  // Toutes les séances plan + 5 dernières libres
+  const allSummary = [
+    ...planSessions,
+    ...libreSessions.slice(-5)
+  ].sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:0;})
+   .map(formatSession).join('\n');
 
   const crossSummary=crossSessions.length?crossSessions.slice(-15).map(s=>
     `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment.slice(0,60)+'"':''}`
   ).join('\n'):'Aucune';
+
+  // ── Métriques pré-calculées par TYPE de séance (plus pertinent que l'allure moyenne brute)
+  const paceSecs = s => { const p=s.pace; if(!p)return null; const [m,sc]=p.split(':').map(Number); return m*60+(sc||0); };
+
+  // Sorties longues (>= 14km)
+  const longRuns = planSessions.filter(s=>s.dist>=14).sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+  const longRunsSummary = longRuns.length
+    ? longRuns.slice(-5).map(s=>`${s.dist}km @ ${s.pace||'?'}/km (${s.date})`).join(', ')
+    : 'Aucune sortie longue ≥14km';
+
+  // Séances VMA/fractionné (titre contient VMA, fractionné, 400m, 1000m, intervalle)
+  const vmaKeywords = /vma|fraction|400m|800m|1000m|interval|répét/i;
+  const vmaSessions = planSessions.filter(s=>{
+    const wk=s.week?getWeek(s.week):null;
+    const title=wk&&s.slot?(wk[s.slot]?.title||''):'';
+    return vmaKeywords.test(title)||vmaKeywords.test(s.comment||'');
+  });
+  const vmaSummary = vmaSessions.length
+    ? vmaSessions.slice(-5).map(s=>`${s.date} @ ${s.pace||'?'}/km`).join(', ')
+    : 'Aucune détectée';
+
+  // Séances seuil/tempo (titre contient seuil, tempo, allure spé)
+  const seuilKeywords = /seuil|tempo|allure spé|spécifique|semi/i;
+  const seuilSessions = planSessions.filter(s=>{
+    const wk=s.week?getWeek(s.week):null;
+    const title=wk&&s.slot?(wk[s.slot]?.title||''):'';
+    return seuilKeywords.test(title)||seuilKeywords.test(s.comment||'');
+  });
+  const seuilSummary = seuilSessions.length
+    ? seuilSessions.slice(-5).map(s=>`${s.date} @ ${s.pace||'?'}/km`).join(', ')
+    : 'Aucune détectée';
+
+  // Progression sur sorties longues (distance max)
+  const maxLongDist = longRuns.length ? Math.max(...longRuns.map(s=>s.dist)) : 0;
+
+  // Allure sur séances Z2 uniquement (titre contient Z2, endurance, footing)
+  const z2Keywords = /z2|endurance|footing/i;
+  const z2Sessions = planSessions.filter(s=>{
+    const wk=s.week?getWeek(s.week):null;
+    const title=wk&&s.slot?(wk[s.slot]?.title||''):'';
+    return z2Keywords.test(title);
+  }).filter(s=>s.pace);
+  const z2Recent5 = z2Sessions.slice(-5).map(s=>paceSecs(s)).filter(Boolean);
+  const z2Prev10 = z2Sessions.slice(-15,-5).map(s=>paceSecs(s)).filter(Boolean);
+  const z2AvgRecent = z2Recent5.length ? Math.round(z2Recent5.reduce((a,b)=>a+b,0)/z2Recent5.length) : null;
+  const z2AvgPrev = z2Prev10.length ? Math.round(z2Prev10.reduce((a,b)=>a+b,0)/z2Prev10.length) : null;
+  const z2ProgressSec = z2AvgRecent && z2AvgPrev ? z2AvgPrev - z2AvgRecent : null;
+  const z2ProgressStr = z2ProgressSec !== null
+    ? (z2ProgressSec > 0 ? `amélioration de ${z2ProgressSec}s/km` : `régression de ${Math.abs(z2ProgressSec)}s/km`)
+    : 'pas assez de données Z2 comparables';
+
+  // Volume hebdomadaire moyen (4 dernières semaines)
+  const recentPlanWeeks = [...new Set(planSessions.map(s=>s.week).filter(Boolean))].sort((a,b)=>b-a).slice(0,4);
+  const weeklyKm = recentPlanWeeks.map(wn=>planSessions.filter(s=>s.week===wn).reduce((a,s)=>a+(s.dist||0),0));
+  const avgWeeklyKm = weeklyKm.length ? (weeklyKm.reduce((a,b)=>a+b,0)/weeklyKm.length).toFixed(1) : '?';
 
   // ── Calcul algorithmique du target_time (reproductible) ──
   // Si prédiction meilleure que 1h50, on cible cette prédiction arrondie vers le bas
@@ -2131,76 +2197,56 @@ async function runCoachAnalysis(lastSession){
 COURSE CIBLE : Semi-marathon le 4 octobre 2026 (${weeksLeft} semaines restantes)
 OBJECTIF A : 1h50 (5:13/km) · OBJECTIF B : sub 2h00 (5:41/km)
 CONTRAINTES : max ${getSlotCount()} séances course/semaine · natation possible en complément
-
-PROFIL : Coureur intermédiaire, 37 ans, FC repos 47, FCmax mesurée ~179 bpm.
+PROFIL : Coureur intermédiaire, 37 ans, FC repos 47, FCmax ~179 bpm.
 
 ÉTAT DE FORME RÉCENT (14 derniers jours) :
-- ${last14Days.length} séances de course
-- ${recentKm.toFixed(1)} km cumulés
-- Plus longue sortie : ${longestRecent.toFixed(1)} km
-- Jours depuis dernière course : ${daysSinceLast}
+- ${last14Days.length} séances de course · ${recentKm.toFixed(1)} km · Jours depuis dernière : ${daysSinceLast}
+- Plus longue sortie récente : ${longestRecent.toFixed(1)} km
 
-IMPORTANT — COMMENTAIRES DES SÉANCES : Chaque séance peut contenir un commentaire entre guillemets. Ces commentaires donnent du contexte crucial. Exemples : "couru avec la poussette (35kg)" signifie que la performance réelle est bien meilleure que l'allure indiquée ; "mal dormi", "fatigue" ou "blessure" signalent des conditions dégradées ; "très facile" ou "bon ressenti" indiquent une forme ascendante. Tiens-en compte dans ton évaluation du potentiel réel.
+MÉTRIQUES PAR TYPE DE SÉANCE (utilise ces données, pas l'allure moyenne brute) :
+- Progression Z2/endurance : ${z2ProgressStr} (comparaison 5 dernières Z2 vs 10 précédentes)
+- Volume hebdo moyen (4 dernières semaines plan) : ${avgWeeklyKm} km/semaine
+- Sortie longue max atteinte : ${maxLongDist} km
+- Séances VMA/fractionné réalisées : ${vmaSummary}
+- Séances seuil/tempo réalisées : ${seuilSummary}
+- Détail sorties longues : ${longRunsSummary}
 
-TOUTES LES SÉANCES DE COURSE (${runSessions.length} séances · ${runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0)} km cumulés) :
+IMPORTANT : Ne PAS comparer les allures moyennes toutes séances confondues — un footing Z1 et un fractionné VMA ne se comparent pas. Utilise les métriques par type ci-dessus.
+
+TOUTES LES SÉANCES (${planSessions.length} séances plan · ${libreSessions.length} séances libres) :
 ${allSummary}
 
-SÉANCES COMPLÉMENTAIRES (natation, vélo, autres — ${crossSessions.length} séances) :
+SÉANCES COMPLÉMENTAIRES (${crossSessions.length} séances) :
 ${crossSummary}
-→ La natation favorise la récupération active et la capacité cardio. Le vélo développe l'endurance sans impact. Intègre-les dans ton évaluation de charge totale.
 
-PRÉDICTIONS ALGORITHMIQUES (depuis la meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
-- Riegel (T2=T1×(D2/D1)^1.06) : ${riegelDetail}
-- Cameron (régression non-linéaire mondiale) : ${cameronDetail}
-- VDOT Jack Daniels : ${vdotDetail}
-- Médiane des 3 = VALEUR OFFICIELLE : ${medianPred?minsToHMS(medianPred):'—'}
+PRÉDICTIONS ALGORITHMIQUES (meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
+- Riegel : ${riegelDetail} · Cameron : ${cameronDetail} · VDOT : ${vdotDetail}
+- Médiane = VALEUR OFFICIELLE : ${medianPred?minsToHMS(medianPred):'—'}
 
-VO2MAX ALGORITHMIQUE : ${vo2Summary}
-(Référence : VO2max ~42 → sub-2h · ~48 → 1h55 · ~52 → 1h50 · ~56 → 1h45)
+VO2MAX : ${vo2Summary}
+TARGET_TIME CALCULÉ : ${targetTimeAlgo} — reprends cette valeur telle quelle.
 
-TARGET_TIME CALCULÉ : ${targetTimeAlgo}
-(Cette valeur a été calculée depuis les prédictions algorithmiques — tu DOIS la reprendre telle quelle dans ta réponse.)
-
-PROCHAINES SEMAINES DU PLAN (non encore réalisées) :
+PROCHAINES SEMAINES DU PLAN :
 ${remainingWeeks||'(toutes réalisées)'}
 
-INSTRUCTIONS POUR UNE ANALYSE PERTINENTE :
-1. Base ton analyse uniquement sur les DONNÉES FOURNIES, pas sur des suppositions
-2. Identifie les TENDANCES réelles (progression, stagnation, régression) en comparant les 5 dernières séances aux 10 précédentes
-3. Mentionne des CHIFFRES PRÉCIS dans ton analyse (ex: "ton allure moyenne est passée de 5:55 à 5:40", "ton volume a augmenté de 20%")
-4. Évalue la CHARGE HEBDOMADAIRE : nombre de séances, km totaux, régularité
-5. Identifie les POINTS FAIBLES concrets : endurance manquante ? séances longues absentes ? fractionné jamais fait ?
-6. Pour les modifications du plan, cible les semaines où il manque un type d'entraînement précis (VMA, seuil, sortie longue)
+INSTRUCTIONS :
+1. Utilise les métriques pré-calculées par type de séance (Z2, VMA, seuil, sorties longues)
+2. Identifie ce qui manque concrètement dans les séances réalisées (type de travail absent)
+3. Chiffres précis uniquement — pas d'affirmations sans données
+4. Évalue le volume hebdomadaire réel vs besoin pour 1h50
+5. Conseil actionnable pour les 2 prochaines semaines
 
 RÉPONDS EN JSON STRICT, sans texte avant ni après, sans backticks :
 {
-  "prediction_direction": "up ou down selon que la prédiction est meilleure ou moins bonne que 1h50",
-  "prediction_comment": "phrase courte et factuelle avec chiffres (ex: 'Progression de 8 sec/km sur les 5 dernières séances')",
+  "prediction_direction": "up ou down vs 1h50",
+  "prediction_comment": "phrase courte et factuelle avec chiffres",
   "target_time": "${targetTimeAlgo}",
-  "plan_adjustment_needed": true/false selon nécessité,
-  "plan_adjustment": "résumé factuel en 1-2 phrases de ce qui change et pourquoi",
-  "analysis": "analyse en 6-8 phrases FACTUELLES avec chiffres précis : (1) progression quantifiée sur les dernières séances, (2) point fort concret observé, (3) point faible identifié avec données, (4) évaluation de la charge hebdomadaire, (5) probabilité de tenir ${targetTimeAlgo} au semi, (6) conseil actionable pour les 2 prochaines semaines",
-  "plan_modifications": [
-    {
-      "week": 5,
-      "title": "Nouveau titre de la semaine",
-      "s1": {
-        "title": "Nouveau titre séance 1",
-        "steps": [["Échauffement","15 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]
-      },
-      "s2": {
-        "title": "Nouveau titre séance 2",
-        "steps": [["Corps","description"],["Retour","description"]]
-      }
-    }
-  ]
+  "plan_adjustment_needed": true/false,
+  "plan_adjustment": "résumé factuel 1-2 phrases",
+  "analysis": "analyse en 5-6 phrases factuelles : (1) progression Z2 quantifiée, (2) état du travail VMA/seuil, (3) progression sorties longues, (4) volume hebdo réel vs nécessaire, (5) probabilité 1h50 avec justification, (6) conseil concret 2 prochaines semaines",
+  "plan_modifications": [{"week":N,"title":"...","s1":{"title":"...","steps":[["label","desc"]]},"s2":{"title":"...","steps":[["label","desc"]]}}]
 }
-
-Règles modifications :
-- Maximum 5 semaines modifiées par analyse
-- Ne modifier QUE les semaines futures non encore réalisées
-- Respecter la structure steps (tableau de paires ["label","description"])
-- Si plan_adjustment_needed=false, retourner plan_modifications=[]`;
+Règles : max 5 semaines modifiées · uniquement semaines futures · plan_modifications=[] si pas de modification`;
 
   try{
     // Timeout 30 secondes avec AbortController
