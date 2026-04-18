@@ -2268,11 +2268,12 @@ PROCHAINES SEMAINES DU PLAN :
 ${remainingWeeks||'(toutes réalisées)'}
 
 INSTRUCTIONS :
-1. Utilise les métriques pré-calculées par type de séance (Z2, VMA, seuil, sorties longues)
-2. Identifie ce qui manque concrètement dans les séances réalisées (type de travail absent)
-3. Chiffres précis uniquement — pas d'affirmations sans données
-4. Évalue le volume hebdomadaire réel vs besoin pour 1h50
-5. Conseil actionnable pour les 2 prochaines semaines
+1. TU ES L'AUTEUR DU PLAN — c'est toi qui as fixé le volume, les types de séances et la progression. Ne critique JAMAIS le volume ou la structure du plan : c'est ton propre travail. Évalue uniquement si l'athlète exécute bien CE plan.
+2. Évalue l'EXÉCUTION du plan : séances réalisées vs prévues, régularité, respect des allures cibles
+3. Identifie les séances manquées ou mal exécutées (voir Plan vs Réalisé ci-dessus)
+4. Utilise les métriques par type de séance (Z2, VMA, seuil, sorties longues) — pas l'allure moyenne brute
+5. Chiffres précis uniquement — pas d'affirmations sans données dans les séances fournies
+6. Si le plan doit évoluer, propose des modifications concrètes (pas de critiques générales)
 
 RÉPONDS EN JSON STRICT, sans texte avant ni après, sans backticks :
 {
@@ -2281,7 +2282,7 @@ RÉPONDS EN JSON STRICT, sans texte avant ni après, sans backticks :
   "target_time": "${targetTimeAlgo}",
   "plan_adjustment_needed": true/false,
   "plan_adjustment": "résumé factuel 1-2 phrases",
-  "analysis": "analyse en 5-6 phrases factuelles : (1) progression Z2 quantifiée, (2) état du travail VMA/seuil, (3) progression sorties longues, (4) volume hebdo réel vs nécessaire, (5) probabilité 1h50 avec justification, (6) conseil concret 2 prochaines semaines",
+  "analysis": "analyse en 5-6 phrases : (1) taux d'exécution du plan (séances réalisées/prévues), (2) qualité d'exécution des séances clés (VMA, seuil, sorties longues), (3) progression observable sur les séances comparables, (4) point fort concret avec chiffres, (5) point à améliorer dans l'exécution (pas dans le plan), (6) conseil concret pour les 2 prochaines semaines",
   "plan_modifications": [{"week":N,"title":"...","s1":{"title":"...","steps":[["label","desc"]]},"s2":{"title":"...","steps":[["label","desc"]]}}]
 }
 Règles : max 5 semaines modifiées · uniquement semaines futures · plan_modifications=[] si pas de modification`;
