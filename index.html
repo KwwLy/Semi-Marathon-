@@ -194,6 +194,23 @@ canvas{display:block;width:100%!important}
 .s-krav{background:var(--rel);color:var(--re)}
 .s-padel{background:var(--pul);color:var(--pu)}
 .s-autre{background:var(--bg3);color:var(--text2)}
+
+/* ── Utility classes (generated refactor) ── */
+.u-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px}
+.u-kpi-val{font-size:22px;font-weight:700;color:var(--or)}
+.u-kpi-val-lg{font-size:16px;font-weight:700;color:var(--text)}
+.u-kpi-val-md{font-size:13px;font-weight:700;color:var(--text)}
+.u-kpi-val-sm{font-size:13px;font-weight:600;color:var(--text)}
+.u-kpi-val-xs{font-size:12px;font-weight:600;color:var(--text)}
+.u-kpi-lbl{text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0}
+.u-chip{background:var(--bg2);border-radius:var(--r);padding:7px 10px}
+.u-chip-pill{background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px}
+.u-chip-center{background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center}
+.u-section-label{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase}
+.u-section-label-lg{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.u-body-sm{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6}
+.u-title-sm{font-size:13px;font-weight:600;color:var(--text)}
+.u-title-md{font-size:14px;font-weight:700;color:var(--text)}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
@@ -445,17 +462,17 @@ canvas{display:block;width:100%!important}
     <div class="card-title"><span class="bar"></span>📅 Calendrier d'activité</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <button class="btn btn-ghost btn-sm" onclick="calPrev()">‹</button>
-      <span id="cal-month-title" style="font-size:13px;font-weight:600;color:var(--text)"></span>
+      <span id="cal-month-title" class="u-kpi-val-sm"></span>
       <button class="btn btn-ghost btn-sm" onclick="calNext()">›</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">L</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">M</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">M</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">J</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">V</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">S</div>
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text3);padding:3px 0">D</div>
+      <div class="u-kpi-lbl">L</div>
+      <div class="u-kpi-lbl">M</div>
+      <div class="u-kpi-lbl">M</div>
+      <div class="u-kpi-lbl">J</div>
+      <div class="u-kpi-lbl">V</div>
+      <div class="u-kpi-lbl">S</div>
+      <div class="u-kpi-lbl">D</div>
     </div>
     <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:11px;color:var(--text3)" id="cal-legend"></div>
@@ -587,7 +604,7 @@ canvas{display:block;width:100%!important}
 <div class="section" id="tab-settings">
   <div class="card" id="fb-settings-card">
     <div class="card-title"><span class="bar"></span>☁️ Synchronisation multi-appareils</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte-toi avec Google pour synchroniser automatiquement tes séances, ton plan et tes réglages sur tous tes appareils.</p>
+    <p class="u-body-sm">Connecte-toi avec Google pour synchroniser automatiquement tes séances, ton plan et tes réglages sur tous tes appareils.</p>
     <div id="fb-settings-logged-out">
       <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">🔑 Se connecter avec Google</button>
       <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:8px">— ou —</div>
@@ -595,7 +612,7 @@ canvas{display:block;width:100%!important}
         <input type="email" id="fb-email-input" placeholder="ton@email.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--text)">
         <button class="btn btn-ghost" onclick="fbSendEmailLink()" style="white-space:nowrap">📧 Lien magique</button>
       </div>
-      <div id="fb-email-msg" style="font-size:11px;color:#27AE60;margin-top:6px;display:none"></div>
+      <div id="fb-email-msg" style="font-size:11px;color:var(--gr);margin-top:6px;display:none"></div>
       <div style="text-align:center;font-size:11px;color:var(--text3);margin:8px 0">— ou utilise un code de transfert —</div>
       <div style="display:flex;gap:6px">
         <input type="text" id="fb-token-input" placeholder="Code à 6 chiffres" maxlength="6" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;letter-spacing:4px;text-align:center;background:var(--bg);color:var(--text)">
@@ -607,7 +624,7 @@ canvas{display:block;width:100%!important}
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <img id="fb-avatar" src="" style="width:36px;height:36px;border-radius:50%;display:none">
         <div>
-          <div id="fb-username" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+          <div id="fb-username" class="u-kpi-val-sm"></div>
           <div id="fb-useremail" style="font-size:11px;color:var(--text3)"></div>
         </div>
         <span id="fb-sync-indicator" style="margin-left:auto;font-size:11px;color:var(--text3)">✓ Synchronisé</span>
@@ -632,15 +649,15 @@ canvas{display:block;width:100%!important}
   <div class="card">
     <div class="card-title"><span class="bar"></span>🟠 Connexion Strava</div>
     <div id="strava-auth-section">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Connecte ton compte Strava pour importer automatiquement tes activités sans exporter de fichiers GPX.</p>
+      <p class="u-body-sm">Connecte ton compte Strava pour importer automatiquement tes activités sans exporter de fichiers GPX.</p>
       <div id="strava-logged-out">
-        <button class="btn btn-full" style="background:#3B82F6;color:#fff" onclick="stravaConnect()">🟠 Se connecter avec Strava</button>
+        <button class="btn btn-full" style="background:var(--or);color:#fff" onclick="stravaConnect()">🟠 Se connecter avec Strava</button>
       </div>
       <div id="strava-logged-in" style="display:none">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <img id="strava-avatar" src="" style="width:36px;height:36px;border-radius:50%;display:none">
           <div>
-            <div id="strava-athlete-name" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+            <div id="strava-athlete-name" class="u-kpi-val-sm"></div>
             <div style="font-size:11px;color:var(--text3)">Strava connecté</div>
           </div>
         </div>
@@ -676,7 +693,7 @@ canvas{display:block;width:100%!important}
   </div>
   <div class="card">
     <div class="card-title"><span class="bar"></span>📂 Import en masse — GPX / FIT</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Sélectionne plusieurs fichiers GPX ou FIT d'un coup. L'app les analyse, détecte les doublons et te montre un récapitulatif avant d'importer.</p>
+    <p class="u-body-sm">Sélectionne plusieurs fichiers GPX ou FIT d'un coup. L'app les analyse, détecte les doublons et te montre un récapitulatif avant d'importer.</p>
     <button class="btn btn-or btn-full" onclick="document.getElementById('bulk-import-input').click()">📂 Sélectionner des fichiers GPX / FIT</button>
     <input type="file" id="bulk-import-input" accept=".gpx,.fit,.tcx" multiple style="display:none" onchange="bulkImport(this)">
     <div id="bulk-import-results" style="margin-top:12px;display:none">
@@ -690,7 +707,7 @@ canvas{display:block;width:100%!important}
 
   <div class="card">
     <div class="card-title"><span class="bar"></span>💾 Sauvegarde manuelle</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Exporte toutes tes données dans un fichier JSON à conserver sur ton appareil. Tu pourras les réimporter à tout moment.</p>
+    <p class="u-body-sm">Exporte toutes tes données dans un fichier JSON à conserver sur ton appareil. Tu pourras les réimporter à tout moment.</p>
     <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="exportData()">⬇️ Exporter mes données (JSON)</button>
     <button class="btn btn-ghost btn-full" onclick="document.getElementById('import-file').click()">⬆️ Importer une sauvegarde</button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
@@ -992,10 +1009,10 @@ function renderPlans(){
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <div style="width:44px;height:44px;border-radius:var(--r);background:${activePlan.color||'#3B82F6'}22;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${planTypeIcon(activePlan.type)}</div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:700;color:var(--text)">${activePlan.name}</div>
+          <div class="u-title-md">${activePlan.name}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:2px">${activePlan.raceDate} · Objectif ${activePlan.goal}</div>
         </div>
-        <span style="background:#E9F7EF;color:#27AE60;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">Actif</span>
+        <span style="background:#E9F7EF;color:var(--gr);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">Actif</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
         <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
@@ -1041,7 +1058,7 @@ function renderPlans(){
         <div style="display:flex;align-items:center;gap:12px">
           <div style="width:36px;height:36px;border-radius:var(--r);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${planTypeIcon(plan.type)}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${plan.name}</div>
+            <div class="u-kpi-val-sm">${plan.name}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:1px">${plan.raceDate} · ${stats.km} km · ${stats.seances} séances</div>
           </div>
           <span style="background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">${plan.status==='completed'?'✓ Terminé':'Archivé'}</span>
@@ -1080,26 +1097,26 @@ function showArchivedPlan(planId){
   let h = `
     <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
       <button class="btn btn-ghost" onclick="renderPlans()" style="padding:6px 10px;font-size:12px">← Retour</button>
-      <div style="font-size:14px;font-weight:700;color:var(--text)">${plan.name}</div>
+      <div class="u-title-md">${plan.name}</div>
       <span style="background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;margin-left:auto">${plan.status==='completed'?'✓ Terminé':'Archivé'}</span>
     </div>
 
     <div class="card">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--or)">${totalKm}</div>
+        <div class="u-chip-center">
+          <div class="u-kpi-val">${totalKm}</div>
           <div style="font-size:10px;color:var(--text3)">km courus</div>
         </div>
-        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--or)">${runSess.length}</div>
+        <div class="u-chip-center">
+          <div class="u-kpi-val">${runSess.length}</div>
           <div style="font-size:10px;color:var(--text3)">séances course</div>
         </div>
-        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--or)">${avgPace}</div>
+        <div class="u-chip-center">
+          <div class="u-kpi-val">${avgPace}</div>
           <div style="font-size:10px;color:var(--text3)">allure moyenne</div>
         </div>
-        <div style="background:var(--bg2);border-radius:var(--r);padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--or)">${progPct}%</div>
+        <div class="u-chip-center">
+          <div class="u-kpi-val">${progPct}%</div>
           <div style="font-size:10px;color:var(--text3)">complété</div>
         </div>
       </div>
@@ -1145,7 +1162,7 @@ function createNewPlan(){
   el.innerHTML = `
     <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
       <button class="btn btn-ghost" onclick="renderPlans()" style="padding:6px 10px;font-size:12px">← Retour</button>
-      <div style="font-size:14px;font-weight:700;color:var(--text)">Nouveau plan d'entraînement</div>
+      <div class="u-title-md">Nouveau plan d'entraînement</div>
     </div>
 
     <div class="card">
@@ -1153,7 +1170,7 @@ function createNewPlan(){
       <div class="g2" style="margin-bottom:10px">
         <div class="field">
           <label class="lbl">Type de course</label>
-          <select id="np-type" class="select-field" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <select id="np-type" class="select-field" class="u-input">
             <option value="5k">5 km</option>
             <option value="10k">10 km</option>
             <option value="semi" selected>Semi-marathon (21.1 km)</option>
@@ -1163,22 +1180,22 @@ function createNewPlan(){
         </div>
         <div class="field">
           <label class="lbl">Date de la course</label>
-          <input type="date" id="np-date" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <input type="date" id="np-date" class="u-input">
         </div>
       </div>
       <div class="g2" style="margin-bottom:10px">
         <div class="field">
           <label class="lbl">Objectif A (idéal)</label>
-          <input type="text" id="np-goal-a" placeholder="ex: 1h45" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <input type="text" id="np-goal-a" placeholder="ex: 1h45" class="u-input">
         </div>
         <div class="field">
           <label class="lbl">Objectif B (minimum)</label>
-          <input type="text" id="np-goal-b" placeholder="ex: 1h55" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <input type="text" id="np-goal-b" placeholder="ex: 1h55" class="u-input">
         </div>
       </div>
       <div class="field" style="margin-bottom:10px">
         <label class="lbl">Nom du plan</label>
-        <input type="text" id="np-name" placeholder="ex: Semi-marathon Lyon 2027" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <input type="text" id="np-name" placeholder="ex: Semi-marathon Lyon 2027" class="u-input">
       </div>
     </div>
 
@@ -1187,7 +1204,7 @@ function createNewPlan(){
       <div class="g2" style="margin-bottom:10px">
         <div class="field">
           <label class="lbl">Séances course / semaine</label>
-          <select id="np-sessions" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <select id="np-sessions" class="u-input">
             <option value="1">1 séance</option>
             <option value="2" selected>2 séances</option>
             <option value="3">3 séances</option>
@@ -1195,7 +1212,7 @@ function createNewPlan(){
         </div>
         <div class="field">
           <label class="lbl">Activités complémentaires</label>
-          <select id="np-cross" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <select id="np-cross" class="u-input">
             <option value="none">Aucune</option>
             <option value="swim" selected>Natation</option>
             <option value="bike">Vélo</option>
@@ -1342,7 +1359,7 @@ Réponds UNIQUEMENT avec ce JSON strict, sans texte avant ni après :
         previewH += `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
           <span style="font-size:11px;font-weight:700;color:var(--text3);min-width:26px">S${w.n}</span>
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:600;color:var(--text)">${w.title}</div>
+            <div class="u-kpi-val-xs">${w.title}</div>
             <div style="font-size:10px;color:var(--text3)">${w.dates} · ${w.s1?.title||''}</div>
           </div>
         </div>`;
@@ -1422,7 +1439,7 @@ function renderWeekCard(w, cls, isModified, phColor){
     return `<div class="sb" style="position:relative">
       <div class="st" style="color:${slColor};display:flex;align-items:center;gap:6px">
         <span>${seance.title||''}</span>
-        ${isDone?`<span style="background:#27AE60;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">✓</span>`:''}
+        ${isDone?`<span style="background:var(--gr);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">✓</span>`:''}
       </div>
       ${(seance.steps||[]).map(s=>`<div class="sr"><span class="sk">${s[0]}</span><span class="sv">${s[1]}</span></div>`).join('')}
     </div>`;
@@ -1432,7 +1449,7 @@ function renderWeekCard(w, cls, isModified, phColor){
     <div class="wsumm" onclick="toggleW(${w.n},this)">
       <span class="wn">S${w.n}</span>
       <span class="wdates">${w.dates||''}</span>
-      <span class="wttl">${w.title||''}${isModified?' <span style="font-size:9px;background:#8E44AD;color:#fff;border-radius:3px;padding:1px 4px;vertical-align:middle">🤖 IA</span>':''}</span>
+      <span class="wttl">${w.title||''}${isModified?' <span style="font-size:9px;background:var(--pu);color:#fff;border-radius:3px;padding:1px 4px;vertical-align:middle">🤖 IA</span>':''}</span>
       <div class="wright">
         ${(w.badges||[]).map(badgeHtml).join('')}
         ${w.n===cur?'<span class="badge bcr">En cours</span>':''}
@@ -1441,7 +1458,7 @@ function renderWeekCard(w, cls, isModified, phColor){
       </div>
     </div>
     <div class="wdet" id="det-${w.n}">
-      ${isModified?`<div style="background:#F4ECF7;border:1px solid #8E44AD;border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
+      ${isModified?`<div style="background:#F4ECF7;border:1px solid var(--pu);border-radius:var(--r);padding:7px 10px;margin-bottom:8px;font-size:11px;color:#6C3483">🤖 Séance modifiée par le Coach IA <button class="btn btn-ghost btn-sm" style="float:right;font-size:10px" onclick="event.stopPropagation();restoreWeek(${w.n})">↩ Restaurer</button></div>`:''}
       <div class="sg">${slotsHtml}</div>
       <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="event.stopPropagation();prefill(${w.n},'s1')">✏️ Saisir S1</button>
       ${Array.from({length:Math.max(0,nSlots-1)},(_,i)=>`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s${i+2}')">✏️ Saisir S${i+2}</button>`).join('')}
@@ -1783,7 +1800,7 @@ function showCompare(s,week){
 
   const planPaceMin=planDur&&planDist?secToPace(Math.round((planDur*60)/planDist)):'—';
 
-  function fmt(val,plan,unit,tol){
+  function fmtComp(val,plan,unit,tol){
     if(!val||!plan)return`<span class="comp-warn">${val||'—'} ${unit}</span>`;
     const ok=Math.abs(val-plan)/plan<tol;
     return`<span class="${ok?'comp-ok':'comp-warn'}">${val} ${unit}</span>`;
@@ -1800,8 +1817,8 @@ function showCompare(s,week){
     </div>
     <div class="comp-col">
       <div class="comp-head" style="color:var(--or)">✅ Réalisé</div>
-      <div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${fmt(s.dist,planDist,'km',0.1)}</span></div>
-      <div class="comp-row"><span class="comp-k">Durée</span><span class="comp-v">${fmt(s.dur,planDur,'min',0.15)}</span></div>
+      <div class="comp-row"><span class="comp-k">Distance</span><span class="comp-v">${fmtComp(s.dist,planDist,'km',0.1)}</span></div>
+      <div class="comp-row"><span class="comp-k">Durée</span><span class="comp-v">${fmtComp(s.dur,planDur,'min',0.15)}</span></div>
       <div class="comp-row"><span class="comp-k">Allure réelle</span><span class="comp-v">${s.pace?s.pace+'/km':'—'}</span></div>
       <div class="comp-row"><span class="comp-k">FC moy</span><span class="comp-v">${s.hr?s.hr+' bpm':'—'}</span></div>
     </div>`;
@@ -2689,13 +2706,13 @@ function renderZones(){
   const z4lo=targetPaceSec-23, z4hi=targetPaceSec-9;
   const z5lo=targetPaceSec-53, z5hi=targetPaceSec-33;
 
-  function fmt(s){return Math.floor(s/60)+':'+(s%60<10?'0':'')+Math.round(s%60)}
+  function fmtSecs(s){return Math.floor(s/60)+':'+(s%60<10?'0':'')+Math.round(s%60)}
   function kmh(s){return(3600/s).toFixed(1)}
   function zoneBlock(color,num,label,lo,hi,fcLow,fcHigh,desc,usage,star=''){
     return`<div style="margin-bottom:10px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)">
       <div style="background:${color};padding:9px 14px;display:flex;align-items:center;justify-content:space-between">
         <div style="color:#fff;font-weight:700;font-size:14px">Z${num} — ${label}${star}</div>
-        <div style="color:rgba(255,255,255,0.9);font-weight:700;font-size:15px">${fmt(lo)} – ${fmt(hi)} /km</div>
+        <div style="color:rgba(255,255,255,0.9);font-weight:700;font-size:15px">${fmtSecs(lo)} – ${fmtSecs(hi)} /km</div>
       </div>
       <div style="padding:10px 14px;background:var(--bg2)">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -2731,7 +2748,7 @@ function renderZones(){
       'Allure confortable mais tonique. Tu peux parler mais pas chanter. Base de toute préparation — développe l\'endurance aérobie, brûle les graisses, construit le volume.',
       'Sorties longues (16-20 km) · Base d\'endurance · Volume hebdomadaire')}
     ${zoneBlock('#3B82F6',3,'Allure semi ⭐',z3lo,z3hi,80,88,
-      `C'est <b>ton allure cible pour le 4 octobre</b> (${fmt(targetPaceSec)}/km = ${targetLabel}). Effort soutenu, tu peux prononcer quelques mots mais plus tenir une vraie conversation. Zone spécifique à apprivoiser.`,
+      `C'est <b>ton allure cible pour le 4 octobre</b> (${fmtSecs(targetPaceSec)}/km = ${targetLabel}). Effort soutenu, tu peux prononcer quelques mots mais plus tenir une vraie conversation. Zone spécifique à apprivoiser.`,
       'Blocs spécifiques semi · Fractions 2-3 km · Finales de sortie longue')}
     ${zoneBlock('#C0392B',4,'Seuil lactique',z4lo,z4hi,88,93,
       'Effort intense, respiration difficile. C\'est le seuil où l\'acide lactique commence à s\'accumuler. Développe ta capacité à soutenir des allures élevées — repousse le "mur" du semi.',
@@ -2761,7 +2778,7 @@ function renderZones(){
             ['#8E44AD','Z5','VMA',z5lo,z5hi,'93','100'],
           ].map((r,i)=>`<tr style="${i%2?'background:var(--bg2)':''}border-top:1px solid var(--border)">
             <td style="padding:8px 10px"><span style="background:${r[0]};color:#fff;border-radius:4px;padding:2px 7px;font-weight:700;font-size:11px">${r[1]}</span> <span style="font-size:11px;color:var(--text3)">${r[2]}</span></td>
-            <td style="padding:8px 10px;text-align:center;font-weight:600">${fmt(r[3])} – ${fmt(r[4])}</td>
+            <td style="padding:8px 10px;text-align:center;font-weight:600">${fmtSecs(r[3])} – ${fmtSecs(r[4])}</td>
             <td style="padding:8px 10px;text-align:center;color:var(--text2)">${kmh(r[4])}–${kmh(r[3])} km/h</td>
             <td style="padding:8px 10px;text-align:center;color:var(--text2)">${r[5]}–${r[6]}%</td>
           </tr>`).join('')}
@@ -2776,7 +2793,7 @@ function renderZones(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Allure semi cible</div>
-        <div style="font-size:22px;font-weight:700;color:var(--or)">${fmt(targetPaceSec)}/km</div>
+        <div class="u-kpi-val">${fmtSecs(targetPaceSec)}/km</div>
         <div style="font-size:10px;color:var(--text3);margin-top:2px">= ${targetLabel} sur 21.1 km</div>
       </div>
       <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;text-align:center">
@@ -2902,19 +2919,19 @@ function renderCalendar(){
         <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:6px">${icon} ${label}</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
           <div style="text-align:center">
-            <div style="font-size:16px;font-weight:700;color:var(--text)">${n}</div>
+            <div class="u-kpi-val-lg">${n}</div>
             <div style="font-size:9px;color:var(--text3)">séance${n>1?'s':''}</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:16px;font-weight:700;color:var(--text)">${km>0?km.toFixed(0)+'km':'—'}</div>
+            <div class="u-kpi-val-lg">${km>0?km.toFixed(0)+'km':'—'}</div>
             <div style="font-size:9px;color:var(--text3)">distance</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:16px;font-weight:700;color:var(--text)">${dplus>0?Math.round(dplus)+'m':'—'}</div>
+            <div class="u-kpi-val-lg">${dplus>0?Math.round(dplus)+'m':'—'}</div>
             <div style="font-size:9px;color:var(--text3)">D+</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:16px;font-weight:700;color:var(--text)">${durStr}</div>
+            <div class="u-kpi-val-lg">${durStr}</div>
             <div style="font-size:9px;color:var(--text3)">durée</div>
           </div>
         </div>
@@ -3105,13 +3122,13 @@ function sessionCard(s){
     </div>
     <div id="hist-detail-${s.id}" style="display:none;width:100%;padding-top:10px;border-top:1px solid var(--border);margin-top:10px">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:8px">
-        ${s.dist?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Distance</div><div style="font-size:16px;font-weight:700">${s.dist} km</div></div>`:''}
-        ${s.dur?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Durée</div><div style="font-size:16px;font-weight:700">${s.dur} min</div></div>`:''}
-        ${s.pace?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Allure</div><div style="font-size:16px;font-weight:700">${s.pace}/km</div></div>`:''}
-        ${s.hr?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC moy</div><div style="font-size:16px;font-weight:700">${s.hr} bpm</div></div>`:''}
-        ${s.hrmax?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">FC max</div><div style="font-size:16px;font-weight:700">${s.hrmax} bpm</div></div>`:''}
-        ${s.dplus?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">D+</div><div style="font-size:16px;font-weight:700">${s.dplus} m</div></div>`:''}
-        ${s.calEst?`<div style="background:var(--bg2);border-radius:var(--r);padding:7px 10px"><div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
+        ${s.dist?`<div class="u-chip"><div class="u-section-label">Distance</div><div style="font-size:16px;font-weight:700">${s.dist} km</div></div>`:''}
+        ${s.dur?`<div class="u-chip"><div class="u-section-label">Durée</div><div style="font-size:16px;font-weight:700">${s.dur} min</div></div>`:''}
+        ${s.pace?`<div class="u-chip"><div class="u-section-label">Allure</div><div style="font-size:16px;font-weight:700">${s.pace}/km</div></div>`:''}
+        ${s.hr?`<div class="u-chip"><div class="u-section-label">FC moy</div><div style="font-size:16px;font-weight:700">${s.hr} bpm</div></div>`:''}
+        ${s.hrmax?`<div class="u-chip"><div class="u-section-label">FC max</div><div style="font-size:16px;font-weight:700">${s.hrmax} bpm</div></div>`:''}
+        ${s.dplus?`<div class="u-chip"><div class="u-section-label">D+</div><div style="font-size:16px;font-weight:700">${s.dplus} m</div></div>`:''}
+        ${s.calEst?`<div class="u-chip"><div class="u-section-label">Calories</div><div style="font-size:16px;font-weight:700">~${s.calEst}</div></div>`:''}
       </div>
       ${s.paceok?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">Allures : <b>${s.paceok}</b></div>`:''}
       ${commentHtml}${mapHtml}${compHtml}${lapsHtml}${kmHtml}${analysisHtml}${aiLoadHtml}
@@ -3231,7 +3248,7 @@ function renderJournal(){
     return `<div style="border-radius:var(--r);overflow:hidden;margin-bottom:6px;border:1px solid var(--border)">
       <div onclick="toggleHistMonth('${key}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--bg2)">
         <div>
-          <span style="font-size:13px;font-weight:700;color:var(--text)">${group.label}</span>
+          <span class="u-kpi-val-md">${group.label}</span>
           <span style="font-size:11px;color:var(--text3);margin-left:8px">${group.sessions.length} séance(s)${kmStr}</span>
         </div>
         <span id="chev-month-${key}" style="font-size:11px;color:var(--text3);transition:transform .2s;display:inline-block;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}">▼</span>
@@ -3315,8 +3332,8 @@ function renderMap(id){
   }
 
   // Marqueurs départ / arrivée
-  const greenIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:#27AE60;border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
-  const redIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:#C0392B;border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
+  const greenIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:var(--gr);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
+  const redIcon=L.divIcon({html:'<div style="width:12px;height:12px;background:var(--re);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>',iconSize:[12,12],iconAnchor:[6,6],className:''});
   L.marker(pts[0],{icon:greenIcon}).addTo(map).bindPopup('Départ');
   L.marker(pts[pts.length-1],{icon:redIcon}).addTo(map).bindPopup('Arrivée');
 
@@ -3330,7 +3347,7 @@ function renderMap(id){
       while(ptIdx<s.gpsTrace.length-1&&(s.gpsTrace[ptIdx].dist||0)<targetDist) ptIdx++;
       if(ptIdx<pts.length){
         const kmIcon=L.divIcon({
-          html:`<div style="background:white;border:1.5px solid #3B82F6;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;color:#3B82F6;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)">${i+1}</div>`,
+          html:`<div style="background:white;border:1.5px solid var(--or);border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;color:var(--or);white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)">${i+1}</div>`,
           className:'',iconAnchor:[12,10]
         });
         L.marker(pts[ptIdx],{icon:kmIcon}).addTo(map)
@@ -4477,7 +4494,7 @@ function renderParcours(){
   let h = `
   <div class="card">
     <div class="card-title"><span class="bar"></span>🗺️ Importer un parcours GPX</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Importe un fichier GPX depuis Komoot, Strava ou Garmin pour visualiser le tracé et l'enregistrer en favori.</p>
+    <p class="u-body-sm">Importe un fichier GPX depuis Komoot, Strava ou Garmin pour visualiser le tracé et l'enregistrer en favori.</p>
     <button class="btn btn-or btn-full" onclick="document.getElementById('parcours-file-input').click()">📂 Choisir un fichier GPX</button>
     <input type="file" id="parcours-file-input" accept=".gpx" style="display:none" onchange="importParcoursGPX(this)">
     <div id="parcours-import-status" style="font-size:12px;color:var(--text2);margin-top:8px;display:none"></div>
@@ -4502,7 +4519,7 @@ function renderParcours(){
       h += `<div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text)">${p.name}</div>
+            <div class="u-kpi-val-md">${p.name}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">
               ${p.sport==='velo'?'🚴':'🏃'} ${p.distKm} km · D+ ${p.dplus}m · Alt max ${p.altMax}m
             </div>
@@ -4608,11 +4625,11 @@ function showParcoursPreview(data){
 
   // Stats
   document.getElementById('parcours-stats-preview').innerHTML = `
-    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">📏 ${data.distKm} km</span>
-    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">⛰️ D+ ${data.dplus}m</span>
-    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">🏔️ Alt max ${data.altMax}m</span>
-    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">🔻 Alt min ${data.altMin}m</span>
-    <span style="background:var(--bg2);padding:5px 10px;border-radius:20px;font-size:12px">📍 ${data.coords.length} points</span>`;
+    <span class="u-chip-pill">📏 ${data.distKm} km</span>
+    <span class="u-chip-pill">⛰️ D+ ${data.dplus}m</span>
+    <span class="u-chip-pill">🏔️ Alt max ${data.altMax}m</span>
+    <span class="u-chip-pill">🔻 Alt min ${data.altMin}m</span>
+    <span class="u-chip-pill">📍 ${data.coords.length} points</span>`;
 
   // Carte
   card.scrollIntoView({behavior:'smooth'});
@@ -4624,7 +4641,7 @@ function showParcoursPreview(data){
     const latLngs = data.coords.map(c=>[c.lat,c.lon]);
     const poly = L.polyline(latLngs,{color:'#3B82F6',weight:4,opacity:0.85}).addTo(parcoursMapInstance);
     // Marqueurs départ/arrivée
-    const startIcon=L.divIcon({html:'<div style="background:#27AE60;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12]});
+    const startIcon=L.divIcon({html:'<div style="background:var(--gr);width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12]});
     const endIcon=L.divIcon({html:'<div style="background:#E53E3E;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12]});
     L.marker(latLngs[0],{icon:startIcon}).addTo(parcoursMapInstance).bindPopup('Départ');
     L.marker(latLngs[latLngs.length-1],{icon:endIcon}).addTo(parcoursMapInstance).bindPopup('Arrivée');
@@ -4700,7 +4717,7 @@ function startTracking(i){
     L.polyline(latLngs,{color:'#3B82F6',weight:5,opacity:0.8}).addTo(trackingMap);
 
     // Marqueurs départ/arrivée
-    const startIcon=L.divIcon({html:'<div style="background:#27AE60;width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
+    const startIcon=L.divIcon({html:'<div style="background:var(--gr);width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
     const endIcon=L.divIcon({html:'<div style="background:#E53E3E;width:14px;height:14px;border-radius:50%;border:2px solid #fff"></div>',className:'',iconSize:[14,14]});
     L.marker(latLngs[0],{icon:startIcon}).addTo(trackingMap);
     L.marker(latLngs[latLngs.length-1],{icon:endIcon}).addTo(trackingMap);
@@ -4710,7 +4727,7 @@ function startTracking(i){
     trackingMap.fitBounds(bounds, {padding:[50,50], maxZoom:16});
 
     // Icône position GPS
-    const posIcon=L.divIcon({html:'<div style="background:#3B82F6;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>',className:'',iconSize:[18,18]});
+    const posIcon=L.divIcon({html:'<div style="background:var(--or);width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>',className:'',iconSize:[18,18]});
     trackingMarker = L.marker([0,0],{icon:posIcon,zIndexOffset:1000});
 
     // Désactiver l'auto-recentrage si l'utilisateur déplace la carte
@@ -4820,12 +4837,12 @@ function renderRenfo(){
   let h = `
   <div class="card">
     <div class="card-title"><span class="bar"></span>💪 Séance express à la maison</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Claude génère une séance de renforcement musculaire adaptée à ta disponibilité — cardio + muscu sans matériel.</p>
+    <p class="u-body-sm">Claude génère une séance de renforcement musculaire adaptée à ta disponibilité — cardio + muscu sans matériel.</p>
 
     <div class="g2" style="margin-bottom:10px">
       <div class="field">
         <label class="lbl">Durée disponible</label>
-        <select id="renfo-duration" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <select id="renfo-duration" class="u-input">
           <option value="10">10 minutes</option>
           <option value="15" selected>15 minutes</option>
           <option value="20">20 minutes</option>
@@ -4834,7 +4851,7 @@ function renderRenfo(){
       </div>
       <div class="field">
         <label class="lbl">Type de séance</label>
-        <select id="renfo-type" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <select id="renfo-type" class="u-input">
           <option value="hiit">HIIT (cardio intense)</option>
           <option value="tabata">Tabata (20s/10s)</option>
           <option value="circuit">Circuit training</option>
@@ -4847,7 +4864,7 @@ function renderRenfo(){
     <div class="g2" style="margin-bottom:10px">
       <div class="field">
         <label class="lbl">Niveau de fatigue</label>
-        <select id="renfo-fatigue" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <select id="renfo-fatigue" class="u-input">
           <option value="fresh">Frais — je peux donner tout</option>
           <option value="moderate" selected>Modéré — séance raisonnable</option>
           <option value="tired">Fatigué — séance légère</option>
@@ -4855,7 +4872,7 @@ function renderRenfo(){
       </div>
       <div class="field">
         <label class="lbl">Focus musculaire</label>
-        <select id="renfo-focus" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <select id="renfo-focus" class="u-input">
           <option value="full">Corps entier</option>
           <option value="lower">Jambes / fessiers</option>
           <option value="upper">Haut du corps</option>
@@ -4878,7 +4895,7 @@ function renderRenfo(){
   <div class="card" style="cursor:pointer;opacity:.85" onclick="displayRenfoSession(${i})">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${s.name}</div>
+        <div class="u-kpi-val-sm">${s.name}</div>
         <div style="font-size:11px;color:var(--text3)">${s.duration}min · ${s.type} · ${s.savedAt?.slice(0,10)||''}</div>
       </div>
       <button class="btn btn-ghost btn-sm" style="color:var(--re)" onclick="event.stopPropagation();deleteRenfo(${i})">🗑️</button>
@@ -4989,7 +5006,7 @@ function displayRenfoSessionData(session){
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
-        <div style="font-size:16px;font-weight:700;color:var(--text)">${session.name}</div>
+        <div class="u-kpi-val-lg">${session.name}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:2px">${session.description}</div>
       </div>
       <div style="text-align:right">
@@ -5000,12 +5017,12 @@ function displayRenfoSessionData(session){
 
     <!-- Échauffement -->
     <div style="background:var(--grl);border-radius:var(--r);padding:10px 12px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:#27AE60;text-transform:uppercase;margin-bottom:6px">🔥 Échauffement</div>
+      <div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:6px">🔥 Échauffement</div>
       ${(session.warmup||[]).map(e=>`
       <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:0.5px solid rgba(39,174,96,.2)">
-        <span style="font-size:11px;font-weight:700;color:#27AE60;min-width:36px">${e.duration}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--gr);min-width:36px">${e.duration}</span>
         <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text)">${e.exercise}</div>
+          <div class="u-kpi-val-xs">${e.exercise}</div>
           <div style="font-size:10px;color:var(--text2)">${e.description}</div>
         </div>
       </div>`).join('')}
@@ -5022,7 +5039,7 @@ function displayRenfoSessionData(session){
       <div style="padding:10px 12px;border-bottom:0.5px solid var(--border)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">${e.exercise}</div>
+            <div class="u-kpi-val-md">${e.exercise}</div>
             <div style="font-size:10px;color:var(--text3)">${e.muscles||''}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
@@ -5042,7 +5059,7 @@ function displayRenfoSessionData(session){
       <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
         <span style="font-size:11px;font-weight:700;color:var(--bl);min-width:36px">${e.duration}</span>
         <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text)">${e.exercise}</div>
+          <div class="u-kpi-val-xs">${e.exercise}</div>
           <div style="font-size:10px;color:var(--text2)">${e.description}</div>
         </div>
       </div>`).join('')}
@@ -5154,7 +5171,7 @@ async function renderHome(){
             <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">${slot.toUpperCase()}</div>
             <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${seance.title}</div>
           </div>
-          ${!done?`<button class="btn btn-or btn-sm" onclick="sw('log');prefill(${cur},'${slot}')" style="font-size:11px;white-space:nowrap">✏️ Saisir</button>`:'<span style="font-size:11px;color:#27AE60;font-weight:700">✓ Fait</span>'}
+          ${!done?`<button class="btn btn-or btn-sm" onclick="sw('log');prefill(${cur},'${slot}')" style="font-size:11px;white-space:nowrap">✏️ Saisir</button>`:'<span style="font-size:11px;color:var(--gr);font-weight:700">✓ Fait</span>'}
         </div>` : '';
       }).filter(Boolean).join('');
       weekH = `<div class="card">
@@ -5177,13 +5194,13 @@ async function renderHome(){
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
         <div style="flex:1">
           <div style="font-size:11px;color:var(--text3);margin-bottom:2px">${sportLbl}${last.week?' · S'+last.week+(last.slot?'-'+last.slot.toUpperCase():''):''}</div>
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${last.date}</div>
+          <div class="u-kpi-val-md">${last.date}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:2px">${last.dist} km · ${last.dur} min${last.pace?' · '+last.pace+'/km':''}</div>
           ${last.comment?`<div style="font-size:11px;color:var(--text3);margin-top:2px;font-style:italic">"${last.comment}"</div>`:''}
         </div>
         ${last.hr?`<div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--or)">${last.hr}</div><div style="font-size:10px;color:var(--text3)">bpm moy</div></div>`:''}
       </div>
-      ${!last.claudeAnalysis?`<button class="btn btn-ghost btn-full" style="font-size:12px" onclick="sw('journal');setTimeout(()=>analyzeFromHistory(${last.id}),300)">🤖 Analyser cette séance</button>`:'<div style="font-size:11px;color:#27AE60">✓ Analysée par Claude</div>'}
+      ${!last.claudeAnalysis?`<button class="btn btn-ghost btn-full" style="font-size:12px" onclick="sw('journal');setTimeout(()=>analyzeFromHistory(${last.id}),300)">🤖 Analyser cette séance</button>`:'<div style="font-size:11px;color:var(--gr)">✓ Analysée par Claude</div>'}
     </div>`;
   }
 
@@ -5205,15 +5222,15 @@ async function renderHome(){
 
   const statsH = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:var(--or)">${monthKm}</div>
+      <div class="u-kpi-val">${monthKm}</div>
       <div style="font-size:10px;color:var(--text3)">km ce mois</div>
     </div>
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:var(--or)">${monthCount}</div>
+      <div class="u-kpi-val">${monthCount}</div>
       <div style="font-size:10px;color:var(--text3)">séances</div>
     </div>
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
-      <div style="font-size:22px;font-weight:700;color:var(--or)">${streak}</div>
+      <div class="u-kpi-val">${streak}</div>
       <div style="font-size:10px;color:var(--text3)">sem. streak</div>
     </div>
   </div>`;
@@ -5531,384 +5548,174 @@ try {
     }
   });
 
-  async function fbLoadData(){
-    if(!fbUser) return;
+  // ── FIREBASE SYNC — architecture unifiée ─────────────────────────────────
+  // fbWrite()  : pousse les données vers Firestore (SDK si connecté, REST sinon)
+  // fbRead(force) : lit depuis Firestore et applique si cloud plus récent (ou force=true)
+  // fbSyncInit() : démarre la sync automatique au chargement
+
+  // ── Données locales → Firestore ──────────────────────────────────────────
+  async function fbWrite(){
+    if(fbSyncing) return;
+    fbSyncing = true;
+    fbSetSyncStatus('⏳ Sync…');
     try {
-      const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-      if(snap.exists){
-        const d = snap.data();
-        // Comparer timestamps — ne charger que si le cloud est plus récent
-        const cloudTs = parseInt(d.updated_at||0);
-        const localTs = parseInt(localStorage.getItem('smi_updated_at')||0);
-        if(cloudTs > 0 && cloudTs <= localTs){
-          // Local plus récent → pousser vers le cloud
-          toast('☁️ Données locales plus récentes → envoi vers le cloud');
-          await fbSaveData();
-          return;
-        }
-        if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
-        else if(d.sessions){ sessions=d.sessions; localStorage.setItem('smi_s',JSON.stringify(sessions)); }
-        if(d.plans_json){ plans=JSON.parse(d.plans_json); localStorage.setItem('smi_plans',d.plans_json); }
-        if(d.parcours_json){ savedParcours=JSON.parse(d.parcours_json); localStorage.setItem('smi_parcours',d.parcours_json); }
-        if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
-        else if(d.planOverrides){ planOverrides=d.planOverrides; localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides)); }
-        if(d.coach_json && d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
-        if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-        if(cloudTs){ localStorage.setItem('smi_updated_at', String(cloudTs)); }
-        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
-        const activeTab = document.querySelector('.section.active')?.id;
-        if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
-        toast('☁️ Données synchronisées depuis le cloud');
+      const now = Date.now();
+      const coachRaw = localStorage.getItem('smi_coach');
+      const payload = {
+        sessions_json:      JSON.stringify(sessions),
+        plans_json:         JSON.stringify(plans),
+        parcours_json:      JSON.stringify(savedParcours),
+        planOverrides_json: JSON.stringify(planOverrides),
+        settings_json:      JSON.stringify({...settings, apiKey:''}),
+        coach_json:         coachRaw || 'null',
+        updated_at:         now
+      };
+
+      if(fbUser){
+        // SDK — PC connecté Google
+        await fbDb.collection('users').doc(fbUser.uid).set({
+          ...payload,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
       } else {
-        await fbSaveData();
+        // REST — iPhone PWA
+        const uid = await getStoredUid();
+        if(!uid){ fbSyncing=false; return; }
+        // Rafraîchir toutes les sources de persistance UID
+        localStorage.setItem('smi_fb_uid', uid);
+        IDB.set('smi_fb_uid', uid);
+        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+        const fields = {};
+        const mask = [];
+        Object.entries(payload).forEach(([k,v])=>{
+          fields[k] = k==='updated_at' ? {integerValue:String(v)} : {stringValue:v};
+          mask.push('updateMask.fieldPaths='+k);
+        });
+        await fetch(
+          `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?${mask.join('&')}`,
+          { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fields}) }
+        );
       }
-    } catch(e){ console.error('FB LOAD ERROR:', e.code, e.message, e); toast('Erreur chargement : '+(e.code||e.message)); }
+
+      localStorage.setItem('smi_updated_at', String(now));
+      IDB.set('smi_updated_at', String(now));
+      fbSetSyncStatus('✓ Synchronisé');
+    } catch(e){
+      fbSetSyncStatus('⚠️ Erreur sync');
+      console.error('fbWrite error:', e);
+    }
+    fbSyncing = false;
   }
 
-  // Sync forcée — fonctionne avec SDK (PC connecté) ET REST (iPhone/PC sans Google)
-  window.forceSyncFromCloud = async function(){
-    toast('⏳ Chargement depuis le cloud…');
-    // Si connecté avec Google → utilise le SDK en forçant
-    if(fbUser){
-      try {
-        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-        if(!snap.exists){ toast('❌ Aucune donnée dans le cloud'); return; }
-        const d = snap.data();
-        if(d.sessions_json){ sessions=JSON.parse(d.sessions_json); localStorage.setItem('smi_s',d.sessions_json); }
-        if(d.plans_json){ plans=JSON.parse(d.plans_json); localStorage.setItem('smi_plans',d.plans_json); }
-        if(d.parcours_json){ savedParcours=JSON.parse(d.parcours_json); localStorage.setItem('smi_parcours',d.parcours_json); }
-        if(d.planOverrides_json){ planOverrides=JSON.parse(d.planOverrides_json); localStorage.setItem('smi_plan_overrides',d.planOverrides_json); }
-        if(d.coach_json&&d.coach_json!=='null') localStorage.setItem('smi_coach',d.coach_json);
-        if(d.settings_json){ const s=JSON.parse(d.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-        const cloudTs = parseInt(d.updated_at||0);
-        if(cloudTs){ localStorage.setItem('smi_updated_at', String(cloudTs)); }
-        renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
-        const activeTab = document.querySelector('.section.active')?.id;
-        if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
-        toast('✅ '+sessions.length+' séances chargées depuis le cloud');
-      } catch(e){ toast('❌ Erreur : '+e.message); console.error(e); }
-      return;
-    }
-    // Sinon → REST avec l'UID stocké
-    const uid = await getStoredUid();
-    if(!uid){ toast('❌ Non connecté — utilise un code de transfert d\'abord'); return; }
+  // ── Firestore → données locales ──────────────────────────────────────────
+  async function fbRead(force = false){
     try {
-      const doc = await fbRestRead(uid);
-      if(!doc||!doc.fields){ toast('❌ Aucune donnée trouvée dans le cloud'); return; }
-      const get = f => doc.fields[f]?.stringValue||'';
-      const sJson = get('sessions_json');
-      const pJson = get('planOverrides_json');
-      const plJson = get('plans_json');
-      const prcJson = get('parcours_json');
-      const cJson = get('coach_json');
-      const setJson = get('settings_json');
-      if(sJson){ sessions=JSON.parse(sJson); localStorage.setItem('smi_s',sJson); }
-      if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
-      if(plJson){ plans=JSON.parse(plJson); localStorage.setItem('smi_plans',plJson); }
-      if(prcJson){ savedParcours=JSON.parse(prcJson); localStorage.setItem('smi_parcours',prcJson); }
-      if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
-      if(setJson){ const s=JSON.parse(setJson); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-      const cloudTs = parseInt(doc.fields.updated_at?.integerValue||0);
+      let data = null; // {sessions_json, plans_json, ...} normalisé
+
+      if(fbUser){
+        // SDK
+        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+        if(!snap.exists){ await fbWrite(); return; }
+        data = snap.data();
+        data._ts = parseInt(data.updated_at||0);
+      } else {
+        // REST
+        const uid = await getStoredUid();
+        if(!uid) return;
+        // Rafraîchir persistance UID
+        localStorage.setItem('smi_fb_uid', uid);
+        IDB.set('smi_fb_uid', uid);
+        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+
+        const doc = await fbRestRead(uid);
+        if(!doc||!doc.fields) return;
+        const get = f => doc.fields[f]?.stringValue||'';
+        data = {
+          sessions_json:      get('sessions_json'),
+          plans_json:         get('plans_json'),
+          parcours_json:      get('parcours_json'),
+          planOverrides_json: get('planOverrides_json'),
+          coach_json:         get('coach_json'),
+          settings_json:      get('settings_json'),
+          _ts:                parseInt(doc.fields.updated_at?.integerValue||0)
+        };
+      }
+
+      const cloudTs = data._ts;
+      const localTs = parseInt(await IDB.get('smi_updated_at') || localStorage.getItem('smi_updated_at')||0);
+
+      if(!force && cloudTs > 0 && cloudTs <= localTs){
+        // Local plus récent → pousser vers le cloud
+        await fbWrite();
+        fbSetSyncStatus('✓ Synchronisé');
+        return;
+      }
+
+      // Appliquer les données cloud
+      if(data.sessions_json){ sessions=JSON.parse(data.sessions_json); localStorage.setItem('smi_s',data.sessions_json); }
+      if(data.plans_json){ plans=JSON.parse(data.plans_json); localStorage.setItem('smi_plans',data.plans_json); }
+      if(data.parcours_json){ savedParcours=JSON.parse(data.parcours_json); localStorage.setItem('smi_parcours',data.parcours_json); }
+      if(data.planOverrides_json){ planOverrides=JSON.parse(data.planOverrides_json); localStorage.setItem('smi_plan_overrides',data.planOverrides_json); }
+      if(data.coach_json&&data.coach_json!=='null') localStorage.setItem('smi_coach',data.coach_json);
+      if(data.settings_json){ const s=JSON.parse(data.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
       if(cloudTs){ localStorage.setItem('smi_updated_at',String(cloudTs)); IDB.set('smi_updated_at',String(cloudTs)); }
+
+      // Re-render tous les onglets
       renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
       const activeTab = document.querySelector('.section.active')?.id;
       if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
-      toast('✅ '+sessions.length+' séances chargées depuis le cloud');
-    } catch(e){ toast('❌ Erreur : '+e.message); console.error(e); }
-  };
 
-  async function fbSaveData(){
-    if(!fbUser||fbSyncing) return;
-    fbSyncing=true; fbSetSyncStatus('⏳ Sync…');
-    try {
-      const coachRaw=localStorage.getItem('smi_coach');
-      const now = Date.now();
-      localStorage.setItem('smi_updated_at', String(now));
-      IDB.set('smi_updated_at', String(now));
-      await fbDb.collection('users').doc(fbUser.uid).set({
-        sessions_json: JSON.stringify(sessions),
-        plans_json: JSON.stringify(plans),
-        parcours_json: JSON.stringify(savedParcours),
-        planOverrides_json: JSON.stringify(planOverrides),
-        settings_json: JSON.stringify({...settings, apiKey:''}),
-        coach_json: coachRaw || 'null',
-        updated_at: now,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      fbSetSyncStatus('✓ Synchronisé');
-    } catch(e){ fbSetSyncStatus('⚠️ Erreur sync'); console.error('FB SYNC ERROR:', e.code, e.message, e); toast('Erreur sync : '+(e.code||e.message)); }
-    fbSyncing=false;
+      const dot = document.getElementById('fb-dot');
+      const label = document.getElementById('fb-label');
+      if(dot) dot.style.background='#27AE60';
+      if(label) label.textContent='✓ Synchronisé';
+      if(force) toast('✅ '+sessions.length+' séances chargées depuis le cloud');
+      else toast('☁️ Données mises à jour depuis le cloud');
+
+    } catch(e){ console.warn('fbRead error:', e); }
   }
 
   function fbSetSyncStatus(msg){ const el=document.getElementById('fb-sync-indicator'); if(el)el.textContent=msg; }
 
-  window.fbSaveData = fbSaveData;
+  // Exposer pour le bouton "Charger depuis le cloud" et le patch localStorage
+  window.fbSaveData = fbWrite;
+  window.forceSyncFromCloud = ()=>{ toast('⏳ Chargement depuis le cloud…'); return fbRead(true); };
 
-  // ── TOKEN DE TRANSFERT ──────────────────────────────────────────────────
-  // Le token encode directement les données — pas besoin de Firestore côté PWA
-  window.fbGenerateToken = async function(){
-    if(!fbUser){
-      toast('⚠️ Tu dois être connecté sur PC pour générer un code');
-      // Afficher un message dans l'interface
-      const display = document.getElementById('fb-token-display');
-      const code = document.getElementById('fb-token-code');
-      if(display && code){
-        code.textContent = '—';
-        code.style.fontSize = '14px';
-        code.style.color = 'var(--re)';
-        code.textContent = 'Connecte-toi d\'abord avec Google sur PC';
-        display.style.display = 'block';
-      }
-      return;
-    }
-    // Forcer une sauvegarde fresh
-    await fbSaveData();
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = Date.now() + 10 * 60 * 1000;
-    try {
-      const coachRaw = localStorage.getItem('smi_coach');
-      await fbDb.collection('tokens').doc(code).set({
-        uid: fbUser.uid,
-        email: fbUser.email||'',
-        sessions_json: JSON.stringify(sessions),
-        planOverrides_json: JSON.stringify(planOverrides),
-        settings_json: JSON.stringify({...settings, apiKey:''}),
-        coach_json: coachRaw||'null',
-        expiresAt,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      document.getElementById('fb-token-code').textContent = code;
-      document.getElementById('fb-token-code').style.fontSize = '32px';
-      document.getElementById('fb-token-code').style.color = 'var(--or)';
-      document.getElementById('fb-token-display').style.display = 'block';
-      let remaining = 600;
-      const timerEl = document.getElementById('fb-token-timer');
-      const iv = setInterval(() => {
-        remaining--;
-        const m=Math.floor(remaining/60), s=remaining%60;
-        if(timerEl) timerEl.textContent = `Expire dans ${m}:${String(s).padStart(2,'0')}`;
-        if(remaining<=0){
-          clearInterval(iv);
-          document.getElementById('fb-token-display').style.display='none';
-          fbDb.collection('tokens').doc(code).delete().catch(()=>{});
-        }
-      },1000);
-      toast('Code généré — valable 10 min');
-    } catch(e){ toast('Erreur : '+e.message); }
-  };
+  // ── Initialisation sync ───────────────────────────────────────────────────
+  function fbSyncInit(){
+    // 1. Sync au démarrage (2s de délai pour laisser le temps à l'auth)
+    setTimeout(()=> fbRead(false), 2000);
 
-  window.fbUseToken = async function(){
-    const code = document.getElementById('fb-token-input')?.value?.trim();
-    if(!code||code.length!==6){ toast('Entre un code à 6 chiffres'); return; }
-    const msgEl = document.getElementById('fb-token-msg');
-    if(msgEl){ msgEl.textContent='⏳ Chargement…'; msgEl.style.display='block'; msgEl.style.color='var(--or)'; }
-
-    // Utiliser fetch() direct vers Firestore REST API — ne nécessite pas d'auth
-    const projectId = 'semi-marathon-94d90';
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/tokens/${code}`;
-    try {
-      const resp = await fetch(url);
-      if(!resp.ok){
-        if(msgEl){ msgEl.textContent='❌ Code invalide ou expiré'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
-        return;
-      }
-      const doc = await resp.json();
-      const fields = doc.fields;
-      if(!fields){ if(msgEl){ msgEl.textContent='❌ Code invalide'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; } return; }
-
-      // Vérifier expiration
-      const expiresAt = parseInt(fields.expiresAt?.integerValue||fields.expiresAt?.doubleValue||0);
-      if(expiresAt && Date.now() > expiresAt){
-        if(msgEl){ msgEl.textContent='❌ Code expiré — génère-en un nouveau'; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
-        return;
-      }
-
-      // Extraire les données (Firestore REST encode les strings différemment)
-      const get = (f) => fields[f]?.stringValue||'';
-      const sJson = get('sessions_json');
-      const pJson = get('planOverrides_json');
-      const cJson = get('coach_json');
-      const stJson = get('settings_json');
-      const email = get('email');
-
-      if(sJson){ sessions=JSON.parse(sJson); localStorage.setItem('smi_s',sJson); }
-      if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
-      if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
-      if(stJson){ const s=JSON.parse(stJson); const k=settings.apiKey; settings={...s,apiKey:k||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-
-      // Stocker l'UID de façon persistante — localStorage + IndexedDB + cookie
-      const uid = fields.uid?.stringValue||'';
-      if(uid){
-        IDB.set('smi_fb_uid', uid);
-        localStorage.setItem('smi_fb_uid', uid);
-        // Cookie : expire dans 1 an, survit au vidage iOS
-        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-      }
-
-      renderPlan(); renderStats(); loadCoachCard();
-      document.getElementById('fb-dot').style.background='#27AE60';
-      document.getElementById('fb-label').textContent=email+' (✓ sync auto activée)';
-      document.getElementById('fb-token-input').value='';
-      if(msgEl) msgEl.style.display='none';
-      toast('✅ Données synchronisées ! Sync auto activée.');
-
-      // Supprimer le token via REST
-      fetch(url, {method:'DELETE'}).catch(()=>{});
-
-    } catch(e){
-      if(msgEl){ msgEl.textContent='❌ Erreur : '+e.message; msgEl.style.display='block'; msgEl.style.color='var(--re)'; }
-    }
-  };
-
-  // ── SYNC AUTO AU DÉMARRAGE (PWA sans auth) ──────────────────────────────
-  const FB_PROJECT = 'semi-marathon-94d90';
-
-  // Lire l'UID depuis toutes les sources disponibles (localStorage, IDB, cookie)
-  function getCookieUid(){
-    const match = document.cookie.match(/smi_uid=([^;]+)/);
-    return match ? match[1] : null;
-  }
-  window.getCookieUid = getCookieUid;
-
-  async function getStoredUid(){
-    return localStorage.getItem('smi_fb_uid')
-      || await IDB.get('smi_fb_uid')
-      || getCookieUid()
-      || null;
-  }
-  window.getStoredUid = getStoredUid;
-
-  async function fbRestRead(uid){
-    try {
-      const resp = await fetch(`https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}`);
-      if(!resp.ok) return null;
-      return await resp.json();
-    } catch(e){ return null; }
-  }
-  window.fbRestRead = fbRestRead;
-
-  async function fbRestWrite(uid){
-    try {
-      // Rafraîchir le cookie à chaque sync pour maintenir la persistance
-      document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-      localStorage.setItem('smi_fb_uid', uid);
-      IDB.set('smi_fb_uid', uid);
-      const coachRaw = localStorage.getItem('smi_coach');
-      const now = Date.now();
-      localStorage.setItem('smi_updated_at', String(now));
-      IDB.set('smi_updated_at', String(now));
-      const body = {
-        fields: {
-          sessions_json:      { stringValue: JSON.stringify(sessions) },
-          plans_json:         { stringValue: JSON.stringify(plans) },
-          parcours_json:      { stringValue: JSON.stringify(savedParcours) },
-          planOverrides_json: { stringValue: JSON.stringify(planOverrides) },
-          settings_json:      { stringValue: JSON.stringify({...settings,apiKey:''}) },
-          coach_json:         { stringValue: coachRaw||'null' },
-          updated_at:         { integerValue: String(now) }
-        }
-      };
-      await fetch(
-        `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=sessions_json&updateMask.fieldPaths=plans_json&updateMask.fieldPaths=parcours_json&updateMask.fieldPaths=planOverrides_json&updateMask.fieldPaths=settings_json&updateMask.fieldPaths=coach_json&updateMask.fieldPaths=updated_at`,
-        { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
-      );
-      fbSetSyncStatus('✓ Synchronisé');
-    } catch(e){ fbSetSyncStatus('⚠️ Sync échouée'); }
-  }
-
-  async function fbAutoSyncOnStart(){
-    if(fbUser) return;
-    const uid = await getStoredUid();
-    if(!uid) return;
-
-    // Toujours rafraîchir toutes les sources de persistance au démarrage
-    localStorage.setItem('smi_fb_uid', uid);
-    IDB.set('smi_fb_uid', uid);
-    document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-
-    // Indicateur sidebar
-    document.getElementById('fb-dot').style.background='#3B82F6';
-    document.getElementById('fb-label').textContent='☁️ Connecté';
-
-    try {
-      const doc = await fbRestRead(uid);
-      if(!doc||!doc.fields) return;
-      const get = f => doc.fields[f]?.stringValue||'';
-      const cloudUpdatedAt = parseInt(doc.fields.updated_at?.integerValue||0);
-      const localUpdatedAt = parseInt(await IDB.get('smi_updated_at') || localStorage.getItem('smi_updated_at')||0);
-
-      if(cloudUpdatedAt > localUpdatedAt){
-        const sJson = get('sessions_json');
-        const pJson = get('planOverrides_json');
-        const plJson = get('plans_json');
-        const prcJson = get('parcours_json');
-        const cJson = get('coach_json');
-        if(sJson){
-          sessions = JSON.parse(sJson);
-          localStorage.setItem('smi_s', sJson);
-          IDB.set('smi_updated_at', String(cloudUpdatedAt));
-          localStorage.setItem('smi_updated_at', String(cloudUpdatedAt));
-        }
-        if(pJson){ planOverrides=JSON.parse(pJson); localStorage.setItem('smi_plan_overrides',pJson); }
-        if(plJson){ plans=JSON.parse(plJson); localStorage.setItem('smi_plans',plJson); }
-        if(prcJson){ savedParcours=JSON.parse(prcJson); localStorage.setItem('smi_parcours',prcJson); }
-        if(cJson&&cJson!=='null') localStorage.setItem('smi_coach',cJson);
-        renderHome(); renderPlan(); renderStats(); loadCoachCard();
-        document.getElementById('fb-dot').style.background='#27AE60';
-        document.getElementById('fb-label').textContent='✓ Synchronisé';
-        toast('☁️ Données mises à jour depuis le cloud');
-      } else {
-        // Données locales à jour — on pousse vers le cloud pour garder le timestamp frais
-        await fbRestWrite(uid);
-        document.getElementById('fb-dot').style.background='#27AE60';
-        document.getElementById('fb-label').textContent='✓ Synchronisé';
-      }
-    } catch(e){ console.warn('Sync error:', e); }
-  }
-
-  // Sync périodique toutes les 30 min — maintient le cookie et l'UID actifs
-  function startPeriodicSync(){
+    // 2. Sync périodique toutes les 30 min
     setInterval(async ()=>{
-      if(fbUser){ if(window.fbSaveData) fbSaveData(); return; }
+      const uid = await getStoredUid();
+      if(!uid && !fbUser) return;
+      if(uid){ localStorage.setItem('smi_fb_uid',uid); IDB.set('smi_fb_uid',uid); document.cookie=`smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`; }
+      fbWrite();
+    }, 30 * 60 * 1000);
+
+    // 3. Rafraîchir UID au retour au premier plan (iOS)
+    document.addEventListener('visibilitychange', async ()=>{
+      if(document.visibilityState !== 'visible') return;
       const uid = await getStoredUid();
       if(!uid) return;
       localStorage.setItem('smi_fb_uid', uid);
       IDB.set('smi_fb_uid', uid);
       document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-      fbRestWrite(uid);
-    }, 30 * 60 * 1000);
+    });
+
+    // 4. Patch localStorage → sync automatique 2s après toute sauvegarde
+    const _orig = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function(key, value){
+      _orig(key, value);
+      if(['smi_s','smi_plan_overrides','smi_coach','smi_plans','smi_parcours'].includes(key)){
+        clearTimeout(localStorage._fbTimer);
+        localStorage._fbTimer = setTimeout(()=> fbWrite(), 2000);
+      }
+    };
   }
 
-  // Rafraîchir à chaque retour au premier plan (iOS background → foreground)
-  document.addEventListener('visibilitychange', async ()=>{
-    if(document.visibilityState !== 'visible') return;
-    const uid = await getStoredUid();
-    if(!uid) return;
-    localStorage.setItem('smi_fb_uid', uid);
-    IDB.set('smi_fb_uid', uid);
-    document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-  });
-
-  setTimeout(fbAutoSyncOnStart, 2000);
-  startPeriodicSync();
-
-  // ── Patch localStorage : sync automatique à chaque sauvegarde ────────────
-  const _origSetItem = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function(key, value){
-    _origSetItem(key, value);
-    if(['smi_s','smi_plan_overrides','smi_coach','smi_plans'].includes(key)){
-      clearTimeout(localStorage._fbSyncTimer);
-      localStorage._fbSyncTimer = setTimeout(async ()=>{
-        const fbUser = window._getFbUser ? window._getFbUser() : null;
-        if(window.fbSaveData && fbUser){
-          window.fbSaveData();
-        } else if(window.fbRestWrite && window.getStoredUid){
-          const uid = await window.getStoredUid();
-          if(uid) window.fbRestWrite(uid);
-        }
-      }, 2000); // délai 2s pour grouper les appels multiples
-    }
-  };
+  fbSyncInit();
 
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
