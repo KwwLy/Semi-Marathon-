@@ -5490,8 +5490,19 @@ try {
 
   // ── PAYLOAD — données à synchroniser ─────────────────────────────────────
   function buildPayload(){
+    // Alléger les séances avant envoi — supprimer les données GPS lourdes
+    // gpsTrace peut peser plusieurs centaines de KB par séance
+    const lightSessions = sessions.map(s => {
+      const light = {...s};
+      // Sous-échantillonner gpsTrace à 100 points max (au lieu de supprimer complètement)
+      if(light.gpsTrace && light.gpsTrace.length > 100){
+        const step = Math.floor(light.gpsTrace.length / 100);
+        light.gpsTrace = light.gpsTrace.filter((_,i) => i % step === 0).slice(0, 100);
+      }
+      return light;
+    });
     return {
-      sessions_json:      JSON.stringify(sessions),
+      sessions_json:      JSON.stringify(lightSessions),
       plans_json:         JSON.stringify(plans),
       parcours_json:      JSON.stringify(savedParcours),
       planOverrides_json: JSON.stringify(planOverrides),
