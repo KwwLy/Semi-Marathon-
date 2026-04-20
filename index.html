@@ -407,23 +407,8 @@ canvas{display:block;width:100%!important}
     </div>
 
     <!-- MODE IMAGE -->
-    <div id="import-img-panel" style="display:none">
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Capture d'écran de Strava, Apple Watch… Claude extraira les données visibles (moins précis qu'un fichier FIT).</p>
-      <div id="strava-drop-zone" onclick="document.getElementById('strava-file').click()" style="border:2px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:border-color .2s">
-        <div style="font-size:26px;margin-bottom:5px">📷</div>
-        <div style="font-size:13px;font-weight:500;color:var(--text2)">Appuyer pour choisir une image</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">Screenshot Strava, Apple Watch, Garmin…</div>
-      </div>
-      <input type="file" id="strava-file" accept="image/*" style="display:none" onchange="handleStravaFile(this)">
-      <div id="strava-preview" style="display:none;margin-top:8px">
-        <img id="strava-img" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border)" alt="preview">
-      </div>
-      <button id="strava-extract-btn" class="btn btn-or btn-full" style="display:none;margin-top:8px" onclick="extractStravaData()">🔍 Extraire les données avec Claude</button>
-      <div id="strava-loading" style="display:none;margin-top:8px" class="ai-loading"><div class="spinner"></div><span>Extraction en cours…</span></div>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px">⚠️ Nécessite une clé API dans les Réglages.</p>
-    </div>
 
-    <div id="strava-result" style="display:none;background:var(--grl);border:1px solid var(--gr);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text);margin-top:10px;line-height:1.7;white-space:pre-wrap"></div>
+    
   </div>
 
   <!-- KM PAR KM -->
@@ -1585,129 +1570,7 @@ function applyPlanOverrides(modifications){
   return count;
 }
 
-// ── EXPLICATION SÉANCE ────────────────────────────────────────────────────
-function sessionExplain(title, steps){
-  const t=title.toLowerCase();
-  const sv=steps.map(s=>s[1]).join(' ').toLowerCase();
-  function box(icon,head,body){
-    return`<div class="explain-box"><b>${icon} ${head}</b><br>${body}</div>`;
-  }
 
-  // Jour J
-  if(t.includes('stratégie de course')||sv.includes('1h50 !!'))
-    return box('🏁','Jour J — Semi-marathon',
-      'C\'est le grand jour ! Stratégie clé : <b>partir prudemment</b>. Les 3 premiers km à 5:30-5:40/km sembleront trop lents — c\'est voulu. L\'adrénaline pousse à partir trop vite, résiste. De km 3 à 16 : verrouille 5:13/km. Si tu te sens bien à 16 km : accélère progressivement. Un semi se gagne dans les 5 derniers km.<br><br>Pense à 3 blocs de 7 km mentalement — ça rend la distance moins intimidante.');
-
-  // Activations semaine finale
-  if(t.includes('activations')||t.includes('lun-ven'))
-    return box('🔋','Semaine de récupération finale',
-      'Cette semaine, ton corps stocke de l\'énergie. Les séances sont courtes et légères — leur but n\'est pas de t\'améliorer (il est trop tard) mais de garder les jambes réactives sans les fatiguer. <b>Ne fais pas plus que ce qui est écrit.</b> Les 4×100m à allure semi le mardi servent à activer le système nerveux.');
-
-  // Préparation mentale
-  if(t.includes('mental')||t.includes('préparation mentale'))
-    return box('🧠','Préparation mentale',
-      'Aussi importante que l\'entraînement physique. Dors 8h minimum, bois 2L/eau par jour. Samedi soir : repas glucidique (pâtes, riz) sans excès. Prépare ton sac la veille (dossard, tenue, gels, chaussures). Visualise ta course : tu pars doucement, tu tiens l\'allure, tu accélères après le km 16.');
-
-  // Rappel allure / –60%
-  if(t.includes('rappel allure'))
-    return box('⚡','Affûtage final',
-      'Volume réduit de 60% — ton corps récupère et se prépare. Les 3×1 km à allure semi ont un seul but : <b>rappeler à tes jambes la sensation de cette allure</b>. Ne force pas. Après cette séance : repos complet jusqu\'au départ.');
-
-  // –40%
-  if(sv.includes('40%')||t.includes('5 km à allure semi'))
-    return box('📉','Semaine d\'affûtage',
-      'Volume réduit de 40% — c\'est normal et voulu. Ton corps convertit les semaines de travail en performances. Ne rajoute pas de km. Les 5 km à allure semi servent à tester tes jambes et confirmer que l\'allure cible est confortable.');
-
-  // VMA 400m
-  if(t.includes('400m')||t.includes('vma'))
-    return box('🏃','Séance VMA — Vitesse Maximale Aérobie',
-      'Le but : courir à ton allure <b>maximale soutenable sur ~1 min</b> (Z5). Ces répétitions développent ton plafond aérobie (VO2max) — plus il monte, plus ton allure semi devient facile en relatif.<br><br><b>Comment faire :</b> Lance-toi à fond sur chaque 400m en visant l\'allure indiquée. La récupération trottinante est aussi importante que l\'effort — respecte-la. Si tu n\'arrives plus à tenir l\'allure, arrête.<br><br><b>Ressenti cible :</b> Très difficile, impossible de parler. FC proche du max. Chaque répétition = même allure que la première.');
-
-  // 800m
-  if(t.includes('800m'))
-    return box('🔥','Séance 800m — Seuil lactique',
-      'Les 800m à allure Z4 combinent les bénéfices du seuil et de la VMA. Plus longues que des 400m, elles t\'apprennent à tenir l\'inconfort sur ~4 min.<br><br><b>Comment faire :</b> Pars à 4:55-5:05/km, reste régulier. Le 2e 400m de chaque 800m doit être au moins aussi rapide que le 1er. Récupère 2 min en trottinant.<br><br><b>Ressenti cible :</b> Difficile, souffle court. FC vers 88-93%.');
-
-  // Fractions 5 min
-  if(t.includes('5 min'))
-    return box('⚡','Fractions longues Z3',
-      'Cinq minutes à allure semi — effort soutenu mais gérable. L\'objectif : habituer ton corps à l\'allure cible par petites doses.<br><br><b>Comment faire :</b> 5 min à 5:10-5:15/km, puis 3 min trot. Les premières répétitions doivent sembler faciles — si tu es à bout dès la 2e, tu pars trop vite.<br><br><b>Ressenti cible :</b> Difficile mais tenu. FC ~85-88%.');
-
-  // Blocs 2 ou 3 km
-  if((t.includes('×2 km')||t.includes('×3 km'))&&t.includes(':'))
-    return box('🎯','Blocs à allure semi Z3',
-      'La séance <b>la plus spécifique</b> de ta préparation — tu cours exactement à la vitesse du 4 octobre.<br><br><b>Comment faire :</b> Atteins l\'allure cible en 200m et maintiens-la. La récupération (3-4 min trot Z1) doit te permettre de repartir à la même allure. Si tu n\'y arrives pas : allonge la récupération.<br><br><b>Critère de réussite :</b> Dernier bloc = même allure que le premier. FC ~80-87%.');
-
-  // Seuil 1 km
-  if(t.includes('×1 km'))
-    return box('🔥','Séance Seuil Z4',
-      'Répétitions d\'1 km à allure seuil lactique — juste au-dessus de l\'allure semi. Ces séances repoussent ton seuil et rendent l\'allure semi confortable le jour J.<br><br><b>Comment faire :</b> Allure stable du 1er au dernier mètre. Récupération de 2 min courte volontairement.<br><br><b>Ressenti cible :</b> Difficile, respiration rapide. FC ~88-93%.');
-
-  // 16 km + 3×2 km
-  if(t.includes('16 km')&&t.includes('3×2'))
-    return box('💪','Sortie longue + blocs finaux',
-      'Dernière séance intense avant les vacances. 10 km en Z2 pour te mettre en route, puis 3 blocs de 2 km à allure semi pour finir fort.<br><br><b>Clé :</b> Courir vite sur jambes fatiguées simule les conditions de fin de course. Après : récupère bien, les vacances sont là.');
-
-  // Sortie spécifique semi (Z2 + portion Z3)
-  if(sv.includes('z3')&&sv.includes('km z2')&&!t.includes('×'))
-    return box('🎯','Sortie longue spécifique semi',
-      'Format progressif : Z2 confortable, puis allure semi (Z3) en milieu de sortie. C\'est la séance qui te prépare le mieux au 4 octobre.<br><br><b>Clé :</b> Ne pas partir trop vite en Z2 — tu dois avoir les jambes fraîches pour la portion Z3.<br><br><b>Ressenti cible :</b> Z2 = facile · Z3 = soutenu. La fatigue arrive sur le dernier tiers.');
-
-  // Sorties longues Z2
-  if((sv.includes('z2')||t.includes('z2'))&&parseInt(t.match(/(\d+)\s*km/)?.[1]||0)>=12)
-    return box('🏃','Sortie longue Z2 — Endurance fondamentale',
-      'L\'objectif n\'est <b>pas d\'aller vite</b> — c\'est de rester longtemps en mouvement pour construire l\'endurance musculaire, cardiaque et mentale.<br><br><b>Comment faire :</b> Démarre les 2-3 premiers km très doucement (Z1), stabilise à 5:45-6:10/km. Conversation possible tout du long.<br><br><b>Ravitaillement :</b> Gel sucré + eau. Mêmes gels que le jour J.<br><br><b>Ressenti cible :</b> Facile à modéré. FC 70-80%. Tu dois finir avec l\'impression de pouvoir encore tenir 20-30 min.');
-
-  // Footing bilan
-  if(t.includes('bilan'))
-    return box('📊','Footing bilan Z2',
-      'Première séance du plan — elle sert à <b>évaluer ton niveau de départ</b>. Cours en Z2 confortable et note tes sensations et ta FC. Ces données serviront de référence pour mesurer ta progression tout au long du plan.');
-
-  // Récup Z1
-  if(t.includes('récup')||(t.includes('z1')&&(t.includes('30 min')||t.includes('35 min')||t.includes('25 min'))))
-    return box('💚','Footing récupération Z1',
-      'Séance très facile pour <b>favoriser la récupération</b>. Courir lentement augmente le flux sanguin et élimine les déchets musculaires.<br><br><b>Règle d\'or :</b> FC sous 70% de ta FC max. Si tu as encore des courbatures, remplace par une marche rapide de 30 min.');
-
-  // Vacances
-  if(t.includes('plaisir')||t.includes('vacances'))
-    return box('🏖️','Footing plaisir — vacances',
-      'Pas de pression, pas de chrono. L\'objectif : maintenir l\'habitude et garder les jambes actives sans se fatiguer. Cours au feeling. Si tu te sens fatigué, écoute ton corps.');
-
-  // Accélérations réactivation
-  if(t.includes('accélérations'))
-    return box('⚡','Réactivation post-vacances',
-      'Après 3 semaines de volume réduit, cette séance réactive ton système nerveux. Les accélérations légères ne sont pas des sprints — juste une montée en allure pour rappeler à tes jambes qu\'elles peuvent courir vite.');
-
-  // Transition
-  if(t.includes('transition'))
-    return box('🔄','Semaine de transition',
-      '<b>Surtout pas d\'intensité cette semaine.</b> Ton corps revient doucement à la charge après les vacances. Une erreur classique : vouloir rattraper en faisant trop — c\'est là que les blessures arrivent.');
-
-  // Natation
-  if(t.includes('natation'))
-    return box('🏊','Natation — récupération active',
-      'La natation sollicite le cardio <b>sans impact sur les articulations</b>. Idéale pour récupérer tout en maintenant ta condition aérobie.<br><br><b>Comment nager :</b> Crawl lent en échauffement pour t\'allonger dans l\'eau, puis endurance douce à rythme régulier sur la portion principale. La brasse en retour au calme détend les épaules et le dos, souvent sollicités chez les coureurs.<br><br><b>Intensité :</b> Effort modéré, respiration contrôlée. Tu dois pouvoir nager sans t\'arrêter sur toute la durée.<br><br><b>Si tu ne nages pas :</b> Remplace par 45 min de vélo en Z1-Z2 ou elliptique à intensité légère.');
-
-  // Repos
-  if(t.includes('repos')||sv.includes('repos'))
-    return box('😴','Repos — aussi important que l\'entraînement',
-      'Le repos n\'est pas un jour perdu — c\'est pendant le repos que ton corps <b>assimile le travail</b> et construit la performance. Supprime ce jour et tu récupères moins bien.<br><br>Hydrate-toi, dors suffisamment. Résiste à l\'envie de faire plus.');
-
-  // Semaine allégée
-  if(t.includes('allégée'))
-    return box('📉','Semaine allégée — supercompensation',
-      'Toutes les 4-5 semaines, le plan réduit le volume volontairement. C\'est la <b>supercompensation</b> : en réduisant la charge, ton corps rebondit au-dessus de son niveau précédent.<br><br>Ne rajoute pas de km — la semaine suivante sera plus dure.');
-
-  // Pour les séances modifiées par le Coach IA sans correspondance connue,
-  // on ne force pas d'explication générique
-  return null;
-}
-
-
-function toggleExplain(id){
-  const el=document.getElementById(id);
-  if(el)el.style.display=el.style.display==='none'?'block':'none';
-}
 function toggleW(n){
   const d=document.getElementById('det-'+n);
   const c=document.getElementById('chev-'+n);
@@ -2028,12 +1891,6 @@ function buildPrompt(s,week){
   return msg;
 }
 
-function copyPrompt(){
-  const txt=document.getElementById('prompt-text').value;
-  navigator.clipboard.writeText(txt).then(()=>toast('Texte copié ! Colle-le dans Claude.')).catch(()=>{
-    document.getElementById('prompt-text').select();document.execCommand('copy');toast('Copié !');
-  });
-}
 
 // ── COACH IA — analyse plan + prédiction ─────────────────────────────────
 async function runCoachAnalysis(lastSession){
@@ -2731,18 +2588,6 @@ function predictSemiFromSession(s){
   return preds[Math.floor(preds.length/2)];
 }
 
-// Appelé par le dashboard — prédit depuis la meilleure séance parmi toutes
-function predictSemiTime(session){
-  // Pour la carte dashboard on passe une séance individuelle
-  // On utilise directement cette séance
-  return predictSemiFromSession(session);
-}
-
-// Meilleure prédiction globale (utilisée par le Coach IA)
-function bestSemiPrediction(runSessions){
-  const best=bestPaceSession(runSessions);
-  return best ? predictSemiFromSession(best) : null;
-}
 
 function computeVO2max(session){
   if(!session) return null;
@@ -2788,11 +2633,6 @@ function minsToHMS(mins){
   const s=Math.round((mins%1)*60);
   return`${h}h${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
-
-
-
-// ── CARTES PRÉDICTION + VO2MAX ────────────────────────────────────────────
-function updatePerfCards(){/* cartes supprimées — prédiction et VO2max dans Coach IA */}
 
 
 // ── ZONES D'ALLURE ────────────────────────────────────────────────────────
@@ -3223,41 +3063,6 @@ function renderPersonalRecords(){
     </div>`).join('');
 }
 
-
-function renderZoneChart(){
-  const zones={Z1:0,Z2:0,Z3:0,Z4:0,Z5:0};
-  sessions.forEach(s=>{
-    if(!s.pace)return;
-    const sec=paceToSec(s.pace);
-    if(sec>360)zones.Z1+=s.dist||0;
-    else if(sec>345)zones.Z2+=s.dist||0;
-    else if(sec>310)zones.Z3+=s.dist||0;
-    else if(sec>290)zones.Z4+=s.dist||0;
-    else zones.Z5+=s.dist||0;
-  });
-  const total=Object.values(zones).reduce((a,b)=>a+b,0);
-  if(!total){document.getElementById('zone-card').style.display='none';return}
-  document.getElementById('zone-card').style.display='block';
-  const colors={Z1:'#2980B9',Z2:'#27AE60',Z3:'#3B82F6',Z4:'#C0392B',Z5:'#8E44AD'};
-  document.getElementById('zone-chart').innerHTML=Object.entries(zones).map(([z,km])=>{
-    const pct=total?Math.round(km/total*100):0;
-    return pct>3?`<div class="zc-seg" style="flex:${pct};background:${colors[z]}">${z}</div>`:'';
-  }).join('');
-  document.getElementById('zone-legend').innerHTML=Object.entries(zones).map(([z,km])=>{
-    const pct=total?Math.round(km/total*100):0;
-    return`<span style="font-size:11px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${colors[z]};display:inline-block"></span>${z} ${pct}%</span>`;
-  }).join('');
-}
-
-function renderSportChips(){
-  const sports={};
-  sessions.forEach(s=>{sports[s.sport]=(sports[s.sport]||0)+1});
-  if(!Object.keys(sports).length){document.getElementById('sport-card').style.display='none';return}
-  document.getElementById('sport-card').style.display='block';
-  document.getElementById('sport-chips').innerHTML=Object.entries(sports).map(([sp,n])=>
-    `<span class="chip ${SPORT_CLASSES[sp]||'s-autre'}">${SPORT_LABELS[sp]||sp} × ${n}</span>`
-  ).join('');
-}
 
 // ── JOURNAL ───────────────────────────────────────────────────────────────
 function sessionCard(s){
@@ -4280,14 +4085,11 @@ function resetPlanOverrides(){
 function clearAll(){if(confirm('Effacer toutes les séances ?')){localStorage.removeItem('smi_s');localStorage.removeItem('smi_coach');localStorage.removeItem('smi_plans');sessions=[];plans=null;renderPlans();renderPlan();renderStats();toast('Données effacées')}}
 
 // ── IMPORT MODE ───────────────────────────────────────────────────────────
-let stravaImageB64='';
-let stravaImageType='';
 let currentImportMode='fit';
 
 function setImportMode(mode){
   currentImportMode=mode;
   document.getElementById('import-fit-panel').style.display=mode==='fit'?'block':'none';
-  document.getElementById('import-img-panel').style.display=mode==='img'?'block':'none';
   document.getElementById('mode-fit-btn').className='btn btn-sm '+(mode==='fit'?'btn-or':'btn-ghost');
   document.getElementById('mode-img-btn').className='btn btn-sm '+(mode==='img'?'btn-or':'btn-ghost');
 }
@@ -4646,62 +4448,6 @@ function applyExtractedData(data, filename){
   toast('Fichier importé avec succès !');
 }
 
-// ── SCREENSHOT IMPORT (fallback) ──────────────────────────────────────────
-function handleStravaFile(input){
-  const file=input.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const dataUrl=e.target.result;
-    stravaImageB64=dataUrl.split(',')[1];
-    stravaImageType=file.type||'image/jpeg';
-    document.getElementById('strava-img').src=dataUrl;
-    document.getElementById('strava-preview').style.display='block';
-    document.getElementById('strava-extract-btn').style.display='block';
-    document.getElementById('strava-result').style.display='none';
-  };
-  reader.readAsDataURL(file);
-}
-
-async function extractStravaData(){
-  const apiKey=settings.apiKey||'';
-  if(!apiKey){toast('⚠️ Ajoute ta clé API dans Réglages d\'abord !');return}
-  if(!stravaImageB64){toast('Sélectionne d\'abord une image !');return}
-
-  document.getElementById('strava-loading').style.display='flex';
-  document.getElementById('strava-extract-btn').style.display='none';
-  document.getElementById('strava-result').style.display='none';
-
-  const prompt=`Extrais TOUTES les données visibles de cette capture d'écran d'app de running et réponds UNIQUEMENT en JSON valide sans markdown :
-{"date":"JJ/MM/AAAA ou vide","distance_km":nombre ou null,"duree_min":nombre ou null,"allure_moy":"M:SS ou vide","fc_moy":nombre ou null,"fc_max":nombre ou null,"denivele_plus":nombre ou null,"calories":nombre ou null,"sport":"course/velo/natation/autre","km_details":[{"km":1,"allure":"M:SS","denivele":nombre ou null,"fc_moy":nombre ou null}],"notes":"autres infos"}`;
-
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,temperature:0.2,messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:stravaImageType,data:stravaImageB64}},
-        {type:'text',text:prompt}
-      ]}]})
-    });
-    const data=await res.json();
-    document.getElementById('strava-loading').style.display='none';
-    if(!data.content||!data.content[0]){toast('Erreur API');document.getElementById('strava-extract-btn').style.display='block';return}
-    let raw=data.content[0].text.trim().replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    let extracted;
-    try{extracted=JSON.parse(raw)}catch(e){
-      document.getElementById('strava-result').textContent='Impossible de parser. Réessaie avec une meilleure capture.';
-      document.getElementById('strava-result').style.display='block';
-      document.getElementById('strava-extract-btn').style.display='block';
-      return;
-    }
-    applyExtractedData(extracted,'screenshot');
-  }catch(e){
-    document.getElementById('strava-loading').style.display='none';
-    document.getElementById('strava-extract-btn').style.display='block';
-    toast('Erreur réseau');
-  }
-}
 
 // ── PARCOURS ──────────────────────────────────────────────────────────────
 let savedParcours = JSON.parse(localStorage.getItem('smi_parcours')||'[]');
