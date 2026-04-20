@@ -5814,29 +5814,74 @@ try {
   window.forceSyncFromCloud = async function(){
     toast('⏳ Synchronisation…');
     try {
-      const uid = fbUser ? fbUser.uid : await getUID();
-      if(!uid){ toast('❌ Non lié'); return; }
-
+      // Lire les données cloud
+      let cloudSessions = [];
       let cloudTs = 0;
+
       if(fbUser){
         const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-        cloudTs = snap.exists ? parseInt(snap.data().updated_at||0) : 0;
+        if(snap.exists){
+          const d = snap.data();
+          cloudTs = parseInt(d.updated_at||0);
+          if(d.sessions_json) cloudSessions = JSON.parse(d.sessions_json);
+        }
       } else {
+        const uid = await getUID();
+        if(!uid){ toast('❌ Non lié'); return; }
         const doc = await restRead(uid);
-        cloudTs = parseInt(doc?.fields?.updated_at?.integerValue||0);
+        if(doc&&doc.fields){
+          cloudTs = parseInt(doc.fields.updated_at?.integerValue||0);
+          const sj = doc.fields.sessions_json?.stringValue;
+          if(sj) cloudSessions = JSON.parse(sj);
+        }
       }
 
-      const localTs = parseInt(localStorage.getItem('smi_updated_at')||0);
+      // FUSION par ID — on garde toutes les séances des deux côtés
+      const localMap  = new Map(sessions.map(s=>[s.id, s]));
+      const cloudMap  = new Map(cloudSessions.map(s=>[s.id, s]));
 
-      if(localTs > cloudTs){
-        // Local plus récent → pousser vers le cloud
-        await fbWrite();
-        toast('☁️ Données locales envoyées vers le cloud');
-      } else {
-        // Cloud plus récent (ou égal avec force) → tirer
-        await fbRead(true);
+      // Union : toutes les IDs des deux côtés
+      const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
+      const merged = [];
+      let added = 0, updated = 0;
+
+      for(const id of allIds){
+        const local = localMap.get(id);
+        const cloud = cloudMap.get(id);
+        if(local && cloud){
+          // Les deux ont la séance — garder la plus récente (par timestamp ou analyseClaud)
+          // On préfère la locale si elle a une analyse Claude que le cloud n'a pas
+          if(!cloud.claudeAnalysis && local.claudeAnalysis) merged.push(local);
+          else merged.push(cloud); // sinon cloud fait foi
+        } else if(local){
+          merged.push(local); // séance locale absente du cloud → l'ajouter
+          added++;
+        } else {
+          merged.push(cloud); // séance cloud absente du local → l'ajouter
+          added++;
+        }
       }
-    } catch(e){ toast('❌ Erreur : '+e.message); }
+
+      // Trier par date
+      merged.sort((a,b)=>{
+        const da=parseDate(a.date), db=parseDate(b.date);
+        return da&&db ? da-db : (a.id||0)-(b.id||0);
+      });
+
+      sessions = merged;
+      const sJson = JSON.stringify(sessions);
+      localStorage.setItem('smi_s', sJson);
+
+      // Pousser la fusion vers le cloud
+      await fbWrite();
+
+      // Re-render
+      renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
+      const tab = document.querySelector('.section.active')?.id;
+      if(tab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
+
+      toast(`✅ Sync terminée — ${merged.length} séances (${added > 0 ? '+'+added+' fusionnées' : 'déjà à jour'})`);
+    } catch(e){ toast('❌ Erreur : '+e.message); console.error(e); }
   };
 
   // ── INITIALISATION SYNC ───────────────────────────────────────────────────
