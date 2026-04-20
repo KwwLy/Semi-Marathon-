@@ -638,6 +638,8 @@ canvas{display:block;width:100%!important}
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;display:flex;flex-direction:column;gap:6px">
       <button class="btn btn-or btn-full" onclick="forceSyncFromCloud()">🔄 Charger depuis le cloud</button>
       <button class="btn btn-ghost btn-full" onclick="fbGenerateToken()">🔑 Générer un code pour l'iPhone</button>
+      <button class="btn btn-ghost btn-full" style="font-size:11px" onclick="fbDiagnostic()">🔍 Diagnostic sync</button>
+      <div id="fb-diagnostic-result" style="display:none;background:var(--bg2);border-radius:var(--r);padding:10px;font-size:11px;font-family:monospace;line-height:1.8;word-break:break-all"></div>
       <div id="fb-token-display" style="display:none;margin-top:8px;text-align:center;background:var(--bg2);border-radius:var(--r);padding:12px">
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Saisis ce code sur l'iPhone · Valable 10 minutes</div>
         <div style="font-size:40px;font-weight:700;letter-spacing:8px;color:var(--or)" id="fb-token-code"></div>
@@ -5730,6 +5732,78 @@ try {
       if(msgEl){msgEl.textContent='❌ Erreur : '+e.message; msgEl.style.color='var(--re)';}
       console.error('fbUseToken:', e);
     }
+  };
+
+  // ── DIAGNOSTIC ───────────────────────────────────────────────────────────
+  window.fbDiagnostic = async function(){
+    const el = document.getElementById('fb-diagnostic-result');
+    if(!el) return;
+    el.style.display = 'block';
+    el.textContent = '⏳ Diagnostic en cours…';
+
+    const lines = [];
+    try {
+      // UID
+      const uid = await getUID();
+      lines.push(`UID stocké : ${uid ? uid.slice(0,12)+'…' : '❌ AUCUN'}`);
+      lines.push(`fbUser (Google) : ${fbUser ? fbUser.email : 'non connecté'}`);
+      lines.push(`Séances locales : ${sessions.length}`);
+
+      if(!uid && !fbUser){
+        lines.push('❌ Pas de liaison — génère un code depuis le PC');
+        el.textContent = lines.join('\n');
+        return;
+      }
+
+      // Lire Firestore
+      lines.push('⏳ Lecture Firestore…');
+      el.textContent = lines.join('\n');
+
+      let cloudCount = null;
+      let cloudTs = null;
+
+      if(fbUser){
+        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+        if(snap.exists){
+          const d = snap.data();
+          cloudCount = JSON.parse(d.sessions_json||'[]').length;
+          cloudTs = d.updated_at;
+        }
+      } else {
+        const doc = await restRead(uid);
+        if(doc && doc.fields){
+          const sJson = doc.fields.sessions_json?.stringValue;
+          cloudCount = sJson ? JSON.parse(sJson).length : 0;
+          cloudTs = doc.fields.updated_at?.integerValue;
+        }
+      }
+
+      lines.pop(); // remove "Lecture…"
+      lines.push(`Séances Firestore : ${cloudCount !== null ? cloudCount : '❌ lecture échouée'}`);
+
+      if(cloudTs){
+        const d = new Date(parseInt(cloudTs));
+        lines.push(`Dernière sync cloud : ${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR')}`);
+      }
+
+      const localTs = parseInt(localStorage.getItem('smi_updated_at')||0);
+      if(localTs){
+        const d = new Date(localTs);
+        lines.push(`Dernière sync locale : ${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR')}`);
+      }
+
+      const diff = cloudCount !== null ? cloudCount - sessions.length : null;
+      if(diff !== null){
+        if(diff > 0) lines.push(`⚠️ ${diff} séances dans le cloud non chargées localement → clique "Charger depuis le cloud"`);
+        else if(diff < 0) lines.push(`⚠️ ${Math.abs(diff)} séances locales non dans le cloud → elles seront poussées`);
+        else lines.push('✅ Local et cloud synchronisés');
+      }
+
+    } catch(e){
+      lines.push(`❌ Erreur : ${e.message}`);
+    }
+
+    el.textContent = lines.join('\n');
   };
 
   // Exposer pour l'UI
