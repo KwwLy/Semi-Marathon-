@@ -636,7 +636,7 @@ canvas{display:block;width:100%!important}
 
     <!-- Actions toujours visibles -->
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;display:flex;flex-direction:column;gap:6px">
-      <button class="btn btn-or btn-full" onclick="forceSyncFromCloud()">🔄 Charger depuis le cloud</button>
+      <button class="btn btn-or btn-full" onclick="forceSyncFromCloud()">🔄 Synchroniser maintenant</button>
       <button class="btn btn-ghost btn-full" onclick="fbGenerateToken()">🔑 Générer un code pour l'iPhone</button>
       <button class="btn btn-ghost btn-full" style="font-size:11px" onclick="fbDiagnostic()">🔍 Diagnostic sync</button>
       <div id="fb-diagnostic-result" style="display:none;background:var(--bg2);border-radius:var(--r);padding:10px;font-size:11px;font-family:monospace;line-height:1.8;word-break:break-all"></div>
@@ -5532,6 +5532,7 @@ try {
     if(tab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
   }
 
+
   // ── ÉCRITURE ─────────────────────────────────────────────────────────────
   async function fbWrite(){
     if(fbSyncing) return;
@@ -5548,7 +5549,7 @@ try {
       } else {
         // iPhone PWA → REST
         const uid = await getUID();
-        if(!uid){ fbSyncing=false; fbSetSyncStatus('⚠️ Non lié'); return; }
+        if(!uid){ fbSetSyncStatus('⚠️ Non lié'); return; }
         await restWrite(uid, payload);
       }
       localStorage.setItem('smi_updated_at', String(payload.updated_at));
@@ -5557,8 +5558,9 @@ try {
     } catch(e){
       fbSetSyncStatus('⚠️ Erreur');
       console.error('fbWrite:', e);
+    } finally {
+      fbSyncing = false;
     }
-    fbSyncing = false;
   }
 
   // ── LECTURE ──────────────────────────────────────────────────────────────
@@ -5809,7 +5811,33 @@ try {
   // Exposer pour l'UI
   window.fbSaveData  = fbWrite;
   window.fbRestWrite = (uid, payload) => payload ? restWrite(uid, payload) : fbWrite();
-  window.forceSyncFromCloud = ()=>{ toast('⏳ Chargement…'); return fbRead(true); };
+  window.forceSyncFromCloud = async function(){
+    toast('⏳ Synchronisation…');
+    try {
+      const uid = fbUser ? fbUser.uid : await getUID();
+      if(!uid){ toast('❌ Non lié'); return; }
+
+      let cloudTs = 0;
+      if(fbUser){
+        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+        cloudTs = snap.exists ? parseInt(snap.data().updated_at||0) : 0;
+      } else {
+        const doc = await restRead(uid);
+        cloudTs = parseInt(doc?.fields?.updated_at?.integerValue||0);
+      }
+
+      const localTs = parseInt(localStorage.getItem('smi_updated_at')||0);
+
+      if(localTs > cloudTs){
+        // Local plus récent → pousser vers le cloud
+        await fbWrite();
+        toast('☁️ Données locales envoyées vers le cloud');
+      } else {
+        // Cloud plus récent (ou égal avec force) → tirer
+        await fbRead(true);
+      }
+    } catch(e){ toast('❌ Erreur : '+e.message); }
+  };
 
   // ── INITIALISATION SYNC ───────────────────────────────────────────────────
   async function fbSyncInit(){
