@@ -5576,7 +5576,14 @@ try {
       } else {
         // iPhone → REST
         const uid = await getUID();
-        if(!uid) return;
+        if(!uid){
+          // Pas d'UID → afficher état "non lié" clairement
+          const dot   = document.getElementById('fb-dot');
+          const label = document.getElementById('fb-label');
+          if(dot)   dot.style.background = 'var(--text3)';
+          if(label) label.textContent     = 'Non lié — utilise un code';
+          return;
+        }
         const doc = await restRead(uid);
         if(!doc||!doc.fields) return;
         const get = k => doc.fields[k]?.stringValue || doc.fields[k]?.integerValue || '';
@@ -5733,28 +5740,35 @@ try {
   // ── INITIALISATION SYNC ───────────────────────────────────────────────────
   async function fbSyncInit(){
 
-    // 1. Au démarrage — sync après 2s (laisse le temps à l'auth de s'initialiser)
+    // 1. Au démarrage — vérifier l'état et sync si lié
     setTimeout(async ()=>{
+      if(fbUser) return; // PC connecté Google → géré par onAuthStateChanged
       const uid = await getUID();
-      const dot = document.getElementById('fb-dot');
+      const dot   = document.getElementById('fb-dot');
       const label = document.getElementById('fb-label');
-      if(uid && !fbUser){
-        // iPhone lié mais pas auth Google → indiquer "Lié (PWA)"
-        if(dot) dot.style.background='#3B82F6';
-        if(label) label.textContent='☁️ Chargement…';
+      if(uid){
+        // iPhone lié → sync
+        if(dot)   dot.style.background = '#3B82F6';
+        if(label) label.textContent     = '☁️ Sync…';
         await fbRead(false);
+      } else {
+        // Pas lié → indiquer clairement
+        if(dot)   dot.style.background = 'var(--text3)';
+        if(label) label.textContent     = 'Non lié — utilise un code';
       }
-    }, 2000);
+    }, 1500);
 
-    // 2. Sync périodique toutes les 5 min (réduit vs 30 pour être plus réactif)
-    setInterval(()=> fbWrite(), 5 * 60 * 1000);
+    // 2. Sync périodique toutes les 5 min
+    setInterval(async ()=>{
+      const uid = await getUID();
+      if(!uid && !fbUser) return;
+      fbWrite();
+    }, 5 * 60 * 1000);
 
-    // 3. Rafraîchir au retour au premier plan (iOS background → foreground)
+    // 3. Rafraîchir au retour au premier plan (iOS)
     document.addEventListener('visibilitychange', async ()=>{
       if(document.visibilityState !== 'visible') return;
-      // Rafraîchir le cache UID en mémoire
       window._linkedUID = await IDB.get(UID_KEY) || null;
-      // Si lié, sync automatique
       if(window._linkedUID || fbUser) fbRead(false);
     });
 
