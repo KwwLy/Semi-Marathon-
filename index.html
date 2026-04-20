@@ -604,45 +604,44 @@ canvas{display:block;width:100%!important}
 <div class="section" id="tab-settings">
   <div class="card" id="fb-settings-card">
     <div class="card-title"><span class="bar"></span>☁️ Synchronisation multi-appareils</div>
-    <p class="u-body-sm">Connecte-toi avec Google pour synchroniser automatiquement tes séances, ton plan et tes réglages sur tous tes appareils.</p>
+
+    <!-- État connexion -->
     <div id="fb-settings-logged-out">
-      <button class="btn btn-or btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">🔑 Se connecter avec Google</button>
-      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:8px">— ou —</div>
-      <div style="display:flex;gap:6px">
-        <input type="email" id="fb-email-input" placeholder="ton@email.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--text)">
-        <button class="btn btn-ghost" onclick="fbSendEmailLink()" style="white-space:nowrap">📧 Lien magique</button>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6">
+        <b>Sur PC</b> : connecte-toi avec Google ci-dessous.<br>
+        <b>Sur iPhone</b> : génère un code sur PC, puis saisis-le ici.
       </div>
-      <div id="fb-email-msg" style="font-size:11px;color:var(--gr);margin-top:6px;display:none"></div>
-      <div style="text-align:center;font-size:11px;color:var(--text3);margin:8px 0">— ou utilise un code de transfert —</div>
+      <button class="btn btn-or btn-full" style="margin-bottom:12px" onclick="fbToggleAuth()">🔑 Se connecter avec Google (PC)</button>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">📱 iPhone — Saisir un code de liaison</div>
       <div style="display:flex;gap:6px">
-        <input type="text" id="fb-token-input" placeholder="Code à 6 chiffres" maxlength="6" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;letter-spacing:4px;text-align:center;background:var(--bg);color:var(--text)">
-        <button class="btn btn-ghost" onclick="fbUseToken()" style="white-space:nowrap">Utiliser</button>
+        <input type="text" id="fb-token-input" placeholder="Code à 6 chiffres" maxlength="6"
+          style="flex:1;padding:10px;border:2px solid var(--border);border-radius:var(--r);font-size:18px;letter-spacing:6px;text-align:center;background:var(--bg);color:var(--text);font-weight:700">
+        <button class="btn btn-or" onclick="fbUseToken()" style="padding:10px 16px;font-size:13px">Lier</button>
       </div>
-      <div id="fb-token-msg" style="font-size:11px;color:var(--re);margin-top:6px;display:none"></div>
+      <div id="fb-token-msg" style="font-size:12px;margin-top:6px;display:none"></div>
     </div>
+
+    <!-- Connecté Google (PC) -->
     <div id="fb-settings-logged-in" style="display:none">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <img id="fb-avatar" src="" style="width:36px;height:36px;border-radius:50%;display:none">
-        <div>
+        <div style="flex:1">
           <div id="fb-username" class="u-kpi-val-sm"></div>
           <div id="fb-useremail" style="font-size:11px;color:var(--text3)"></div>
         </div>
-        <span id="fb-sync-indicator" style="margin-left:auto;font-size:11px;color:var(--text3)">✓ Synchronisé</span>
+        <span id="fb-sync-indicator" style="font-size:11px;color:var(--text3)">✓ Synchronisé</span>
       </div>
-      <button class="btn btn-ghost btn-full" style="margin-bottom:8px" onclick="fbToggleAuth()">Se déconnecter</button>
+      <button class="btn btn-ghost btn-full" onclick="fbToggleAuth()">Se déconnecter</button>
     </div>
-    <!-- Bouton sync toujours visible -->
-    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px">
-      <button class="btn btn-or btn-full" style="margin-bottom:6px" onclick="forceSyncFromCloud()">🔄 Charger les données depuis le cloud</button>
-    </div>
-    <!-- Génération code transfert — toujours visible -->
-    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">📱 Transférer vers un autre appareil</div>
-      <button class="btn btn-ghost btn-full" onclick="fbGenerateToken()">🔑 Générer un code à 6 chiffres</button>
-      <div id="fb-token-display" style="display:none;margin-top:10px;text-align:center">
-        <div style="font-size:36px;font-weight:700;letter-spacing:8px;color:var(--or)" id="fb-token-code"></div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Valable 10 minutes · Saisis ce code dans la PWA</div>
-        <div id="fb-token-timer" style="font-size:11px;color:var(--am);margin-top:2px"></div>
+
+    <!-- Actions toujours visibles -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;display:flex;flex-direction:column;gap:6px">
+      <button class="btn btn-or btn-full" onclick="forceSyncFromCloud()">🔄 Charger depuis le cloud</button>
+      <button class="btn btn-ghost btn-full" onclick="fbGenerateToken()">🔑 Générer un code pour l'iPhone</button>
+      <div id="fb-token-display" style="display:none;margin-top:8px;text-align:center;background:var(--bg2);border-radius:var(--r);padding:12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Saisis ce code sur l'iPhone · Valable 10 minutes</div>
+        <div style="font-size:40px;font-weight:700;letter-spacing:8px;color:var(--or)" id="fb-token-code"></div>
+        <div id="fb-token-timer" style="font-size:11px;color:var(--am);margin-top:4px"></div>
       </div>
     </div>
   </div>
@@ -4476,15 +4475,7 @@ let currentTrackingParcours = null;
 
 function saveParcoursList(){
   localStorage.setItem('smi_parcours', JSON.stringify(savedParcours));
-  clearTimeout(window._parcoursTimer);
-  window._parcoursTimer = setTimeout(async ()=>{
-    const fbUser = window._getFbUser ? window._getFbUser() : null;
-    if(window.fbSaveData && fbUser) window.fbSaveData();
-    else if(window.fbRestWrite && window.getStoredUid){
-      const uid = await window.getStoredUid();
-      if(uid) window.fbRestWrite(uid);
-    }
-  }, 1000);
+  // Le patch localStorage déclenche fbWrite() automatiquement après 2s
 }
 
 function renderParcours(){
@@ -5415,296 +5406,361 @@ const IDB = {
 
 window.addEventListener('DOMContentLoaded', function(){
 try {
+
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  const FB_PROJECT = 'semi-marathon-94d90';
+  const FB_API_KEY = 'AIzaSyCAxvE_GNcpqFePMdmU3Ht7QeS-sYAE5-E';
+
   firebase.initializeApp({
-    apiKey: "AIzaSyCAxvE_GNcpqFePMdmU3Ht7QeS-sYAE5-E",
-    authDomain: "semi-marathon-94d90.firebaseapp.com",
-    projectId: "semi-marathon-94d90",
-    storageBucket: "semi-marathon-94d90.firebasestorage.app",
-    messagingSenderId: "430293017307",
-    appId: "1:430293017307:web:109e1cdbab4ac49350a2fe"
+    apiKey: FB_API_KEY,
+    authDomain: 'semi-marathon-94d90.firebaseapp.com',
+    projectId: FB_PROJECT,
+    storageBucket: 'semi-marathon-94d90.firebasestorage.app',
+    messagingSenderId: '430293017307',
+    appId: '1:430293017307:web:109e1cdbab4ac49350a2fe'
   });
 
   const fbAuth = firebase.auth();
-  const fbDb = firebase.firestore();
-  let fbUser = null;
-  window._getFbUser = () => fbUser;
+  const fbDb   = firebase.firestore();
+  let fbUser   = null;
   let fbSyncing = false;
+  window._getFbUser = () => fbUser;
 
   document.getElementById('fb-banner').style.display = 'flex';
 
-  fbAuth.onAuthStateChanged(async user => {
-    fbUser = user;
-    if(user){ fbSetConnected(user); await fbLoadData(); }
-    else { fbSetDisconnected(); }
-  });
+  // ── STOCKAGE UID (IndexedDB = seul stockage fiable sur iOS PWA) ───────────
+  const UID_KEY = 'smi_linked_uid'; // clé unique pour l'UID lié
 
-  function fbSetConnected(user){
-    const dot = document.getElementById('fb-dot');
-    const label = document.getElementById('fb-label');
-    if(dot) dot.style.background = '#27AE60';
-    if(label) label.textContent = user.displayName||user.email;
-    const lo = document.getElementById('fb-settings-logged-out');
-    const li = document.getElementById('fb-settings-logged-in');
-    const un = document.getElementById('fb-username');
-    const ue = document.getElementById('fb-useremail');
-    const av = document.getElementById('fb-avatar');
-    if(lo) lo.style.display = 'none';
-    if(li) li.style.display = 'block';
-    if(un) un.textContent = user.displayName||'';
-    if(ue) ue.textContent = user.email||'';
-    if(av && user.photoURL){ av.src=user.photoURL; av.style.display='block'; }
+  async function saveUID(uid){
+    await IDB.set(UID_KEY, uid);
+    // Aussi dans localStorage et cookie comme backup
+    try { localStorage.setItem('smi_fb_uid', uid); } catch(e){}
+    try { document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`; } catch(e){}
+    window._linkedUID = uid; // cache mémoire
   }
 
-  function fbSetDisconnected(){
-    const dot = document.getElementById('fb-dot');
-    const label = document.getElementById('fb-label');
-    if(dot) dot.style.background = 'var(--text3)';
-    if(label) label.textContent = 'Non connecté';
-    const lo = document.getElementById('fb-settings-logged-out');
-    const li = document.getElementById('fb-settings-logged-in');
-    if(lo) lo.style.display = 'block';
-    if(li) li.style.display = 'none';
+  async function getUID(){
+    // 1. Cache mémoire (le plus rapide)
+    if(window._linkedUID) return window._linkedUID;
+    // 2. IndexedDB (le plus fiable)
+    const idbVal = await IDB.get(UID_KEY);
+    if(idbVal){ window._linkedUID = idbVal; return idbVal; }
+    // 3. localStorage (fallback)
+    const lsVal = localStorage.getItem('smi_fb_uid');
+    if(lsVal){ await saveUID(lsVal); return lsVal; }
+    // 4. Cookie (dernier recours)
+    const cookieMatch = document.cookie.match(/smi_uid=([^;]+)/);
+    if(cookieMatch){ await saveUID(cookieMatch[1]); return cookieMatch[1]; }
+    return null;
   }
 
-  window.fbToggleAuth = function(){
-    if(fbUser){
-      if(confirm('Se déconnecter ? Tes données restent dans le cloud.')) fbAuth.signOut();
-    } else {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      // GitHub Pages bloque les popups COOP → utiliser redirect uniquement
-      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur : '+e.message));
-    }
-  };
+  async function clearUID(){
+    window._linkedUID = null;
+    await IDB.del(UID_KEY);
+    try { localStorage.removeItem('smi_fb_uid'); } catch(e){}
+    document.cookie = 'smi_uid=;max-age=0;path=/';
+  }
 
-  // Lien magique par email
-  window.fbSendEmailLink = async function(){
-    const email = document.getElementById('fb-email-input')?.value?.trim();
-    if(!email){ toast('Entre ton adresse email'); return; }
-    const actionCodeSettings = {
-      url: window.location.origin + window.location.pathname,
-      handleCodeInApp: true
+  // Exposer pour les fonctions externes (saveParcoursList, etc.)
+  window.getStoredUid = getUID;
+
+  // ── API REST FIRESTORE (pour iPhone sans auth Google) ────────────────────
+  const FB_REST = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`;
+
+  async function restRead(uid){
+    const r = await fetch(`${FB_REST}/users/${uid}`);
+    if(!r.ok) return null;
+    return r.json();
+  }
+  window.fbRestRead = restRead;
+
+  async function restWrite(uid, payload){
+    const fields = {};
+    const mask = [];
+    Object.entries(payload).forEach(([k,v])=>{
+      fields[k] = (k==='updated_at') ? {integerValue:String(v)} : {stringValue:String(v)};
+      mask.push('updateMask.fieldPaths='+k);
+    });
+    return fetch(`${FB_REST}/users/${uid}?${mask.join('&')}`,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fields})
+    });
+  }
+
+  // ── PAYLOAD — données à synchroniser ─────────────────────────────────────
+  function buildPayload(){
+    return {
+      sessions_json:      JSON.stringify(sessions),
+      plans_json:         JSON.stringify(plans),
+      parcours_json:      JSON.stringify(savedParcours),
+      planOverrides_json: JSON.stringify(planOverrides),
+      settings_json:      JSON.stringify({...settings, apiKey:''}),
+      coach_json:         localStorage.getItem('smi_coach') || 'null',
+      updated_at:         Date.now()
     };
-    try {
-      await fbAuth.sendSignInLinkToEmail(email, actionCodeSettings);
-      localStorage.setItem('smi_email_link', email);
-      const msgEl = document.getElementById('fb-email-msg');
-      if(msgEl){ msgEl.textContent = '✅ Email envoyé à '+email+' — clique le lien dans l\'email !'; msgEl.style.display='block'; }
-      toast('📧 Email envoyé !');
-    } catch(e){ toast('Erreur envoi email : '+e.message); }
-  };
-
-  // Vérifier si on revient d'un lien magique
-  const currentUrl = window.location.href;
-  const isEmailLink = fbAuth.isSignInWithEmailLink(currentUrl);
-
-  console.log('URL actuelle:', currentUrl);
-  console.log('Est un lien email Firebase:', isEmailLink);
-  console.log('Contient oobCode:', currentUrl.includes('oobCode'));
-
-  // Debug visible dans l'app (utile sur iPhone sans DevTools)
-  if(currentUrl.includes('oobCode')){
-    const dbgEl = document.getElementById('fb-email-msg');
-    if(dbgEl){ 
-      dbgEl.textContent = isEmailLink ? 'Lien détecté ✓, connexion en cours…' : '⚠️ Lien non reconnu par Firebase (isEmailLink=false)'; 
-      dbgEl.style.display='block'; 
-      dbgEl.style.color = isEmailLink ? 'var(--or)' : 'var(--re)'; 
-    }
   }
 
-  if(isEmailLink){
-    let email = localStorage.getItem('smi_email_link');
-    if(!email) email = prompt('Confirme ton adresse email pour te connecter :');
-    if(email){
-      fbAuth.signInWithEmailLink(email, currentUrl)
-        .then(result => {
-          console.log('Connexion email réussie:', result.user.email);
-          localStorage.removeItem('smi_email_link');
-          window.history.replaceState({}, document.title, window.location.pathname);
-          toast('✅ Connecté avec succès !');
-        })
-        .catch(e => {
-          console.error('Email link error:', e.code, e.message);
-          const dbgEl = document.getElementById('fb-email-msg');
-          if(dbgEl){ dbgEl.textContent = '❌ '+e.code+' : '+e.message; dbgEl.style.display='block'; dbgEl.style.color='var(--re)'; }
-          toast('Erreur : '+e.code);
-        });
+  function applyPayload(d, getField){
+    // getField(key) → string value, works for both SDK doc and REST doc
+    const s  = getField('sessions_json');
+    const pl = getField('plans_json');
+    const pr = getField('parcours_json');
+    const po = getField('planOverrides_json');
+    const co = getField('coach_json');
+    const st = getField('settings_json');
+    const ts = getField('updated_at');
+
+    if(s)  { sessions=JSON.parse(s); localStorage.setItem('smi_s', s); }
+    if(pl) { plans=JSON.parse(pl); localStorage.setItem('smi_plans', pl); }
+    if(pr) { savedParcours=JSON.parse(pr); localStorage.setItem('smi_parcours', pr); }
+    if(po) { planOverrides=JSON.parse(po); localStorage.setItem('smi_plan_overrides', po); }
+    if(co && co!=='null') localStorage.setItem('smi_coach', co);
+    if(st) {
+      const parsed=JSON.parse(st);
+      const k=settings.apiKey;
+      settings={...parsed, apiKey:k||parsed.apiKey||''};
+      localStorage.setItem('smi_cfg', JSON.stringify(settings));
     }
+    const tsNum = parseInt(ts||0);
+    if(tsNum){ localStorage.setItem('smi_updated_at', String(tsNum)); IDB.set('smi_updated_at', String(tsNum)); }
   }
 
-  // Récupérer le résultat après redirection Google
-  fbAuth.getRedirectResult().then(result => {
-    if(result && result.user){
-      console.log('Connexion redirect OK:', result.user.email);
-      toast('✅ Connecté : '+result.user.email);
-      // onAuthStateChanged va s'en charger, mais on force quand même
-      fbUser = result.user;
-      fbSetConnected(result.user);
-      fbLoadData();
-    }
-  }).catch(e=>{
-    if(e.code !== 'auth/no-auth-event'){
-      console.error('Redirect result error:', e.code, e.message);
-      toast('Erreur connexion : '+e.message);
-    }
-  });
+  function renderAll(){
+    renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
+    const tab = document.querySelector('.section.active')?.id;
+    if(tab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
+  }
 
-  // ── FIREBASE SYNC — architecture unifiée ─────────────────────────────────
-  // fbWrite()  : pousse les données vers Firestore (SDK si connecté, REST sinon)
-  // fbRead(force) : lit depuis Firestore et applique si cloud plus récent (ou force=true)
-  // fbSyncInit() : démarre la sync automatique au chargement
-
-  // ── Données locales → Firestore ──────────────────────────────────────────
+  // ── ÉCRITURE ─────────────────────────────────────────────────────────────
   async function fbWrite(){
     if(fbSyncing) return;
     fbSyncing = true;
     fbSetSyncStatus('⏳ Sync…');
     try {
-      const now = Date.now();
-      const coachRaw = localStorage.getItem('smi_coach');
-      const payload = {
-        sessions_json:      JSON.stringify(sessions),
-        plans_json:         JSON.stringify(plans),
-        parcours_json:      JSON.stringify(savedParcours),
-        planOverrides_json: JSON.stringify(planOverrides),
-        settings_json:      JSON.stringify({...settings, apiKey:''}),
-        coach_json:         coachRaw || 'null',
-        updated_at:         now
-      };
-
+      const payload = buildPayload();
       if(fbUser){
-        // SDK — PC connecté Google
+        // PC connecté Google → SDK
         await fbDb.collection('users').doc(fbUser.uid).set({
           ...payload,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        // REST — iPhone PWA
-        const uid = await getStoredUid();
-        if(!uid){ fbSyncing=false; return; }
-        // Rafraîchir toutes les sources de persistance UID
-        localStorage.setItem('smi_fb_uid', uid);
-        IDB.set('smi_fb_uid', uid);
-        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-        const fields = {};
-        const mask = [];
-        Object.entries(payload).forEach(([k,v])=>{
-          fields[k] = k==='updated_at' ? {integerValue:String(v)} : {stringValue:v};
-          mask.push('updateMask.fieldPaths='+k);
-        });
-        await fetch(
-          `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/users/${uid}?${mask.join('&')}`,
-          { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fields}) }
-        );
+        // iPhone PWA → REST
+        const uid = await getUID();
+        if(!uid){ fbSyncing=false; fbSetSyncStatus('⚠️ Non lié'); return; }
+        await restWrite(uid, payload);
       }
-
-      localStorage.setItem('smi_updated_at', String(now));
-      IDB.set('smi_updated_at', String(now));
+      localStorage.setItem('smi_updated_at', String(payload.updated_at));
+      IDB.set('smi_updated_at', String(payload.updated_at));
       fbSetSyncStatus('✓ Synchronisé');
     } catch(e){
-      fbSetSyncStatus('⚠️ Erreur sync');
-      console.error('fbWrite error:', e);
+      fbSetSyncStatus('⚠️ Erreur');
+      console.error('fbWrite:', e);
     }
     fbSyncing = false;
   }
 
-  // ── Firestore → données locales ──────────────────────────────────────────
-  async function fbRead(force = false){
+  // ── LECTURE ──────────────────────────────────────────────────────────────
+  async function fbRead(force=false){
     try {
-      let data = null; // {sessions_json, plans_json, ...} normalisé
-
-      if(fbUser){
-        // SDK
-        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-        if(!snap.exists){ await fbWrite(); return; }
-        data = snap.data();
-        data._ts = parseInt(data.updated_at||0);
-      } else {
-        // REST
-        const uid = await getStoredUid();
-        if(!uid) return;
-        // Rafraîchir persistance UID
-        localStorage.setItem('smi_fb_uid', uid);
-        IDB.set('smi_fb_uid', uid);
-        document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
-
-        const doc = await fbRestRead(uid);
-        if(!doc||!doc.fields) return;
-        const get = f => doc.fields[f]?.stringValue||'';
-        data = {
-          sessions_json:      get('sessions_json'),
-          plans_json:         get('plans_json'),
-          parcours_json:      get('parcours_json'),
-          planOverrides_json: get('planOverrides_json'),
-          coach_json:         get('coach_json'),
-          settings_json:      get('settings_json'),
-          _ts:                parseInt(doc.fields.updated_at?.integerValue||0)
-        };
-      }
-
-      const cloudTs = data._ts;
+      let cloudTs = 0;
       const localTs = parseInt(await IDB.get('smi_updated_at') || localStorage.getItem('smi_updated_at')||0);
 
-      if(!force && cloudTs > 0 && cloudTs <= localTs){
-        // Local plus récent → pousser vers le cloud
-        await fbWrite();
-        fbSetSyncStatus('✓ Synchronisé');
-        return;
+      if(fbUser){
+        // PC connecté Google → SDK
+        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+        if(!snap.exists){ await fbWrite(); return; }
+        const d = snap.data();
+        cloudTs = parseInt(d.updated_at||0);
+        if(!force && cloudTs > 0 && cloudTs <= localTs){ await fbWrite(); fbSetSyncStatus('✓ Synchronisé'); return; }
+        applyPayload(d, k => d[k] || '');
+      } else {
+        // iPhone → REST
+        const uid = await getUID();
+        if(!uid) return;
+        const doc = await restRead(uid);
+        if(!doc||!doc.fields) return;
+        const get = k => doc.fields[k]?.stringValue || doc.fields[k]?.integerValue || '';
+        cloudTs = parseInt(doc.fields.updated_at?.integerValue||0);
+        if(!force && cloudTs > 0 && cloudTs <= localTs){ await fbWrite(); fbSetSyncStatus('✓ Synchronisé'); return; }
+        applyPayload(doc, get);
       }
 
-      // Appliquer les données cloud
-      if(data.sessions_json){ sessions=JSON.parse(data.sessions_json); localStorage.setItem('smi_s',data.sessions_json); }
-      if(data.plans_json){ plans=JSON.parse(data.plans_json); localStorage.setItem('smi_plans',data.plans_json); }
-      if(data.parcours_json){ savedParcours=JSON.parse(data.parcours_json); localStorage.setItem('smi_parcours',data.parcours_json); }
-      if(data.planOverrides_json){ planOverrides=JSON.parse(data.planOverrides_json); localStorage.setItem('smi_plan_overrides',data.planOverrides_json); }
-      if(data.coach_json&&data.coach_json!=='null') localStorage.setItem('smi_coach',data.coach_json);
-      if(data.settings_json){ const s=JSON.parse(data.settings_json); const k=settings.apiKey; settings={...s,apiKey:k||s.apiKey||''}; localStorage.setItem('smi_cfg',JSON.stringify(settings)); }
-      if(cloudTs){ localStorage.setItem('smi_updated_at',String(cloudTs)); IDB.set('smi_updated_at',String(cloudTs)); }
-
-      // Re-render tous les onglets
-      renderHome(); renderPlans(); renderPlan(); renderStats(); loadCoachCard(); renderParcours();
-      const activeTab = document.querySelector('.section.active')?.id;
-      if(activeTab==='tab-journal'){ populateJournalPlanFilter(); renderJournal(); }
-
-      const dot = document.getElementById('fb-dot');
-      const label = document.getElementById('fb-label');
-      if(dot) dot.style.background='#27AE60';
-      if(label) label.textContent='✓ Synchronisé';
-      if(force) toast('✅ '+sessions.length+' séances chargées depuis le cloud');
+      renderAll();
+      setSyncIndicator(true);
+      if(force) toast('✅ '+sessions.length+' séances chargées');
       else toast('☁️ Données mises à jour depuis le cloud');
-
-    } catch(e){ console.warn('fbRead error:', e); }
+    } catch(e){ console.warn('fbRead:', e); }
   }
 
-  function fbSetSyncStatus(msg){ const el=document.getElementById('fb-sync-indicator'); if(el)el.textContent=msg; }
+  // ── UI INDICATEURS ────────────────────────────────────────────────────────
+  function fbSetSyncStatus(msg){
+    const el=document.getElementById('fb-sync-indicator');
+    if(el) el.textContent=msg;
+  }
 
-  // Exposer pour le bouton "Charger depuis le cloud" et le patch localStorage
-  window.fbSaveData = fbWrite;
-  window.forceSyncFromCloud = ()=>{ toast('⏳ Chargement depuis le cloud…'); return fbRead(true); };
+  function setSyncIndicator(linked, name){
+    const dot   = document.getElementById('fb-dot');
+    const label = document.getElementById('fb-label');
+    if(dot)   dot.style.background   = linked ? '#27AE60' : 'var(--text3)';
+    if(label) label.textContent       = linked ? (name||'✓ Lié') : 'Non lié';
+  }
 
-  // ── Initialisation sync ───────────────────────────────────────────────────
-  function fbSyncInit(){
-    // 1. Sync au démarrage (2s de délai pour laisser le temps à l'auth)
-    setTimeout(()=> fbRead(false), 2000);
+  // ── AUTH GOOGLE (PC uniquement) ──────────────────────────────────────────
+  fbAuth.onAuthStateChanged(async user => {
+    fbUser = user;
+    if(user){
+      // Sauvegarder l'UID Google pour que l'iPhone puisse s'y connecter via code
+      await saveUID(user.uid);
+      // UI PC
+      const lo=document.getElementById('fb-settings-logged-out');
+      const li=document.getElementById('fb-settings-logged-in');
+      const un=document.getElementById('fb-username');
+      const ue=document.getElementById('fb-useremail');
+      const av=document.getElementById('fb-avatar');
+      if(lo) lo.style.display='none';
+      if(li) li.style.display='block';
+      if(un) un.textContent=user.displayName||'';
+      if(ue) ue.textContent=user.email||'';
+      if(av&&user.photoURL){ av.src=user.photoURL; av.style.display='block'; }
+      setSyncIndicator(true, user.displayName||user.email);
+      await fbRead(false);
+    } else {
+      const lo=document.getElementById('fb-settings-logged-out');
+      const li=document.getElementById('fb-settings-logged-in');
+      if(lo) lo.style.display='block';
+      if(li) li.style.display='none';
+      // Vérifier si lié via code (iPhone)
+      const uid = await getUID();
+      if(uid) setSyncIndicator(true, '✓ Lié (PWA)');
+      else setSyncIndicator(false);
+    }
+  });
 
-    // 2. Sync périodique toutes les 30 min
-    setInterval(async ()=>{
-      const uid = await getStoredUid();
-      if(!uid && !fbUser) return;
-      if(uid){ localStorage.setItem('smi_fb_uid',uid); IDB.set('smi_fb_uid',uid); document.cookie=`smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`; }
-      fbWrite();
-    }, 30 * 60 * 1000);
+  fbAuth.getRedirectResult().then(result=>{
+    if(result&&result.user) toast('✅ Connecté : '+result.user.email);
+  }).catch(e=>{ if(e.code!=='auth/no-auth-event') console.error('Redirect:', e.code); });
 
-    // 3. Rafraîchir UID au retour au premier plan (iOS)
+  window.fbToggleAuth = function(){
+    if(fbUser){
+      if(confirm('Se déconnecter ?')) fbAuth.signOut();
+    } else {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      fbAuth.signInWithRedirect(provider).catch(e=>toast('Erreur : '+e.message));
+    }
+  };
+
+  // ── CODE DE TRANSFERT (6 chiffres) ───────────────────────────────────────
+  // Le PC génère un code qui stocke son UID dans Firestore/tokens pendant 10 min.
+  // L'iPhone utilise ce code pour récupérer l'UID et se lier au même compte.
+
+  window.fbGenerateToken = async function(){
+    if(!fbUser){ toast('⚠️ Connecte-toi avec Google sur PC d\'abord'); return; }
+    const code = String(Math.floor(100000 + Math.random()*900000));
+    const expires = Date.now() + 10*60*1000;
+    try {
+      await fbDb.collection('tokens').doc(code).set({
+        uid: fbUser.uid,
+        expires,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      // Afficher le code
+      const display = document.getElementById('fb-token-display');
+      const codeEl  = document.getElementById('fb-token-code');
+      const timerEl = document.getElementById('fb-token-timer');
+      if(codeEl){ codeEl.textContent=code; codeEl.style.fontSize='36px'; codeEl.style.color='var(--or)'; }
+      if(display) display.style.display='block';
+      // Compte à rebours
+      let remaining = 600;
+      const interval = setInterval(()=>{
+        remaining--;
+        if(timerEl) timerEl.textContent = `Expire dans ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`;
+        if(remaining<=0){
+          clearInterval(interval);
+          if(timerEl) timerEl.textContent='Expiré';
+          fbDb.collection('tokens').doc(code).delete().catch(()=>{});
+        }
+      }, 1000);
+    } catch(e){ toast('Erreur : '+e.message); }
+  };
+
+  window.fbUseToken = async function(){
+    const input = document.getElementById('fb-token-input');
+    const msgEl = document.getElementById('fb-token-msg');
+    const code  = input?.value?.trim();
+    if(!code||code.length!==6){ if(msgEl){msgEl.textContent='Entre un code à 6 chiffres';msgEl.style.display='block';} return; }
+
+    try {
+      if(msgEl){ msgEl.textContent='⏳ Vérification…'; msgEl.style.color='var(--text3)'; msgEl.style.display='block'; }
+
+      const resp = await fetch(`${FB_REST}/tokens/${code}`);
+      if(!resp.ok){ if(msgEl){msgEl.textContent='❌ Code invalide ou expiré';msgEl.style.color='var(--re)';} return; }
+      const doc = await resp.json();
+      const uid      = doc.fields?.uid?.stringValue;
+      const expires  = parseInt(doc.fields?.expires?.integerValue||0);
+
+      if(!uid||Date.now()>expires){ if(msgEl){msgEl.textContent='❌ Code expiré';msgEl.style.color='var(--re)';} return; }
+
+      // Sauvegarder l'UID dans toutes les sources de stockage
+      await saveUID(uid);
+
+      // Lire les données du cloud immédiatement
+      const cloudDoc = await restRead(uid);
+      if(cloudDoc&&cloudDoc.fields){
+        const get = k => cloudDoc.fields[k]?.stringValue || cloudDoc.fields[k]?.integerValue || '';
+        applyPayload(cloudDoc, get);
+        renderAll();
+      }
+
+      setSyncIndicator(true, '✓ Lié (PWA)');
+      if(msgEl){ msgEl.textContent='✅ Lié avec succès !'; msgEl.style.color='var(--gr)'; }
+      if(input) input.value='';
+      toast('✅ iPhone lié ! Tes données sont synchronisées.');
+
+      // Supprimer le token utilisé
+      await fetch(`${FB_REST}/tokens/${code}`, {method:'DELETE'}).catch(()=>{});
+
+    } catch(e){
+      if(msgEl){msgEl.textContent='❌ Erreur : '+e.message; msgEl.style.color='var(--re)';}
+      console.error('fbUseToken:', e);
+    }
+  };
+
+  // Exposer pour l'UI
+  window.fbSaveData  = fbWrite;
+  window.fbRestWrite = (uid, payload) => payload ? restWrite(uid, payload) : fbWrite();
+  window.forceSyncFromCloud = ()=>{ toast('⏳ Chargement…'); return fbRead(true); };
+
+  // ── INITIALISATION SYNC ───────────────────────────────────────────────────
+  async function fbSyncInit(){
+
+    // 1. Au démarrage — sync après 2s (laisse le temps à l'auth de s'initialiser)
+    setTimeout(async ()=>{
+      const uid = await getUID();
+      const dot = document.getElementById('fb-dot');
+      const label = document.getElementById('fb-label');
+      if(uid && !fbUser){
+        // iPhone lié mais pas auth Google → indiquer "Lié (PWA)"
+        if(dot) dot.style.background='#3B82F6';
+        if(label) label.textContent='☁️ Chargement…';
+        await fbRead(false);
+      }
+    }, 2000);
+
+    // 2. Sync périodique toutes les 5 min (réduit vs 30 pour être plus réactif)
+    setInterval(()=> fbWrite(), 5 * 60 * 1000);
+
+    // 3. Rafraîchir au retour au premier plan (iOS background → foreground)
     document.addEventListener('visibilitychange', async ()=>{
       if(document.visibilityState !== 'visible') return;
-      const uid = await getStoredUid();
-      if(!uid) return;
-      localStorage.setItem('smi_fb_uid', uid);
-      IDB.set('smi_fb_uid', uid);
-      document.cookie = `smi_uid=${uid};max-age=31536000;path=/;SameSite=Strict`;
+      // Rafraîchir le cache UID en mémoire
+      window._linkedUID = await IDB.get(UID_KEY) || null;
+      // Si lié, sync automatique
+      if(window._linkedUID || fbUser) fbRead(false);
     });
 
-    // 4. Patch localStorage → sync automatique 2s après toute sauvegarde
+    // 4. Patch localStorage → sync 2s après toute sauvegarde
     const _orig = localStorage.setItem.bind(localStorage);
     localStorage.setItem = function(key, value){
       _orig(key, value);
@@ -5719,6 +5775,7 @@ try {
 
 } catch(e){ console.warn('Firebase non disponible:', e); }
 }); // DOMContentLoaded
+
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
