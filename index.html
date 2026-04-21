@@ -1234,10 +1234,15 @@ function renderWeekCard(w, cls, isModified, phColor){
   const color=phColor||w.color||'#3B82F6';
   const nSlots=getSlotCount();
   const slotColors=['#3B82F6','#27AE60','#8E44AD','#E67E22'];
+  const activePlanId = getActivePlan()?.id;
   const doneSlots={};
   for(let i=1;i<=nSlots;i++){
     const sl='s'+i;
-    doneSlots[sl]=sessions.some(s=>s.week===w.n&&s.slot===sl&&['plan','natation-plan'].includes(s.sport));
+    doneSlots[sl]=sessions.some(s=>
+      s.week===w.n && s.slot===sl &&
+      ['plan','natation-plan'].includes(s.sport) &&
+      (!s.planId || s.planId===activePlanId)
+    );
   }
   const slotsHtml=Array.from({length:nSlots},(_,i)=>{
     const sl='s'+(i+1);
@@ -1677,20 +1682,22 @@ Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine: n, dates, ti
     function stepsFromTitle(title, dist, dur, slot){
       const isVMA    = /vma|fraction|400m|800m|1000m/i.test(title);
       const isSeuil  = /seuil|tempo|allure spé/i.test(title);
-      const isLong   = dist >= 16;
-      const isRecup  = /récup|doux|léger/i.test(title);
-      const isRace   = /course|semi|compét|race/i.test(title);
+      const isLong   = dist >= 14;
+      const isRecup  = /récup|doux|léger|footing/i.test(title);
+      const isRace   = /course|semi|compét|race|jour j/i.test(title);
       const paceFond = secToPace(Math.round(goalPaceSec * 1.15));
       const paceZ2   = secToPace(Math.round(goalPaceSec * 1.05));
-      const paceZ3   = secToPace(Math.round(goalPaceSec * 1.01));
-      const paceVMA  = secToPace(Math.round(goalPaceSec * 0.85));
+      const paceVMA  = secToPace(Math.round(goalPaceSec * 0.83));
+      const paceZ4   = secToPace(Math.round(goalPaceSec * 0.97));
+      const distStr  = dist ? dist+'km' : '';
+      const durStr   = dur ? '~'+dur+' min' : '';
 
-      if(isRace) return [['Objectif','Allure cible '+struct.goalPace+'/km'],['Stratégie','Départ prudent, accélération en 2ème moitié'],['Nutrition','Gel km 10, eau km 7 et 14']];
-      if(isRecup) return [['Corps',`${Math.round(dur*0.9)} min très facile (${paceFond}/km)`],['Retour','5 min marche + étirements']];
-      if(isVMA)  return [['Échauffement','15 min Z1 + gammes'],['Corps',title+' · récup 90s trot'],['Retour','15 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
-      if(isSeuil) return [['Échauffement','20 min Z1'],['Corps',title+' à '+paceZ3+'/km · récup 3 min'],['Retour','15 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
-      if(isLong)  return [['Échauffement','10 min Z1'],['Corps',`${dist} km allure fond (${paceZ2}/km)`],['Retour','10 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
-      return [['Échauffement','10 min Z1'],['Corps',`${Math.round(dist*0.8)} km Z2 (${paceZ2}/km)`],['Retour','10 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
+      if(isRace)  return [['Objectif','Allure cible '+struct.goalPace+'/km'],['Stratégie','Départ prudent, accélération en 2ème moitié'],['Nutrition','Gel km 10, eau km 7 et 14']];
+      if(isVMA)   return [['Échauffement','15 min Z1 + gammes'],['Corps',title+' à '+paceVMA+'/km · récup 90s trot'],['Retour','15 min Z1 + étirements'],['Durée / distance',durStr+' · '+distStr]];
+      if(isSeuil) return [['Échauffement','20 min Z1'],['Corps',title+' à '+paceZ4+'/km · récup 3 min'],['Retour','15 min Z1 + étirements'],['Durée / distance',durStr+' · '+distStr]];
+      if(isLong)  return [['Échauffement','10 min Z1'],['Corps',distStr+' allure fond ('+paceZ2+'/km)'],['Retour','10 min Z1 + étirements'],['Durée / distance',durStr+' · '+distStr]];
+      if(isRecup) return [['Corps',distStr+' très facile ('+paceFond+'/km)'],['Retour','5 min marche + étirements'],['Durée / distance',durStr+' · '+distStr]];
+      return [['Échauffement','10 min Z1'],['Corps',distStr+' Z2 ('+paceZ2+'/km)'],['Retour','10 min Z1 + étirements'],['Durée / distance',durStr+' · '+distStr]];
     }
 
     // Injecter les steps dans chaque semaine
@@ -1698,10 +1705,14 @@ Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine: n, dates, ti
       ...ph,
       weeks: ph.weeks.map(w => {
         const week = {...w};
-        week.s1 = { title: w.s1title||w.title, steps: stepsFromTitle(w.s1title||w.title, w.dist, w.dur, 's1') };
-        week.s2 = { title: w.s2title||('Footing récup '+(Math.round(w.dist*0.4))+'km'), steps: stepsFromTitle(w.s2title||'', Math.round(w.dist*0.4), Math.round(w.dur*0.45), 's2') };
+        // Distances réalistes par slot
+        const distS1 = Math.round(w.dist * 0.60 * 10) / 10; // ~60% pour la séance principale
+        const distS2 = Math.round(w.dist * 0.40 * 10) / 10; // ~40% pour la séance secondaire
+        const durS1  = Math.round(w.dur * 0.60);
+        const durS2  = Math.round(w.dur * 0.40);
+        week.s1 = { title: w.s1title||w.title, steps: stepsFromTitle(w.s1title||w.title, distS1, durS1, 's1') };
+        week.s2 = { title: w.s2title||('Footing récup '+distS2+'km'), steps: stepsFromTitle(w.s2title||'footing récup', distS2, durS2, 's2') };
         if(sessPerWk > 2) week.s3 = { title: w.s3title||'Renfo / cross-training', steps:[['Corps','30-45 min activité complémentaire'],['Note','Vélo, natation ou renforcement musculaire']] };
-        // Nettoyer les champs temporaires
         delete week.s1title; delete week.s2title; delete week.s3title;
         return week;
       })
