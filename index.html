@@ -1637,24 +1637,24 @@ async function generatePlanWithAI(){
   btn.style.display = 'none';
   loading.style.display = 'block';
 
-  // Résumé statistique au lieu de toutes les séances
-  const last8 = runSessions.slice(-8).map(s=>
-    `${s.date}: ${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}${s.hr?' FC'+s.hr:''}`
-  ).join(' | ');
+  // Résumé très condensé — pas toutes les séances
+  const last5 = runSessions.slice(-5).map(s=>
+    `${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}`
+  ).join(', ');
 
-  const prompt = `Coach running expert. Génère un plan semi-marathon JSON.
+  const prompt = `Coach running expert. Génère plan semi-marathon JSON strict.
 
-PARAMÈTRES: Course=${raceName} Date=${raceDate} Départ=${startStr} ${nWeeks}semaines Objectif=${goal} ${sessPerWk}séances/sem Niveau=${level}${context?' Contexte='+context:''}
+PROFIL: ${nWeeks} semaines, objectif=${goal}, ${sessPerWk}séances/sem, niveau=${level}
+Volume actuel=${avgWeeklyKm}km/sem, plus longue=${maxDist}km, prédiction=${medianPred?minsToHMS(medianPred):'—'}
+5 dernières sorties: ${last5||'aucune'}
+${context?'Contexte: '+context:''}
 
-PROFIL ATHLÈTE: ${runSessions.length} séances · ${totalKm}km cumulés · Volume hebdo=${avgWeeklyKm}km · Plus longue=${maxDist}km · Prédiction=${medianPred?minsToHMS(medianPred):'—'} · VO2max=${vo2Now||'—'}
-8 dernières sorties: ${last8||'aucune'}
+CONSIGNE: Semaine 1 part de ${avgWeeklyKm}km/sem (pas zéro). Progression vers ${goal}. Récup toutes les 3-4 sem. Sem${nWeeks}=course.
 
-RÈGLES: Semaine 1 commence à ${avgWeeklyKm}km/sem (pas zéro). Progression vers ${goal}. Récup toutes les 3-4 sem. Dernière sem=course.
-
-JSON STRICT (répondre uniquement avec le JSON, sans délimiteurs de code):
+Réponds UNIQUEMENT avec ce JSON (une seule ligne, sans texte avant/après):
 {"name":"Semi ${raceName} ${goal}","goal":"${goal}","goalPace":"X:XX","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"Phase 1","color":"#2980B9","weeks":[{"n":1,"dates":"JJ-JJ mois","title":"titre","badges":["z2"],"dist":14,"dur":85,"s1":{"title":"titre s1","steps":[["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~85 min · 14 km"]]},"s2":{"title":"titre s2","steps":[["Corps","description"],["Retour","5 min"]]}}]}]}
 
-Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}), réparties en phases. JSON compact une ligne.`;
+Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}).`;
 
   try {
     const controller = new AbortController();
