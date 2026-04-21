@@ -383,7 +383,7 @@ canvas{display:block;width:100%!important}
     <div class="card-title"><span class="bar"></span>Séance</div>
     <div class="field">
       <label class="lbl">Type d'entrainement</label>
-      <select id="lg-sport" onchange="onSportChange()">
+      <select id="lg-sport" onchange="updateSport()">
         <optgroup label="Plan semi-marathon">
           <option value="plan">Séance du plan (course)</option>
           <option value="natation-plan">Séance natation du plan</option>
@@ -1637,83 +1637,40 @@ async function generatePlanWithAI(){
   btn.style.display = 'none';
   loading.style.display = 'block';
 
-  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement personnalisé pour un semi-marathon en te basant sur l'historique complet de l'athlète.
+  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement personnalisé pour un semi-marathon.
 
-PARAMÈTRES DU NOUVEAU PLAN :
-- Course : ${raceName}
-- Date de course : ${raceDate}
-- Départ du plan : ${startStr}
-- Durée : ${nWeeks} semaines
-- Objectif : ${goal}
-- Séances course/semaine : ${sessPerWk}
-- Niveau déclaré : ${level}
-${context ? '- Contexte athlète : '+context : ''}
+PARAMÈTRES :
+- Course : ${raceName} · Date : ${raceDate} · Départ : ${startStr} · ${nWeeks} semaines
+- Objectif : ${goal} · ${sessPerWk} séances/semaine · Niveau : ${level}
+${context ? '- Contexte : '+context : ''}
 - Âge : ${settings.age||37} ans | FC repos : ${settings.hrRest||47} bpm
 
-HISTORIQUE D'ENTRAÎNEMENT COMPLET (${runSessions.length} séances · ${totalKm} km cumulés) :
-${allRunSummary || 'Aucune séance enregistrée'}
+HISTORIQUE (${runSessions.length} séances · ${totalKm} km) :
+${allRunSummary || 'Aucune séance'}
 
-MÉTRIQUES ACTUELLES :
-- Prédiction semi algorithmique : ${medianPred ? minsToHMS(medianPred) : 'non calculable'} (Riegel/Cameron/VDOT)
-- VO2max estimé : ${vo2Now ? vo2Now+' ml/kg/min' : 'non calculable'}
-- Volume hebdo moyen (4 dernières semaines) : ${avgWeeklyKm} km
-- Plus longue sortie réalisée : ${maxDist} km
-- Séances VMA identifiées : ${vmaCount}
-- Séances seuil identifiées : ${seuilCount}
+MÉTRIQUES :
+- Prédiction semi : ${medianPred ? minsToHMS(medianPred) : '—'} | VO2max : ${vo2Now||'—'} ml/kg/min
+- Volume hebdo moyen : ${avgWeeklyKm} km | Plus longue sortie : ${maxDist} km
 
-INSTRUCTIONS POUR LE PLAN :
-1. Commence à un volume COHÉRENT avec le volume actuel (${avgWeeklyKm} km/semaine) — ne repart pas de zéro
-2. La semaine 1 doit correspondre au niveau actuel, pas à un débutant
-3. Progresse depuis ce niveau réel vers l'objectif ${goal}
-4. Intègre les types de séances adaptés au niveau (VMA si déjà pratiqué, seuil, sorties longues)
-5. Tiens compte de la plus longue sortie (${maxDist}km) pour calibrer la progression des sorties longues
-6. La prédiction algorithmique (${medianPred ? minsToHMS(medianPred) : '—'}) reflète le niveau réel — calibre l'objectif en conséquence
+RÈGLES IMPORTANTES :
+- Semaine 1 = niveau actuel (${avgWeeklyKm} km/semaine), ne repart pas de zéro
+- Progression progressive vers ${goal}
+- Semaine récup toutes les 3-4 semaines
+- Dernière semaine = course uniquement
 
-Génère le plan complet en JSON STRICT, sans backticks :
-{
-  "name": "nom du plan",
-  "goal": "${goal}",
-  "goalPace": "allure cible /km",
-  "raceDate": "${raceDate}",
-  "sessionsPerWeek": ${sessPerWk},
-  "phases": [
-    {
-      "phase": "Nom de la phase",
-      "color": "#couleur_hex",
-      "weeks": [
-        {
-          "n": 1,
-          "dates": "JJ-JJ mois",
-          "title": "titre court",
-          "badges": ["z2"],
-          "dist": 14,
-          "dur": 85,
-          "s1": {"title": "titre", "steps": [["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]},
-          "s2": {"title": "titre", "steps": [["Corps","description"],["Retour","description"]]}
-        }
-      ]
-    }
-  ]
-}
+JSON STRICT (sans backticks) :
+{"name":"...","goal":"${goal}","goalPace":"...","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"...","color":"#hex","weeks":[{"n":1,"dates":"JJ-JJ mois","title":"titre court","badges":["z2"],"dist":14,"dur":85,"s1":{"title":"...","steps":[["Échauffement","10 min Z1"],["Corps","description séance"],["Retour","10 min Z1"],["Durée / distance","~85 min · 14 km"]]},"s2":{"title":"...","steps":[["Corps","description"],["Retour","description"]]}}]}]}
 
-Règles :
-- Exactement ${nWeeks} semaines numérotées de 1 à ${nWeeks}
-- 4-5 phases progressives (ex: Transition, Construction, Spécifique, Affûtage)
-- Semaine de récupération toutes les 3-4 semaines
-- Semaine ${nWeeks} = jour de course uniquement
-- Chaque semaine a exactement s1 et s2${sessPerWk>2?' et s3':''}
-- Badges : z1 z2 z3 z4 z5
-- Steps : tableau de paires ["label","description"]
-- Dates cohérentes depuis ${startStr}`;
+Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine a s1 et s2${sessPerWk>2?' et s3':''}. Steps = paires ["label","description"].`;
 
   try {
     const controller = new AbortController();
-    setTimeout(()=>controller.abort(), 120000);
+    setTimeout(()=>controller.abort(), 180000);
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST', signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:8000, temperature:0.3,
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:6000, temperature:0.3,
         messages:[{role:'user', content:prompt}]})
     });
 
@@ -3749,7 +3706,7 @@ function applyExtractedData(data, filename){
   if(data.denivele_plus) document.getElementById('lg-d').value=data.denivele_plus;
   const sportMap={'course':'plan','velo':'velo','natation':'natation-plan','autre':'autre'};
   document.getElementById('lg-sport').value=sportMap[data.sport]||'plan';
-  onSportChange();
+  updateSport();
 
   if(data.km_details&&data.km_details.length){
     kmRows=data.km_details.map(k=>({
@@ -4615,7 +4572,7 @@ renderHome();
 renderPlans();
 renderPlan();
 populateWeekSelect();
-onSportChange();
+updateSport();
 setImportMode('fit');
 loadCoachCard();
 renderStats();
