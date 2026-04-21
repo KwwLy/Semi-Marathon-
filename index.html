@@ -874,14 +874,23 @@ if(!plans){
   localStorage.setItem('smi_s', JSON.stringify(sessions));
   localStorage.setItem('smi_plans', JSON.stringify(plans));
 } else {
-  // Migration : ajouter les phases si absentes (ancien plan sans phases)
+  // Migration : toujours s'assurer que les phases sont présentes
+  // Les phases ne sont PAS sauvegardées dans Firestore (trop lourd)
+  // → elles viennent toujours de PLAN_PHASES dans le code
+  let changed = false;
   plans = plans.map(p => {
     if(p.id === PLAN_SEMI_ID && !p.phases){
+      changed = true;
+      return {...p, phases: PLAN_PHASES};
+    }
+    // Pour tous les plans semi, on force PLAN_PHASES (source de vérité = le code)
+    if(p.id === PLAN_SEMI_ID){
       return {...p, phases: PLAN_PHASES};
     }
     return p;
   });
-  localStorage.setItem('smi_plans', JSON.stringify(plans));
+  // Toujours sauvegarder sans phases (trop lourd pour Firestore)
+  // Les phases sont réinjectées à chaque chargement depuis PLAN_PHASES
 }
 
 // ── FONCTIONS PLAN ────────────────────────────────────────────────────────
@@ -1112,6 +1121,7 @@ function renderPlans(){
   if(!el)return;
   const activePlan=getActivePlan();
   let h='';
+
   if(activePlan){
     const weeksLeft=Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
     const progress=planProgress();
@@ -1126,23 +1136,36 @@ function renderPlans(){
           <div style="font-size:10px;color:var(--text3)">complété</div>
         </div>
       </div>
-      <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+      <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden;margin-bottom:10px">
         <div style="background:var(--or);width:${progress}%;height:100%;border-radius:4px;transition:.3s"></div>
       </div>
-      <button class="btn btn-or btn-sm" style="margin-top:10px" onclick="sw('plan')">📋 Voir le plan actif</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-or btn-sm" style="flex:1" onclick="sw('plan')">📋 Voir le plan</button>
+        <button class="btn btn-ghost btn-sm" onclick="archivePlan('${activePlan.id}')">📦 Archiver</button>
+      </div>
     </div>`;
   }
+
   const archived=plans.filter(p=>p.status!=='active');
   if(archived.length){
-    h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:8px 0 6px">Plans archivés</div>`;
+    h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:12px 0 6px">Plans archivés</div>`;
     archived.forEach(p=>{
-      h+=`<div class="card" style="opacity:.7">
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${p.name}</div>
-        <div style="font-size:11px;color:var(--text3)">${p.goal} · ${p.raceDate}</div>
+      h+=`<div class="card" style="opacity:.75">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${p.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${p.goal} · ${p.raceDate}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="activatePlan('${p.id}')">↩ Réactiver</button>
+        </div>
       </div>`;
     });
   }
-  if(!plans.length) h='<div class="card"><p class="u-body-sm">Aucun plan. Lance le Coach IA pour en créer un.</p></div>';
+
+  if(!plans.length){
+    h='<div class="card"><p class="u-body-sm">Aucun plan actif.</p></div>';
+  }
+
   el.innerHTML=h;
 }
 
@@ -4531,19 +4554,22 @@ try {
   // ── PAYLOAD — données à synchroniser ─────────────────────────────────────
   function buildPayload(){
     // Alléger les séances avant envoi — supprimer les données GPS lourdes
-    // gpsTrace peut peser plusieurs centaines de KB par séance
     const lightSessions = sessions.map(s => {
       const light = {...s};
-      // Sous-échantillonner gpsTrace à 100 points max (au lieu de supprimer complètement)
       if(light.gpsTrace && light.gpsTrace.length > 100){
         const step = Math.floor(light.gpsTrace.length / 100);
         light.gpsTrace = light.gpsTrace.filter((_,i) => i % step === 0).slice(0, 100);
       }
       return light;
     });
+    // Exclure phases des plans (trop lourd, toujours rechargé depuis PLAN_PHASES)
+    const lightPlans = plans.map(p => {
+      const {phases, ...rest} = p;
+      return rest;
+    });
     return {
       sessions_json:      JSON.stringify(lightSessions),
-      plans_json:         JSON.stringify(plans),
+      plans_json:         JSON.stringify(lightPlans),
       parcours_json:      JSON.stringify(savedParcours),
       planOverrides_json: JSON.stringify(planOverrides),
       settings_json:      JSON.stringify({...settings, apiKey:''}),
