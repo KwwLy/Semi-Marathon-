@@ -1201,6 +1201,7 @@ function renderPlans(){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-or btn-sm" style="flex:1" onclick="sw('plan')">📋 Voir le plan</button>
         <button class="btn btn-ghost btn-sm" onclick="archivePlan('${activePlan.id}')">📦 Archiver</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--re)" onclick="deletePlan('${activePlan.id}')">🗑️</button>
       </div>
     </div>`;
   }
@@ -1271,6 +1272,21 @@ function renderWeekCard(w, cls, isModified, phColor){
       ${Array.from({length:Math.max(0,nSlots-1)},(_,i)=>`<button class="btn btn-ghost btn-sm" style="margin-top:10px;margin-left:6px" onclick="event.stopPropagation();prefill(${w.n},'s${i+2}')">✏️ Saisir S${i+2}</button>`).join('')}
     </div>
   </div>`;
+}
+
+function deletePlan(id){
+  const plan = plans.find(p=>p.id===id);
+  if(!plan) return;
+  if(!confirm(`Supprimer le plan "${plan.name}" ?\n\nTes séances réalisées sont conservées.`)) return;
+  plans = plans.filter(p=>p.id!==id);
+  // Si c'était le seul plan, ne pas laisser vide — activer un plan archivé si dispo
+  if(!getActivePlan() && plans.length > 0){
+    plans[plans.length-1].status = 'active';
+  }
+  savePlans();
+  renderPlans();
+  renderPlan();
+  toast('Plan supprimé — tes séances sont conservées');
 }
 
 function archivePlan(id){
@@ -1604,7 +1620,7 @@ async function generatePlanWithAI(){
   const start    = new Date();
   const end      = new Date(raceDate);
   const nWeeks   = Math.max(8, Math.min(30, Math.round((end-start)/(7*86400000))));
-  const startStr = start.toLocaleDateString('fr-FR');
+  const startStr = start.toISOString().split('T')[0]; // YYYY-MM-DD pour Claude
 
   // ── Contexte complet de l'historique d'entraînement ──────────────────────
   const runSessions = sessions
@@ -1642,19 +1658,28 @@ async function generatePlanWithAI(){
     `${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}`
   ).join(', ');
 
-  const prompt = `Coach running expert. Génère plan semi-marathon JSON strict.
+  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement semi-marathon.
 
-PROFIL: ${nWeeks} semaines, objectif=${goal}, ${sessPerWk}séances/sem, niveau=${level}
-Volume actuel=${avgWeeklyKm}km/sem, plus longue=${maxDist}km, prédiction=${medianPred?minsToHMS(medianPred):'—'}
-5 dernières sorties: ${last5||'aucune'}
-${context?'Contexte: '+context:''}
+PARAMÈTRES:
+- Course: ${raceName} le ${raceDate}
+- Plan du ${startStr} au ${raceDate} = ${nWeeks} semaines
+- Objectif: ${goal} | ${sessPerWk} séances/semaine | Niveau: ${level}
+- Volume actuel athlète: ${avgWeeklyKm}km/semaine | Plus longue sortie: ${maxDist}km
+- Prédiction actuelle: ${medianPred?minsToHMS(medianPred):'non calculée'}
+- 5 dernières sorties: ${last5||'aucune'}
+${context?'- Contexte: '+context:''}
 
-CONSIGNE: Semaine 1 part de ${avgWeeklyKm}km/sem (pas zéro). Progression vers ${goal}. Récup toutes les 3-4 sem. Sem${nWeeks}=course.
+RÈGLES STRICTES:
+1. Le plan commence le ${startStr} et se termine le ${raceDate} — RESPECTE ces dates
+2. Semaine 1 = niveau actuel (${avgWeeklyKm}km/sem), PAS un débutant
+3. NE PAS reproduire les sorties passées — créer un nouveau plan progressif
+4. Récupération toutes les 3-4 semaines
+5. Dernière semaine = course uniquement (volume minimal)
 
-Réponds UNIQUEMENT avec ce JSON (une seule ligne, sans texte avant/après):
-{"name":"Semi ${raceName} ${goal}","goal":"${goal}","goalPace":"X:XX","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"Phase 1","color":"#2980B9","weeks":[{"n":1,"dates":"JJ-JJ mois","title":"titre","badges":["z2"],"dist":14,"dur":85,"s1":{"title":"titre s1","steps":[["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~85 min · 14 km"]]},"s2":{"title":"titre s2","steps":[["Corps","description"],["Retour","5 min"]]}}]}]}
+STRUCTURE JSON ATTENDUE (remplace les valeurs par les vraies):
+{"name":"[nom]","goal":"${goal}","goalPace":"[X:XX]","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"[nom phase]","color":"[#hex]","weeks":[{"n":1,"dates":"[JJ-JJ mois depuis ${startStr}]","title":"[titre]","badges":["z2"],"dist":[km],"dur":[min],"s1":{"title":"[titre]","steps":[["Échauffement","[desc]"],["Corps","[desc]"],["Retour","[desc]"],["Durée / distance","~[X] min · [Y] km"]]},"s2":{"title":"[titre]","steps":[["Corps","[desc]"],["Retour","[desc]"]]}}]}]}
 
-Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}).`;
+Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}) avec des dates cohérentes depuis ${startStr}. Réponds UNIQUEMENT avec le JSON, sans texte avant ni après.`;
 
   try {
     const controller = new AbortController();
