@@ -1606,37 +1606,72 @@ async function generatePlanWithAI(){
   const nWeeks   = Math.max(8, Math.min(30, Math.round((end-start)/(7*86400000))));
   const startStr = start.toLocaleDateString('fr-FR');
 
-  // Résumé des séances passées pour contexte
+  // ── Contexte complet de l'historique d'entraînement ──────────────────────
   const runSessions = sessions
     .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
     .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
-  const recentSummary = runSessions.slice(-10).map(s=>
-    `  ${s.date} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}`
+
+  // Toutes les séances (pas juste 10)
+  const allRunSummary = runSessions.map(s=>
+    `  ${s.date} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.hr?' FC'+s.hr:''}${s.dplus?' D+'+s.dplus+'m':''}${s.comment?' "'+s.comment.slice(0,60)+'"':''}`
   ).join('\n');
+
+  // Métriques clés
+  const bestSession  = bestPaceSession(runSessions);
+  const medianPred   = bestSession ? predictSemiFromSession(bestSession) : null;
+  const vo2Estimates = runSessions.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
+  const vo2Now       = vo2Estimates.length ? vo2Estimates[vo2Estimates.length-1] : null;
+  const totalKm      = runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0);
+  const maxDist      = runSessions.reduce((m,s)=>Math.max(m,s.dist||0),0);
+  const last4wks     = runSessions.filter(s=>{ const d=parseDate(s.date); return d&&(new Date()-d)<28*86400000; });
+  const avgWeeklyKm  = last4wks.length ? (last4wks.reduce((a,s)=>a+(s.dist||0),0)/4).toFixed(1) : '0';
+
+  // Séances VMA / seuil déjà faites
+  const vmaKeywords   = /vma|fraction|400m|800m|1000m/i;
+  const seuilKeywords = /seuil|tempo|allure spé/i;
+  const vmaCount   = runSessions.filter(s=>vmaKeywords.test(s.comment||'')).length;
+  const seuilCount = runSessions.filter(s=>seuilKeywords.test(s.comment||'')).length;
 
   const btn = document.getElementById('np-generate-btn');
   const loading = document.getElementById('np-loading');
   btn.style.display = 'none';
   loading.style.display = 'block';
 
-  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement complet pour un semi-marathon.
+  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement personnalisé pour un semi-marathon en te basant sur l'historique complet de l'athlète.
 
-PARAMÈTRES :
+PARAMÈTRES DU NOUVEAU PLAN :
 - Course : ${raceName}
-- Date : ${raceDate}
-- Départ plan : ${startStr}
+- Date de course : ${raceDate}
+- Départ du plan : ${startStr}
 - Durée : ${nWeeks} semaines
 - Objectif : ${goal}
 - Séances course/semaine : ${sessPerWk}
-- Niveau : ${level}
-${context ? '- Contexte : '+context : ''}
+- Niveau déclaré : ${level}
+${context ? '- Contexte athlète : '+context : ''}
+- Âge : ${settings.age||37} ans | FC repos : ${settings.hrRest||47} bpm
 
-SÉANCES RÉCENTES (contexte niveau actuel) :
-${recentSummary || 'Aucune séance enregistrée'}
+HISTORIQUE D'ENTRAÎNEMENT COMPLET (${runSessions.length} séances · ${totalKm} km cumulés) :
+${allRunSummary || 'Aucune séance enregistrée'}
+
+MÉTRIQUES ACTUELLES :
+- Prédiction semi algorithmique : ${medianPred ? minsToHMS(medianPred) : 'non calculable'} (Riegel/Cameron/VDOT)
+- VO2max estimé : ${vo2Now ? vo2Now+' ml/kg/min' : 'non calculable'}
+- Volume hebdo moyen (4 dernières semaines) : ${avgWeeklyKm} km
+- Plus longue sortie réalisée : ${maxDist} km
+- Séances VMA identifiées : ${vmaCount}
+- Séances seuil identifiées : ${seuilCount}
+
+INSTRUCTIONS POUR LE PLAN :
+1. Commence à un volume COHÉRENT avec le volume actuel (${avgWeeklyKm} km/semaine) — ne repart pas de zéro
+2. La semaine 1 doit correspondre au niveau actuel, pas à un débutant
+3. Progresse depuis ce niveau réel vers l'objectif ${goal}
+4. Intègre les types de séances adaptés au niveau (VMA si déjà pratiqué, seuil, sorties longues)
+5. Tiens compte de la plus longue sortie (${maxDist}km) pour calibrer la progression des sorties longues
+6. La prédiction algorithmique (${medianPred ? minsToHMS(medianPred) : '—'}) reflète le niveau réel — calibre l'objectif en conséquence
 
 Génère le plan complet en JSON STRICT, sans backticks :
 {
-  "name": "nom du plan (ex: Semi Lyon 1h50)",
+  "name": "nom du plan",
   "goal": "${goal}",
   "goalPace": "allure cible /km",
   "raceDate": "${raceDate}",
@@ -1649,18 +1684,12 @@ Génère le plan complet en JSON STRICT, sans backticks :
         {
           "n": 1,
           "dates": "JJ-JJ mois",
-          "title": "titre court de la semaine",
+          "title": "titre court",
           "badges": ["z2"],
           "dist": 14,
           "dur": 85,
-          "s1": {
-            "title": "titre séance 1",
-            "steps": [["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]
-          },
-          "s2": {
-            "title": "titre séance 2",
-            "steps": [["Corps","description"],["Retour","description"]]
-          }
+          "s1": {"title": "titre", "steps": [["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]},
+          "s2": {"title": "titre", "steps": [["Corps","description"],["Retour","description"]]}
         }
       ]
     }
@@ -1668,13 +1697,14 @@ Génère le plan complet en JSON STRICT, sans backticks :
 }
 
 Règles :
-- ${nWeeks} semaines au total, réparties en 4-5 phases progressives
-- Badges disponibles : z1, z2, z3, z4, z5 (zones d'allure)
-- Semaine de récupération toutes les 4 semaines
-- Dernière semaine = affûtage/course (volume très réduit)
+- Exactement ${nWeeks} semaines numérotées de 1 à ${nWeeks}
+- 4-5 phases progressives (ex: Transition, Construction, Spécifique, Affûtage)
+- Semaine de récupération toutes les 3-4 semaines
+- Semaine ${nWeeks} = jour de course uniquement
 - Chaque semaine a exactement s1 et s2${sessPerWk>2?' et s3':''}
+- Badges : z1 z2 z3 z4 z5
 - Steps : tableau de paires ["label","description"]
-- Les dates doivent être cohérentes depuis ${startStr}`;
+- Dates cohérentes depuis ${startStr}`;
 
   try {
     const controller = new AbortController();
