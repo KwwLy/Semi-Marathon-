@@ -1682,11 +1682,11 @@ STRUCTURE JSON ATTENDUE (remplace les valeurs par les vraies):
 Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}) avec des dates cohérentes depuis ${startStr}. Réponds UNIQUEMENT avec le JSON, sans texte avant ni après.`;
 
   try {
-    const controller = new AbortController();
-    setTimeout(()=>controller.abort(), 180000);
+    loading.style.display = 'block';
+    btn.style.display = 'none';
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', signal:controller.signal,
+      method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:8000, temperature:0.3,
         messages:[{role:'user', content:prompt}]})
