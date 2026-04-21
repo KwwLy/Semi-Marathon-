@@ -1637,31 +1637,24 @@ async function generatePlanWithAI(){
   btn.style.display = 'none';
   loading.style.display = 'block';
 
-  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement personnalisé pour un semi-marathon.
+  // Résumé statistique au lieu de toutes les séances
+  const last8 = runSessions.slice(-8).map(s=>
+    `${s.date}: ${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}${s.hr?' FC'+s.hr:''}`
+  ).join(' | ');
 
-PARAMÈTRES :
-- Course : ${raceName} · Date : ${raceDate} · Départ : ${startStr} · ${nWeeks} semaines
-- Objectif : ${goal} · ${sessPerWk} séances/semaine · Niveau : ${level}
-${context ? '- Contexte : '+context : ''}
-- Âge : ${settings.age||37} ans | FC repos : ${settings.hrRest||47} bpm
+  const prompt = `Coach running expert. Génère un plan semi-marathon JSON.
 
-HISTORIQUE (${runSessions.length} séances · ${totalKm} km) :
-${allRunSummary || 'Aucune séance'}
+PARAMÈTRES: Course=${raceName} Date=${raceDate} Départ=${startStr} ${nWeeks}semaines Objectif=${goal} ${sessPerWk}séances/sem Niveau=${level}${context?' Contexte='+context:''}
 
-MÉTRIQUES :
-- Prédiction semi : ${medianPred ? minsToHMS(medianPred) : '—'} | VO2max : ${vo2Now||'—'} ml/kg/min
-- Volume hebdo moyen : ${avgWeeklyKm} km | Plus longue sortie : ${maxDist} km
+PROFIL ATHLÈTE: ${runSessions.length} séances · ${totalKm}km cumulés · Volume hebdo=${avgWeeklyKm}km · Plus longue=${maxDist}km · Prédiction=${medianPred?minsToHMS(medianPred):'—'} · VO2max=${vo2Now||'—'}
+8 dernières sorties: ${last8||'aucune'}
 
-RÈGLES IMPORTANTES :
-- Semaine 1 = niveau actuel (${avgWeeklyKm} km/semaine), ne repart pas de zéro
-- Progression progressive vers ${goal}
-- Semaine récup toutes les 3-4 semaines
-- Dernière semaine = course uniquement
+RÈGLES: Semaine 1 commence à ${avgWeeklyKm}km/sem (pas zéro). Progression vers ${goal}. Récup toutes les 3-4 sem. Dernière sem=course.
 
-JSON STRICT (sans backticks) :
-{"name":"...","goal":"${goal}","goalPace":"...","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"...","color":"#hex","weeks":[{"n":1,"dates":"JJ-JJ mois","title":"titre court","badges":["z2"],"dist":14,"dur":85,"s1":{"title":"...","steps":[["Échauffement","10 min Z1"],["Corps","description séance"],["Retour","10 min Z1"],["Durée / distance","~85 min · 14 km"]]},"s2":{"title":"...","steps":[["Corps","description"],["Retour","description"]]}}]}]}
+JSON STRICT (répondre uniquement avec le JSON, sans délimiteurs de code):
+{"name":"Semi ${raceName} ${goal}","goal":"${goal}","goalPace":"X:XX","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"Phase 1","color":"#2980B9","weeks":[{"n":1,"dates":"JJ-JJ mois","title":"titre","badges":["z2"],"dist":14,"dur":85,"s1":{"title":"titre s1","steps":[["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~85 min · 14 km"]]},"s2":{"title":"titre s2","steps":[["Corps","description"],["Retour","5 min"]]}}]}]}
 
-Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine a s1 et s2${sessPerWk>2?' et s3':''}. Steps = paires ["label","description"].`;
+Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}), réparties en phases. JSON compact une ligne.`;
 
   try {
     const controller = new AbortController();
@@ -1670,7 +1663,7 @@ Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine a s1 et s2${s
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST', signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:6000, temperature:0.3,
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:8000, temperature:0.3,
         messages:[{role:'user', content:prompt}]})
     });
 
@@ -1680,7 +1673,7 @@ Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine a s1 et s2${s
 
     if(!data.content || !data.content[0]) throw new Error('Réponse vide');
 
-    let raw = data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+    let raw = data.content[0].text.trim().replace(/\x60{3}json/,"").replace(/\x60{3}/g,"").trim();
     const json = JSON.parse(raw);
 
     // Créer le nouveau plan
@@ -1719,6 +1712,7 @@ Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine a s1 et s2${s
 }
 
 function openCalDay(dateStr){
+  const ds=sessions.filter(s=>s.date===dateStr);
   if(!ds.length)return;
   toast(ds.map(s=>SPORT_LABELS[s.sport]||s.sport).join(', ')+' — '+dateStr);
 }
@@ -2075,7 +2069,7 @@ RÉPONDS EN JSON STRICT sans backticks :
       return;
     }
 
-    let raw = data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+    let raw = data.content[0].text.trim().replace(/\x60{3}json/,"").replace(/\x60{3}/g,"").trim();
     const json = JSON.parse(raw);
 
     // Sauvegarder sans modifications de plan
