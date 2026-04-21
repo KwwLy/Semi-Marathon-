@@ -1606,8 +1606,8 @@ async function generatePlanWithAI(){
   const apiKey = settings.apiKey;
   if(!apiKey){ toast('⚠️ Ajoute ta clé API dans Réglages'); return; }
 
-  const raceName = document.getElementById('np-race-name')?.value?.trim() || 'Semi-marathon';
-  const raceDate = document.getElementById('np-race-date')?.value;
+  const raceName  = document.getElementById('np-race-name')?.value?.trim() || 'Semi-marathon';
+  const raceDate  = document.getElementById('np-race-date')?.value;
   if(!raceDate){ toast('⚠️ Indique la date de la course'); return; }
 
   const goalSel   = document.getElementById('np-goal')?.value;
@@ -1616,106 +1616,111 @@ async function generatePlanWithAI(){
   const level     = document.getElementById('np-level')?.value || 'intermediaire';
   const context   = document.getElementById('np-context')?.value?.trim() || '';
 
-  // Calculer le nombre de semaines
-  const start    = new Date();
-  const end      = new Date(raceDate);
-  const nWeeks   = Math.max(8, Math.min(30, Math.round((end-start)/(7*86400000))));
-  const startStr = start.toISOString().split('T')[0]; // YYYY-MM-DD pour Claude
+  const start   = new Date();
+  const end     = new Date(raceDate);
+  const nWeeks  = Math.max(8, Math.min(30, Math.round((end-start)/(7*86400000))));
+  const startISO = start.toISOString().split('T')[0];
 
-  // ── Contexte complet de l'historique d'entraînement ──────────────────────
+  // Contexte historique condensé
   const runSessions = sessions
     .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
     .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+  const last5 = runSessions.slice(-5).map(s=>`${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}`).join(', ');
+  const maxDist = runSessions.length ? Math.max(...runSessions.map(s=>s.dist||0)) : 0;
+  const last4wks = runSessions.filter(s=>{ const d=parseDate(s.date); return d&&(new Date()-d)<28*86400000; });
+  const avgWeeklyKm = last4wks.length ? (last4wks.reduce((a,s)=>a+(s.dist||0),0)/4).toFixed(1) : '20';
+  const bestS = bestPaceSession(runSessions);
+  const medianPred = bestS ? predictSemiFromSession(bestS) : null;
 
-  // Toutes les séances (pas juste 10)
-  const allRunSummary = runSessions.map(s=>
-    `  ${s.date} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.hr?' FC'+s.hr:''}${s.dplus?' D+'+s.dplus+'m':''}${s.comment?' "'+s.comment.slice(0,60)+'"':''}`
-  ).join('\n');
-
-  // Métriques clés
-  const bestSession  = bestPaceSession(runSessions);
-  const medianPred   = bestSession ? predictSemiFromSession(bestSession) : null;
-  const vo2Estimates = runSessions.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
-  const vo2Now       = vo2Estimates.length ? vo2Estimates[vo2Estimates.length-1] : null;
-  const totalKm      = runSessions.reduce((a,s)=>a+(s.dist||0),0).toFixed(0);
-  const maxDist      = runSessions.reduce((m,s)=>Math.max(m,s.dist||0),0);
-  const last4wks     = runSessions.filter(s=>{ const d=parseDate(s.date); return d&&(new Date()-d)<28*86400000; });
-  const avgWeeklyKm  = last4wks.length ? (last4wks.reduce((a,s)=>a+(s.dist||0),0)/4).toFixed(1) : '0';
-
-  // Séances VMA / seuil déjà faites
-  const vmaKeywords   = /vma|fraction|400m|800m|1000m/i;
-  const seuilKeywords = /seuil|tempo|allure spé/i;
-  const vmaCount   = runSessions.filter(s=>vmaKeywords.test(s.comment||'')).length;
-  const seuilCount = runSessions.filter(s=>seuilKeywords.test(s.comment||'')).length;
-
-  const btn = document.getElementById('np-generate-btn');
+  const btn     = document.getElementById('np-generate-btn');
   const loading = document.getElementById('np-loading');
   btn.style.display = 'none';
   loading.style.display = 'block';
+  loading.querySelector('div').textContent = 'Étape 1/2 — Structure du plan…';
 
-  // Résumé très condensé — pas toutes les séances
-  const last5 = runSessions.slice(-5).map(s=>
-    `${s.dist}km ${s.dur}min${s.pace?' @'+s.pace:''}`
-  ).join(', ');
-
-  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement semi-marathon.
-
-PARAMÈTRES:
-- Course: ${raceName} le ${raceDate}
-- Plan du ${startStr} au ${raceDate} = ${nWeeks} semaines
-- Objectif: ${goal} | ${sessPerWk} séances/semaine | Niveau: ${level}
-- Volume actuel athlète: ${avgWeeklyKm}km/semaine | Plus longue sortie: ${maxDist}km
-- Prédiction actuelle: ${medianPred?minsToHMS(medianPred):'non calculée'}
-- 5 dernières sorties: ${last5||'aucune'}
-${context?'- Contexte: '+context:''}
-
-RÈGLES STRICTES:
-1. Le plan commence le ${startStr} et se termine le ${raceDate} — RESPECTE ces dates
-2. Semaine 1 = niveau actuel (${avgWeeklyKm}km/sem), PAS un débutant
-3. NE PAS reproduire les sorties passées — créer un nouveau plan progressif
-4. Récupération toutes les 3-4 semaines
-5. Dernière semaine = course uniquement (volume minimal)
-
-STRUCTURE JSON ATTENDUE (remplace les valeurs par les vraies):
-{"name":"[nom]","goal":"${goal}","goalPace":"[X:XX]","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"[nom phase]","color":"[#hex]","weeks":[{"n":1,"dates":"[JJ-JJ mois depuis ${startStr}]","title":"[titre]","badges":["z2"],"dist":[km],"dur":[min],"s1":{"title":"[titre]","steps":[["Échauffement","[desc]"],["Corps","[desc]"],["Retour","[desc]"],["Durée / distance","~[X] min · [Y] km"]]},"s2":{"title":"[titre]","steps":[["Corps","[desc]"],["Retour","[desc]"]]}}]}]}
-
-Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}) avec des dates cohérentes depuis ${startStr}. Réponds UNIQUEMENT avec le JSON, sans texte avant ni après.`;
-
-  try {
-    loading.style.display = 'block';
-    btn.style.display = 'none';
-
+  const apiCall = async (prompt, maxTok) => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:8000, temperature:0.3,
-        messages:[{role:'user', content:prompt}]})
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,
+               'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:maxTok,
+                            temperature:0.3, messages:[{role:'user',content:prompt}]})
     });
-
     const data = await res.json();
-    loading.style.display = 'none';
-    btn.style.display = 'block';
+    if(!data.content?.[0]) throw new Error('Réponse vide API');
+    return data.content[0].text.trim().replace(/\x60{3}json/g,'').replace(/\x60{3}/g,'').trim();
+  };
 
-    if(!data.content || !data.content[0]) throw new Error('Réponse vide');
+  try {
+    // ── APPEL 1 : Structure légère (phases + semaines sans détail séances) ──
+    const prompt1 = `Coach running expert. Génère la STRUCTURE d'un plan semi-marathon.
 
-    let raw = data.content[0].text.trim().replace(/\x60{3}json/,"").replace(/\x60{3}/g,"").trim();
-    const json = JSON.parse(raw);
+PARAMÈTRES: ${nWeeks} semaines du ${startISO} au ${raceDate}, objectif=${goal}, ${sessPerWk} séances/sem, niveau=${level}
+ATHLÈTE: volume actuel=${avgWeeklyKm}km/sem, plus longue=${maxDist}km, prédiction=${medianPred?minsToHMS(medianPred):'—'}
+5 dernières sorties: ${last5||'aucune'}${context?'\nContexte: '+context:''}
 
-    // Créer le nouveau plan
+RÈGLES: Semaine 1 part de ${avgWeeklyKm}km/sem. NE PAS reprendre les sorties passées. Récup toutes les 3-4 sem. Sem${nWeeks}=course.
+
+JSON STRICT (une ligne, sans texte avant/après):
+{"name":"[nom]","goal":"${goal}","goalPace":"[X:XX]","raceDate":"${raceDate}","sessionsPerWeek":${sessPerWk},"phases":[{"phase":"[nom]","color":"[#hex]","weeks":[{"n":1,"dates":"[JJ-JJ mois]","title":"[titre court]","badges":["z2"],"dist":[km],"dur":[min],"s1title":"[titre s1]","s2title":"[titre s2]"}]}]}
+
+Exactement ${nWeeks} semaines (n:1 à n:${nWeeks}). Chaque semaine: n, dates, title, badges, dist, dur, s1title, s2title${sessPerWk>2?', s3title':''}.`;
+
+    const raw1 = await apiCall(prompt1, 6000);
+    const struct = JSON.parse(raw1);
+
+    // ── APPEL 2 : Détails séances pour chaque phase (par lot) ─────────────
+    loading.querySelector('div').textContent = 'Étape 2/2 — Détail des séances…';
+
+    // Construire les semaines avec steps depuis les titres
+    const goalPaceSec = paceToSec(struct.goalPace || '5:13');
+    function stepsFromTitle(title, dist, dur, slot){
+      const isVMA    = /vma|fraction|400m|800m|1000m/i.test(title);
+      const isSeuil  = /seuil|tempo|allure spé/i.test(title);
+      const isLong   = dist >= 16;
+      const isRecup  = /récup|doux|léger/i.test(title);
+      const isRace   = /course|semi|compét|race/i.test(title);
+      const paceFond = secToPace(Math.round(goalPaceSec * 1.15));
+      const paceZ2   = secToPace(Math.round(goalPaceSec * 1.05));
+      const paceZ3   = secToPace(Math.round(goalPaceSec * 1.01));
+      const paceVMA  = secToPace(Math.round(goalPaceSec * 0.85));
+
+      if(isRace) return [['Objectif','Allure cible '+struct.goalPace+'/km'],['Stratégie','Départ prudent, accélération en 2ème moitié'],['Nutrition','Gel km 10, eau km 7 et 14']];
+      if(isRecup) return [['Corps',`${Math.round(dur*0.9)} min très facile (${paceFond}/km)`],['Retour','5 min marche + étirements']];
+      if(isVMA)  return [['Échauffement','15 min Z1 + gammes'],['Corps',title+' · récup 90s trot'],['Retour','15 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
+      if(isSeuil) return [['Échauffement','20 min Z1'],['Corps',title+' à '+paceZ3+'/km · récup 3 min'],['Retour','15 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
+      if(isLong)  return [['Échauffement','10 min Z1'],['Corps',`${dist} km allure fond (${paceZ2}/km)`],['Retour','10 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
+      return [['Échauffement','10 min Z1'],['Corps',`${Math.round(dist*0.8)} km Z2 (${paceZ2}/km)`],['Retour','10 min Z1 + étirements'],['Durée / distance',`~${dur} min · ${dist} km`]];
+    }
+
+    // Injecter les steps dans chaque semaine
+    const phases = struct.phases.map(ph => ({
+      ...ph,
+      weeks: ph.weeks.map(w => {
+        const week = {...w};
+        week.s1 = { title: w.s1title||w.title, steps: stepsFromTitle(w.s1title||w.title, w.dist, w.dur, 's1') };
+        week.s2 = { title: w.s2title||('Footing récup '+(Math.round(w.dist*0.4))+'km'), steps: stepsFromTitle(w.s2title||'', Math.round(w.dist*0.4), Math.round(w.dur*0.45), 's2') };
+        if(sessPerWk > 2) week.s3 = { title: w.s3title||'Renfo / cross-training', steps:[['Corps','30-45 min activité complémentaire'],['Note','Vélo, natation ou renforcement musculaire']] };
+        // Nettoyer les champs temporaires
+        delete week.s1title; delete week.s2title; delete week.s3title;
+        return week;
+      })
+    }));
+
     const newPlan = {
       id: 'plan_' + Date.now(),
-      name: json.name || raceName + ' ' + goal,
+      name: struct.name || raceName + ' ' + goal,
       type: 'semi',
-      goal: json.goal || goal,
-      goalPace: json.goalPace || '',
-      raceDate: json.raceDate || raceDate,
-      startDate: startStr,
+      goal: struct.goal || goal,
+      goalPace: struct.goalPace || '5:13',
+      raceDate: struct.raceDate || raceDate,
+      startDate: startISO,
       status: 'active',
       color: '#3B82F6',
       weeksCount: nWeeks,
       sessionsPerWeek: sessPerWk,
       createdAt: new Date().toISOString(),
-      phases: json.phases
+      phases
     };
 
     // Archiver le plan actuel
@@ -1723,18 +1728,22 @@ Génère EXACTEMENT ${nWeeks} semaines (n:1 à n:${nWeeks}) avec des dates cohé
     plans.push(newPlan);
     savePlans();
 
+    loading.style.display = 'none';
+    btn.style.display = 'block';
     closeNewPlanModal();
     renderPlans();
     sw('plan');
-    toast('✅ Plan généré et activé !');
+    toast('✅ Plan généré — '+nWeeks+' semaines !');
 
   } catch(e){
     loading.style.display = 'none';
     btn.style.display = 'block';
-    toast('Erreur génération : '+(e.message||'inconnue'));
-    console.error(e);
+    toast('Erreur : '+(e.message||'inconnue'));
+    console.error('generatePlanWithAI:', e);
   }
 }
+
+
 
 function openCalDay(dateStr){
   const ds=sessions.filter(s=>s.date===dateStr);
