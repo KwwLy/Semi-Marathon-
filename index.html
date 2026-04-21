@@ -268,6 +268,62 @@ canvas{display:block;width:100%!important}
 <!-- PLANS -->
 <div class="section" id="tab-plans"><div id="plans-content"></div></div>
 
+<!-- MODAL CRÉATION PLAN -->
+<div id="new-plan-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg);border-radius:var(--rl);padding:20px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">🤖 Nouveau plan avec le Coach IA</div>
+      <button onclick="closeNewPlanModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label class="lbl">Course cible</label>
+      <input type="text" id="np-race-name" placeholder="Ex: Semi-marathon Lyon" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label class="lbl">Date de la course</label>
+      <input type="date" id="np-race-date" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label class="lbl">Objectif de temps</label>
+      <select id="np-goal" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+        <option value="1h45">1h45 (4:59/km)</option>
+        <option value="1h50" selected>1h50 (5:13/km)</option>
+        <option value="1h55">1h55 (5:27/km)</option>
+        <option value="2h00">2h00 (5:41/km)</option>
+        <option value="2h10">2h10 (6:08/km)</option>
+        <option value="autre">Autre…</option>
+      </select>
+      <input type="text" id="np-goal-custom" placeholder="Ex: 1h48" style="display:none;margin-top:6px;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+    </div>
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field">
+        <label class="lbl">Séances course/semaine</label>
+        <select id="np-sessions" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">Niveau actuel</label>
+        <select id="np-level" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="debutant">Débutant</option>
+          <option value="intermediaire" selected>Intermédiaire</option>
+          <option value="confirme">Confirmé</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label class="lbl">Contexte / infos utiles (optionnel)</label>
+      <textarea id="np-context" placeholder="Ex: FC repos 47, blessure genou récente, disponible le mardi et jeudi…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);font-size:12px;resize:vertical;min-height:60px"></textarea>
+    </div>
+    <div id="np-loading" style="display:none;text-align:center;padding:20px;color:var(--text2);font-size:12px">
+      <div class="spinner" style="margin:0 auto 10px"></div>
+      <div>Génération du plan en cours… (~30-60s)</div>
+    </div>
+    <button class="btn btn-or btn-full" id="np-generate-btn" onclick="generatePlanWithAI()">🤖 Générer le plan</button>
+  </div>
+</div>
+
 <!-- PLAN ACTIF -->
 <div class="section" id="tab-plan">
 
@@ -1117,10 +1173,13 @@ function planProgress(){
 }
 
 function renderPlans(){
-  const el=document.getElementById('tab-plans');
-  if(!el)return;
-  const activePlan=getActivePlan();
-  let h='';
+  const el = document.getElementById('plans-content') || document.getElementById('tab-plans');
+  if(!el) return;
+  const activePlan = getActivePlan();
+  let h = '';
+
+  // Bouton créer un nouveau plan
+  h += `<button class="btn btn-or btn-full" style="margin-bottom:12px" onclick="openNewPlanModal()">➕ Créer un nouveau plan avec le Coach IA</button>`;
 
   if(activePlan){
     const weeksLeft=Math.max(0,Math.round((new Date(activePlan.raceDate)-new Date())/(7*86400000)));
@@ -1507,8 +1566,172 @@ function renderCalendar(){
   el.innerHTML=html;
 }
 
+function openNewPlanModal(){
+  const modal = document.getElementById('new-plan-modal');
+  if(modal) modal.style.display = 'flex';
+  // Pré-remplir la date à +20 semaines
+  const d = new Date(); d.setDate(d.getDate() + 140);
+  const dateEl = document.getElementById('np-race-date');
+  if(dateEl) dateEl.value = d.toISOString().split('T')[0];
+  // Afficher/masquer champ objectif custom
+  const goalSel = document.getElementById('np-goal');
+  if(goalSel) goalSel.onchange = function(){
+    const custom = document.getElementById('np-goal-custom');
+    if(custom) custom.style.display = this.value==='autre' ? 'block' : 'none';
+  };
+}
+
+function closeNewPlanModal(){
+  const modal = document.getElementById('new-plan-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+async function generatePlanWithAI(){
+  const apiKey = settings.apiKey;
+  if(!apiKey){ toast('⚠️ Ajoute ta clé API dans Réglages'); return; }
+
+  const raceName = document.getElementById('np-race-name')?.value?.trim() || 'Semi-marathon';
+  const raceDate = document.getElementById('np-race-date')?.value;
+  if(!raceDate){ toast('⚠️ Indique la date de la course'); return; }
+
+  const goalSel   = document.getElementById('np-goal')?.value;
+  const goal      = goalSel==='autre' ? (document.getElementById('np-goal-custom')?.value?.trim()||'1h50') : goalSel;
+  const sessPerWk = parseInt(document.getElementById('np-sessions')?.value||'2');
+  const level     = document.getElementById('np-level')?.value || 'intermediaire';
+  const context   = document.getElementById('np-context')?.value?.trim() || '';
+
+  // Calculer le nombre de semaines
+  const start    = new Date();
+  const end      = new Date(raceDate);
+  const nWeeks   = Math.max(8, Math.min(30, Math.round((end-start)/(7*86400000))));
+  const startStr = start.toLocaleDateString('fr-FR');
+
+  // Résumé des séances passées pour contexte
+  const runSessions = sessions
+    .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
+    .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+  const recentSummary = runSessions.slice(-10).map(s=>
+    `  ${s.date} : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}`
+  ).join('\n');
+
+  const btn = document.getElementById('np-generate-btn');
+  const loading = document.getElementById('np-loading');
+  btn.style.display = 'none';
+  loading.style.display = 'block';
+
+  const prompt = `Tu es un coach running expert. Génère un plan d'entraînement complet pour un semi-marathon.
+
+PARAMÈTRES :
+- Course : ${raceName}
+- Date : ${raceDate}
+- Départ plan : ${startStr}
+- Durée : ${nWeeks} semaines
+- Objectif : ${goal}
+- Séances course/semaine : ${sessPerWk}
+- Niveau : ${level}
+${context ? '- Contexte : '+context : ''}
+
+SÉANCES RÉCENTES (contexte niveau actuel) :
+${recentSummary || 'Aucune séance enregistrée'}
+
+Génère le plan complet en JSON STRICT, sans backticks :
+{
+  "name": "nom du plan (ex: Semi Lyon 1h50)",
+  "goal": "${goal}",
+  "goalPace": "allure cible /km",
+  "raceDate": "${raceDate}",
+  "sessionsPerWeek": ${sessPerWk},
+  "phases": [
+    {
+      "phase": "Nom de la phase",
+      "color": "#couleur_hex",
+      "weeks": [
+        {
+          "n": 1,
+          "dates": "JJ-JJ mois",
+          "title": "titre court de la semaine",
+          "badges": ["z2"],
+          "dist": 14,
+          "dur": 85,
+          "s1": {
+            "title": "titre séance 1",
+            "steps": [["Échauffement","10 min Z1"],["Corps","description"],["Retour","10 min Z1"],["Durée / distance","~X min · Y km"]]
+          },
+          "s2": {
+            "title": "titre séance 2",
+            "steps": [["Corps","description"],["Retour","description"]]
+          }
+        }
+      ]
+    }
+  ]
+}
+
+Règles :
+- ${nWeeks} semaines au total, réparties en 4-5 phases progressives
+- Badges disponibles : z1, z2, z3, z4, z5 (zones d'allure)
+- Semaine de récupération toutes les 4 semaines
+- Dernière semaine = affûtage/course (volume très réduit)
+- Chaque semaine a exactement s1 et s2${sessPerWk>2?' et s3':''}
+- Steps : tableau de paires ["label","description"]
+- Les dates doivent être cohérentes depuis ${startStr}`;
+
+  try {
+    const controller = new AbortController();
+    setTimeout(()=>controller.abort(), 120000);
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', signal:controller.signal,
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:8000, temperature:0.3,
+        messages:[{role:'user', content:prompt}]})
+    });
+
+    const data = await res.json();
+    loading.style.display = 'none';
+    btn.style.display = 'block';
+
+    if(!data.content || !data.content[0]) throw new Error('Réponse vide');
+
+    let raw = data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+    const json = JSON.parse(raw);
+
+    // Créer le nouveau plan
+    const newPlan = {
+      id: 'plan_' + Date.now(),
+      name: json.name || raceName + ' ' + goal,
+      type: 'semi',
+      goal: json.goal || goal,
+      goalPace: json.goalPace || '',
+      raceDate: json.raceDate || raceDate,
+      startDate: startStr,
+      status: 'active',
+      color: '#3B82F6',
+      weeksCount: nWeeks,
+      sessionsPerWeek: sessPerWk,
+      createdAt: new Date().toISOString(),
+      phases: json.phases
+    };
+
+    // Archiver le plan actuel
+    plans = plans.map(p => p.status==='active' ? {...p, status:'archived'} : p);
+    plans.push(newPlan);
+    savePlans();
+
+    closeNewPlanModal();
+    renderPlans();
+    sw('plan');
+    toast('✅ Plan généré et activé !');
+
+  } catch(e){
+    loading.style.display = 'none';
+    btn.style.display = 'block';
+    toast('Erreur génération : '+(e.message||'inconnue'));
+    console.error(e);
+  }
+}
+
 function openCalDay(dateStr){
-  const ds=sessions.filter(s=>s.date===dateStr);
   if(!ds.length)return;
   toast(ds.map(s=>SPORT_LABELS[s.sport]||s.sport).join(', ')+' — '+dateStr);
 }
