@@ -1191,6 +1191,28 @@ function renderWeekCard(w, cls, isModified, phColor){
   </div>`;
 }
 
+function archivePlan(id){
+  const plan = plans.find(p=>p.id===id);
+  if(!plan) return;
+  if(!confirm(`Archiver le plan "${plan.name}" ? Les séances liées sont conservées.`)) return;
+  plan.status = 'archived';
+  savePlans();
+  renderPlans();
+  renderPlan();
+  toast('Plan archivé — tes séances sont conservées');
+}
+
+function activatePlan(id){
+  // Désactiver tous les autres plans
+  plans.forEach(p => { if(p.id!==id) p.status='archived'; });
+  const plan = plans.find(p=>p.id===id);
+  if(plan) plan.status='active';
+  savePlans();
+  renderPlans();
+  renderPlan();
+  toast('Plan activé');
+}
+
 function restoreWeek(n){
   if(!confirm('Restaurer la semaine S'+n+' à son état original ?'))return;
   delete planOverrides[n];
