@@ -1288,37 +1288,68 @@ function loadCoachCard(){
 }
 
 function renderCoachCard(data){
-  const el=document.getElementById('coach-result');
-  if(!el||!data)return;
-  const isUp=data.prediction_direction==='up';
-  const arrow=isUp?'📈':'📉';
-  el.style.display='block';
-  el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span style="font-size:24px">${arrow}</span>
+  const el = document.getElementById('coach-result');
+  if(!el || !data) return;
+  const isUp = data.prediction_direction === 'up';
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span style="font-size:24px">${isUp?'📈':'📉'}</span>
       <div>
         <div style="font-size:13px;font-weight:700;color:var(--text)">${data.target_time||'1h50'} — ${data.prediction_comment||''}</div>
-        ${data.plan_adjustment_needed&&data.plan_adjustment?`<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ${data.plan_adjustment}</div>`:''}
       </div>
     </div>
-    <div style="font-size:12px;color:var(--text2);line-height:1.7;background:var(--bg2);border-radius:var(--r);padding:10px;white-space:pre-wrap">${data.analysis||''}</div>
-    ${data.savedAt?`<div style="font-size:10px;color:var(--text3);margin-top:6px">Analysé le ${new Date(data.savedAt).toLocaleDateString('fr-FR')}</div>`:''}`;
 
-  const metricsRow=document.getElementById('coach-metrics-row');
+    ${data.ctlNow !== undefined ? `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">
+      <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--or)">${data.ctlNow}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">CTL (forme)</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--re)">${data.atlNow}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">ATL (fatigue)</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:${data.tsb>5?'var(--gr)':data.tsb<-30?'var(--re)':'var(--am)'}">${data.tsb>0?'+':''}${data.tsb}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">TSB (${data.tsbZone||'fraîcheur'})</div>
+      </div>
+    </div>
+    ${data.pctZ1 !== undefined ? `
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:5px">Distribution intensités</div>
+      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px">
+        <div style="background:#3498DB;width:${data.pctZ1}%" title="Z1 ${data.pctZ1}%"></div>
+        <div style="background:#F39C12;width:${data.pctZ2}%" title="Z2 ${data.pctZ2}%"></div>
+        <div style="background:#E74C3C;width:${data.pctZ3}%" title="Z3+ ${data.pctZ3}%"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;font-size:10px;color:var(--text3)">
+        <span>🔵 Z1 ${data.pctZ1}%</span>
+        <span>🟡 Z2 ${data.pctZ2}%</span>
+        <span>🔴 Z3+ ${data.pctZ3}%</span>
+        ${data.adherenceRate !== undefined ? `<span style="margin-left:auto">✅ ${data.adherenceRate}% adhérence</span>` : ''}
+      </div>
+    </div>` : ''}` : ''}
+
+    <div style="font-size:12px;color:var(--text2);line-height:1.8;background:var(--bg2);border-radius:var(--r);padding:12px;white-space:pre-wrap">${data.analysis||''}</div>
+    ${data.savedAt ? `<div style="font-size:10px;color:var(--text3);margin-top:6px">Analysé le ${new Date(data.savedAt).toLocaleDateString('fr-FR')}</div>` : ''}`;
+
+  const metricsRow = document.getElementById('coach-metrics-row');
   if(metricsRow){
-    const runSessions=sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:0});
-    const bestSession=bestPaceSession(runSessions);
-    const medianPred=bestSession?predictSemiFromSession(bestSession):null;
-    const vo2Estimates=runSessions.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
-    const vo2Last=vo2Estimates.length?vo2Estimates[vo2Estimates.length-1]:null;
-    metricsRow.style.display='flex';
-    metricsRow.innerHTML=`
-      <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:700;color:var(--or)">${medianPred?minsToHMS(medianPred):'—'}</div><div style="font-size:9px;color:var(--text3)">Prédiction</div></div>
-      <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:700;color:var(--or)">${vo2Last?vo2Last+' ml/kg/min':'—'}</div><div style="font-size:9px;color:var(--text3)">VO2max</div></div>`;
+    const runS = sessions.filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0);
+    const best = bestPaceSession(runS);
+    const pred = best ? predictSemiFromSession(best) : null;
+    const vo2  = runS.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
+    const vo2Now = vo2.length ? vo2[vo2.length-1] : null;
+    metricsRow.style.display = 'flex';
+    metricsRow.innerHTML = `
+      <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:700;color:var(--or)">${pred?minsToHMS(pred):'—'}</div><div style="font-size:9px;color:var(--text3)">Prédiction semi</div></div>
+      <div style="text-align:center;flex:1"><div style="font-size:16px;font-weight:700;color:var(--or)">${vo2Now?vo2Now+' ml':'—'}</div><div style="font-size:9px;color:var(--text3)">VO2max</div></div>`;
   }
-
   renderZones(data.target_time);
 }
+
 
 function renderZones(targetTime){
   const el=document.getElementById('zones-inline');
@@ -1538,222 +1569,296 @@ function resetAndReanalyze(id){
 }
 
 // ── COACH IA GLOBAL ─────────────────────────────────────────────────────────
-async function runCoachAnalysis(lastSession){
+async function runCoachAnalysis(){
   const apiKey = settings.apiKey;
   if(!apiKey){ toast('⚠️ Ajoute ta clé API dans Réglages !'); return; }
 
   const btn = document.getElementById('coach-analyze-btn');
-  btn.disabled=true; btn.textContent='⏳ Analyse en cours…';
-  document.getElementById('coach-loading').style.display='flex';
-  document.getElementById('coach-result').style.display='none';
-  const metricsRow=document.getElementById('coach-metrics-row');
-  if(metricsRow) metricsRow.style.display='none';
+  btn.disabled = true; btn.textContent = '⏳ Analyse en cours…';
+  document.getElementById('coach-loading').style.display = 'flex';
+  document.getElementById('coach-result').style.display = 'none';
+  const metricsRow = document.getElementById('coach-metrics-row');
+  if(metricsRow) metricsRow.style.display = 'none';
 
+  // ── Séances triées chronologiquement ─────────────────────────────────────
   const runSessions = sessions
     .filter(s=>['plan','course-libre'].includes(s.sport)&&s.dist>0&&s.dur>0)
-    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:a.id-b.id});
-  const crossSessions = sessions
-    .filter(s=>['natation-plan','natation-libre','velo','krav','padel','autre','renfo'].includes(s.sport)&&s.dur>0)
-    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:0});
+    .sort((a,b)=>{ const da=parseDate(a.date),db=parseDate(b.date); return da&&db?da-db:0; });
+  const planSessions = runSessions.filter(s=>s.sport==='plan');
 
   if(!runSessions.length){
     toast('Aucune séance de course enregistrée.');
-    btn.disabled=false; btn.textContent='🔍 Analyser l\'ensemble de mes séances';
+    btn.disabled=false; btn.textContent='🔍 Analyser';
     document.getElementById('coach-loading').style.display='none';
     return;
   }
 
+  // ── 1. TRIMP par séance (heart rate based training impulse) ───────────────
+  // Si FC disponible : TRIMP = dur × FC_ratio × 0.64e^(1.92×FC_ratio)
+  // Sinon : estimation par allure relative à l'allure seuil (~5:13/km)
+  const thresholdPaceSec = paceToSec('5:13'); // allure seuil semi cible
+
+  function sessionTRIMP(s){
+    const dur = s.dur; // minutes
+    if(s.hr && s.hrmax){
+      const fcRest = settings.hrRest || 47;
+      const fcMax  = settings.hrMax || 179;
+      const hrR = (s.hr - fcRest) / (fcMax - fcRest); // FC réserve normalisée
+      return dur * hrR * 0.64 * Math.exp(1.92 * hrR);
+    }
+    // Fallback allure : zone estimée
+    if(s.pace){
+      const paceSec = paceToSec(s.pace);
+      const ratio   = thresholdPaceSec / paceSec; // >1 = plus rapide que seuil
+      const zone    = ratio > 1.05 ? 3 : ratio > 0.9 ? 2 : 1;
+      const weights = [0.55, 1.1, 2.0]; // Z1, Z2, Z3 — basé sur Seiler
+      return dur * weights[zone-1];
+    }
+    return dur * 0.7; // défaut Z1
+  }
+
+  // ── 2. CTL / ATL / TSB (modèle Banister) ─────────────────────────────────
+  // CTL = moyenne exponentielle sur 42 jours (fitness chronique)
+  // ATL = moyenne exponentielle sur 7 jours  (fatigue aiguë)
+  const K_CTL = 42, K_ATL = 7;
+  const λCTL = 1 - Math.exp(-1/K_CTL);
+  const λATL = 1 - Math.exp(-1/K_ATL);
+
+  // Construire un calendrier journalier
+  const today = new Date();
+  const startDate = parseDate(runSessions[0].date) || new Date(today - 90*86400000);
+  const nDays = Math.floor((today - startDate) / 86400000) + 1;
+  const dailyTRIMP = new Array(nDays).fill(0);
+
+  runSessions.forEach(s => {
+    const d = parseDate(s.date);
+    if(!d) return;
+    const idx = Math.floor((d - startDate) / 86400000);
+    if(idx >= 0 && idx < nDays) dailyTRIMP[idx] += sessionTRIMP(s);
+  });
+
+  let ctl = 0, atl = 0;
+  const ctlHistory = [], atlHistory = [];
+  for(let i = 0; i < nDays; i++){
+    ctl = ctl * (1 - λCTL) + dailyTRIMP[i] * λCTL;
+    atl = atl * (1 - λATL) + dailyTRIMP[i] * λATL;
+    ctlHistory.push(Math.round(ctl * 10)/10);
+    atlHistory.push(Math.round(atl * 10)/10);
+  }
+  const tsb = Math.round((ctl - atl) * 10) / 10;
+  const ctlNow = Math.round(ctl * 10) / 10;
+  const atlNow = Math.round(atl * 10) / 10;
+
+  // TSB zone
+  let tsbZone, tsbAdvice;
+  if(tsb > 25)        { tsbZone='désentraînement'; tsbAdvice='Volume trop faible — risque de perte de forme'; }
+  else if(tsb > 5)    { tsbZone='pic de performance'; tsbAdvice='Excellent — état idéal pour performer'; }
+  else if(tsb > -10)  { tsbZone='entraînement productif'; tsbAdvice='Bon équilibre charge/récupération'; }
+  else if(tsb > -30)  { tsbZone='sur-atteinte modérée'; tsbAdvice='Fatigue accumulée — surveiller la récupération'; }
+  else                { tsbZone='surmenage'; tsbAdvice='Fatigue excessive — récupération prioritaire'; }
+
+  // ── 3. Distribution des intensités ───────────────────────────────────────
+  // Z1 : allure < 88% seuil (>5:56/km)   → endurance fondamentale
+  // Z2 : 88-100% seuil (5:13-5:56/km)    → tempo / allure semi
+  // Z3 : > 100% seuil (<5:13/km)          → seuil, VMA
+  let durZ1=0, durZ2=0, durZ3=0;
+  runSessions.forEach(s => {
+    if(!s.pace || !s.dur) return;
+    const ps = paceToSec(s.pace);
+    const ratio = thresholdPaceSec / ps;
+    if(ratio < 0.88)      durZ1 += s.dur;
+    else if(ratio < 1.0)  durZ2 += s.dur;
+    else                   durZ3 += s.dur;
+  });
+  const durTotal = durZ1 + durZ2 + durZ3;
+  const pctZ1 = durTotal ? Math.round(durZ1/durTotal*100) : 0;
+  const pctZ2 = durTotal ? Math.round(durZ2/durTotal*100) : 0;
+  const pctZ3 = durTotal ? Math.round(durZ3/durTotal*100) : 0;
+  // Norme scientifique : ~75-80% Z1, ~5-10% Z2, ~15-20% Z3 (modèle polarisé)
+  const distrib80_20 = pctZ1 >= 70 ? '✓ Distribution polarisée correcte' : `⚠️ Trop de Z2 (${pctZ2}%) — modèle polarisé recommande <10% Z2`;
+
+  // ── 4. Taux d'adhérence au plan ───────────────────────────────────────────
+  const doneWeeks  = new Set(planSessions.map(s=>s.week).filter(Boolean));
+  const totalWeeks = new Set(allWeeks().map(w=>w.n));
+  const passedWeeks = [...totalWeeks].filter(wn => {
+    const w = allWeeks().find(x=>x.n===wn);
+    if(!w) return false;
+    const wStart = parseDate(w.dates?.split('-')[0]?.trim() + '/' + new Date().getFullYear());
+    return wStart && wStart <= today;
+  });
+  const adherenceRate = passedWeeks.length > 0
+    ? Math.round(passedWeeks.filter(wn=>doneWeeks.has(wn)).length / passedWeeks.length * 100)
+    : 0;
+
+  // Respect des allures : séances plan avec allure dans la fenêtre cible ±10%
+  const planWithPace = planSessions.filter(s=>s.pace&&s.week);
+  let paceOkCount = 0;
+  planWithPace.forEach(s => {
+    const wk = getWeek(s.week);
+    if(!wk) return;
+    const badges = wk.badges || [];
+    // Allure cible selon zone prescrite
+    let targetLo, targetHi;
+    if(badges.includes('z5'))      { targetLo=paceToSec('4:20'); targetHi=paceToSec('4:45'); }
+    else if(badges.includes('z4')) { targetLo=paceToSec('5:00'); targetHi=paceToSec('5:20'); }
+    else if(badges.includes('z3')) { targetLo=paceToSec('5:10'); targetHi=paceToSec('5:35'); }
+    else                            { targetLo=paceToSec('5:45'); targetHi=paceToSec('6:30'); } // Z1/Z2
+    const actual = paceToSec(s.pace);
+    if(actual >= targetLo * 0.9 && actual <= targetHi * 1.1) paceOkCount++;
+  });
+  const paceAdherence = planWithPace.length > 0
+    ? Math.round(paceOkCount / planWithPace.length * 100) : null;
+
+  // ── 5. Progression sorties longues ───────────────────────────────────────
+  const longRuns = planSessions.filter(s=>s.dist>=12).sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+  const maxLong  = longRuns.length ? Math.max(...longRuns.map(s=>s.dist)) : 0;
+  const last3Long = longRuns.slice(-3).map(s=>`${s.dist}km @ ${s.pace||'?'}/km (${s.date})`).join(', ');
+
+  // ── 6. Prédiction algorithmique ───────────────────────────────────────────
   const bestSession  = bestPaceSession(runSessions);
   const medianPred   = bestSession ? predictSemiFromSession(bestSession) : null;
-  const camF = d=>13.49681-0.048865*d+2.438936/Math.pow(d,0.7905);
-  const riegelDetail  = bestSession ? minsToHMS(bestSession.dur*Math.pow(21.1/bestSession.dist,1.06)) : '—';
-  const cameronDetail = bestSession ? minsToHMS((bestSession.dur/bestSession.dist)*(camF(bestSession.dist)/camF(21.1))*21.1) : '—';
-  const vdotBS        = bestSession ? computeVDOT(bestSession.dist,bestSession.dur) : null;
-  const vdotDetail    = vdotBS ? minsToHMS(semiTimeFromVDOT(vdotBS)) : '—';
-  const vo2Estimates  = runSessions.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
-  const vo2Last       = vo2Estimates.length ? vo2Estimates[vo2Estimates.length-1] : null;
-  const vo2First      = vo2Estimates.length>1 ? vo2Estimates[0] : null;
-  const vo2Trend      = vo2First&&vo2Last ? vo2Last-vo2First : 0;
-  const vo2Summary    = vo2Last ? `${vo2Last.toFixed(1)} ml/kg/min (tendance ${vo2Trend>=0?'+':''}${vo2Trend.toFixed(1)})` : 'non calculable';
+  const vo2Estimates = runSessions.map(s=>computeVO2max(s)).filter(v=>v&&v>25&&v<80);
+  const vo2Now       = vo2Estimates.length ? vo2Estimates[vo2Estimates.length-1] : null;
 
-  const raceDate  = new Date('2026-10-04');
-  const today     = new Date();
-  const weeksLeft = Math.max(0,Math.round((raceDate-today)/(7*86400000)));
-  const crossSportLabels = {'natation-plan':'Natation plan','natation-libre':'Natation','velo':'Vélo','krav':'Krav Maga','padel':'Padel','renfo':'Renfo muscu','autre':'Autre'};
-
-  const doneWeeks = new Set(sessions.filter(s=>['plan','natation-plan'].includes(s.sport)&&s.week).map(s=>s.week));
-  const remainingWeeks = allWeeks()
-    .filter(w=>!doneWeeks.has(w.n)&&!w.vacation)
-    .slice(0,6)
-    .map(w=>`  S${w.n} (${w.dates||''}) : S1="${w.s1?.title||''}" · S2="${w.s2?.title||''}"`).join('\n');
-
-  // Métriques pré-calculées
-  const planSessions  = runSessions.filter(s=>s.sport==='plan');
-  const libreSessions = runSessions.filter(s=>s.sport==='course-libre');
-
-  const formatSession = s=>{
-    const wk = s.week ? getWeek(s.week) : null;
-    const slotInfo = wk&&s.slot ? (wk[s.slot]?.title||'') : '';
-    return`  ${s.date||'?'} [${s.slot||'libre'}${slotInfo?' — '+slotInfo:''}] : ${s.dist}km en ${s.dur}min${s.pace?' @ '+s.pace+'/km':''}${s.hr?' FC'+s.hr:''}${s.comment?' "'+s.comment.slice(0,80)+'"':''}`;
-  };
-  const allSummary = [...planSessions,...libreSessions.slice(-5)]
-    .sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return da&&db?da-db:0})
-    .map(formatSession).join('\n');
-  const crossSummary = crossSessions.length ? crossSessions.slice(-15).map(s=>
-    `  ${s.date||'?'} : ${crossSportLabels[s.sport]||s.sport} ${s.dist?s.dist+'km ':''} ${s.dur}min${s.comment?' "'+s.comment.slice(0,60)+'"':''}`
-  ).join('\n') : 'Aucune';
-
-  // Plan vs réalisé
-  const doneWeekNums = [...new Set(planSessions.map(s=>s.week).filter(Boolean))].sort((a,b)=>b-a).slice(0,8);
-  const planVsActual = doneWeekNums.map(wn=>{
-    const wk=getWeek(wn); if(!wk)return null;
-    const nSlots=getSlotCount();
-    const lines=[`  S${wn} (${wk.dates||''}) — "${wk.title||''}"`];
-    for(let i=1;i<=nSlots;i++){
-      const sl='s'+i, planned=wk[sl], done=planSessions.find(s=>s.week===wn&&s.slot===sl);
+  // ── 7. Plan vs réalisé (8 dernières semaines) ─────────────────────────────
+  const recentWeekNums = [...new Set(planSessions.map(s=>s.week).filter(Boolean))].sort((a,b)=>b-a).slice(0,6);
+  const planVsActual = recentWeekNums.map(wn => {
+    const wk = getWeek(wn); if(!wk) return null;
+    const nSlots = getSlotCount();
+    const lines = [`S${wn} "${wk.title||''}":`];
+    for(let i=1; i<=nSlots; i++){
+      const sl='s'+i, planned=wk[sl];
+      const done=planSessions.find(s=>s.week===wn&&s.slot===sl);
       if(planned){
-        if(done) lines.push(`    ✓ ${sl.toUpperCase()} "${planned.title}" → ${done.dist}km en ${done.dur}min${done.pace?' @ '+done.pace+'/km':''}${done.hr?' FC'+done.hr:''}`);
-        else     lines.push(`    ✗ ${sl.toUpperCase()} "${planned.title}" → NON RÉALISÉE`);
+        if(done) lines.push(`  ✓ ${sl.toUpperCase()} "${planned.title}" → ${done.dist}km ${done.dur}min${done.pace?' @ '+done.pace+'/km':''}${done.hr?' FC'+done.hr:''}`);
+        else     lines.push(`  ✗ ${sl.toUpperCase()} "${planned.title}" → NON RÉALISÉE`);
       }
     }
     return lines.join('\n');
   }).filter(Boolean).join('\n');
 
-  const sessionAnalyses = planSessions.filter(s=>s.claudeAnalysis).slice(-8).map(s=>{
+  // ── 8. Analyses individuelles récentes ────────────────────────────────────
+  const recentAnalyses = planSessions.filter(s=>s.claudeAnalysis).slice(-5).map(s=>{
     const wk=s.week?getWeek(s.week):null;
     const title=wk&&s.slot?(wk[s.slot]?.title||''):'';
-    return`  ${s.date} [S${s.week} ${(s.slot||'').toUpperCase()} — ${title}] : "${s.claudeAnalysis.replace(/\n+/g,' ').slice(0,200)}…"`;
+    return `  ${s.date} [${title}] : "${s.claudeAnalysis.replace(/\n+/g,' ').slice(0,150)}…"`;
   }).join('\n');
 
-  // target_time algorithmique
-  let targetTimeAlgo='1h50';
-  if(medianPred&&medianPred<110){
-    const minutes=Math.max(105,Math.floor(medianPred/5)*5);
-    targetTimeAlgo=Math.floor(minutes/60)+'h'+String(minutes%60).padStart(2,'0');
-  }
+  const raceDate  = new Date('2026-10-04');
+  const weeksLeft = Math.max(0, Math.round((raceDate - today) / (7*86400000)));
 
-  const last14Days = runSessions.filter(s=>{const d=parseDate(s.date);return d&&(new Date()-d)<14*86400000;});
-  const recentKm   = last14Days.reduce((a,s)=>a+(s.dist||0),0);
-  const longestRecent = last14Days.reduce((m,s)=>Math.max(m,s.dist||0),0);
-  const runDates   = runSessions.map(s=>parseDate(s.date)).filter(Boolean);
-  const daysSinceLast = runDates.length ? Math.floor((new Date()-runDates[runDates.length-1])/86400000) : 99;
+  // ── PROMPT ────────────────────────────────────────────────────────────────
+  const prompt = `Tu es un coach running expert. Analyse la préparation au semi-marathon en te basant UNIQUEMENT sur les métriques scientifiques fournies. Sois factuel, précis, et utilise les chiffres fournis.
 
-  const vmaKeywords=/vma|fraction|400m|800m|1000m|interval|répét/i;
-  const vmaSessions=planSessions.filter(s=>{const wk=s.week?getWeek(s.week):null;const title=wk&&s.slot?(wk[s.slot]?.title||''):'';return vmaKeywords.test(title)||vmaKeywords.test(s.comment||'');});
-  const vmaSummary=vmaSessions.length?vmaSessions.slice(-5).map(s=>`${s.date} @ ${s.pace||'?'}/km`).join(', '):'Aucune détectée';
-  const seuilKeywords=/seuil|tempo|allure spé|spécifique|semi/i;
-  const seuilSessions=planSessions.filter(s=>{const wk=s.week?getWeek(s.week):null;const title=wk&&s.slot?(wk[s.slot]?.title||''):'';return seuilKeywords.test(title)||seuilKeywords.test(s.comment||'');});
-  const seuilSummary=seuilSessions.length?seuilSessions.slice(-5).map(s=>`${s.date} @ ${s.pace||'?'}/km`).join(', '):'Aucune détectée';
-  const longRuns=planSessions.filter(s=>s.dist>=14).sort((a,b)=>parseDate(a.date)-parseDate(b.date));
-  const maxLongDist=longRuns.length?Math.max(...longRuns.map(s=>s.dist)):0;
-  const longRunsSummary=longRuns.length?longRuns.slice(-5).map(s=>`${s.dist}km @ ${s.pace||'?'}/km (${s.date})`).join(', '):'Aucune sortie longue ≥14km';
-  const recentPlanWeeks=[...new Set(planSessions.map(s=>s.week).filter(Boolean))].sort((a,b)=>b-a).slice(0,4);
-  const weeklyKm=recentPlanWeeks.map(wn=>planSessions.filter(s=>s.week===wn).reduce((a,s)=>a+(s.dist||0),0));
-  const avgWeeklyKm=weeklyKm.length?(weeklyKm.reduce((a,b)=>a+b,0)/weeklyKm.length).toFixed(1):'?';
+COURSE : Semi-marathon — 4 octobre 2026 (${weeksLeft} semaines)
+OBJECTIF : 1h50 (allure seuil 5:13/km)
+PROFIL : 37 ans, FC repos ${settings.hrRest||47} bpm, FCmax ~179 bpm
 
-  const prompt=`Tu es un coach running expert, factuel et précis. Analyse la préparation d'un athlète et adapte le plan si nécessaire.
+━━━ MÉTRIQUES CTL/ATL/TSB (modèle Banister) ━━━
+CTL (fitness chronique 42j) : ${ctlNow} TRIMP/j
+ATL (fatigue aiguë 7j)      : ${atlNow} TRIMP/j
+TSB (fraîcheur = CTL-ATL)   : ${tsb > 0 ? '+' : ''}${tsb}
+Zone TSB                     : ${tsbZone}
+Interprétation               : ${tsbAdvice}
+Référence : TSB idéal entraînement [-10 à -30], peak performance [+5 à +25]
 
-COURSE CIBLE : Semi-marathon le 4 octobre 2026 (${weeksLeft} semaines restantes)
-OBJECTIF A : 1h50 (5:13/km) · OBJECTIF B : sub 2h00 (5:41/km)
-PROFIL : Coureur intermédiaire, 37 ans, FC repos 47, FCmax ~179 bpm.
+━━━ DISTRIBUTION DES INTENSITÉS ━━━
+Z1 (endurance fond. >5:56/km) : ${pctZ1}%
+Z2 (tempo 5:13-5:56/km)       : ${pctZ2}%
+Z3+ (seuil/VMA <5:13/km)      : ${pctZ3}%
+Norme polarisée (Seiler)       : ~75-80% Z1, <10% Z2, ~15-20% Z3
+Évaluation                     : ${distrib80_20}
 
-ÉTAT DE FORME RÉCENT (14 derniers jours) :
-- ${last14Days.length} séances · ${recentKm.toFixed(1)} km · Jours depuis dernière : ${daysSinceLast}
-- Plus longue sortie récente : ${longestRecent.toFixed(1)} km
+━━━ TAUX D'ADHÉRENCE AU PLAN ━━━
+Semaines réalisées / passées : ${passedWeeks.filter(wn=>doneWeeks.has(wn)).length} / ${passedWeeks.length} (${adherenceRate}%)
+Respect des allures cibles   : ${paceAdherence !== null ? paceAdherence+'% des séances dans la fenêtre cible' : 'non calculable'}
 
-PLAN VS RÉALISÉ (8 dernières semaines) :
-${planVsActual||'Aucune donnée'}
+━━━ PROGRESSION SORTIES LONGUES ━━━
+Distance max atteinte  : ${maxLong} km
+3 dernières longues    : ${last3Long || 'aucune'}
+Objectif avant course  : 25 km (S26)
 
-${sessionAnalyses?'ANALYSES INDIVIDUELLES RÉCENTES :\n'+sessionAnalyses+'\n':''}
-MÉTRIQUES PAR TYPE DE SÉANCE :
-- Volume hebdo moyen (4 dernières semaines plan) : ${avgWeeklyKm} km/semaine
-- Sortie longue max atteinte : ${maxLongDist} km
-- Séances VMA/fractionné réalisées : ${vmaSummary}
-- Séances seuil/tempo réalisées : ${seuilSummary}
-- Détail sorties longues : ${longRunsSummary}
+━━━ PRÉDICTION ALGORITHMIQUE ━━━
+Meilleure séance base : ${bestSession ? bestSession.dist+'km en '+bestSession.dur+'min @ '+(bestSession.pace||'?')+'/km' : '—'}
+Prédiction semi       : ${medianPred ? minsToHMS(medianPred) : '—'} (médiane Riegel/Cameron/VDOT)
+VO2max estimé         : ${vo2Now ? vo2Now+' ml/kg/min' : '—'}
 
-TOUTES LES SÉANCES (${planSessions.length} plan · ${libreSessions.length} libres) :
-${allSummary}
+━━━ PLAN VS RÉALISÉ (6 dernières semaines) ━━━
+${planVsActual || 'Pas encore de séances plan'}
 
-SÉANCES COMPLÉMENTAIRES :
-${crossSummary}
-
-PRÉDICTIONS ALGORITHMIQUES (meilleure séance : ${bestSession?bestSession.dist+'km en '+bestSession.dur+'min':'-'}) :
-- Riegel : ${riegelDetail} · Cameron : ${cameronDetail} · VDOT : ${vdotDetail}
-- Médiane = VALEUR OFFICIELLE : ${medianPred?minsToHMS(medianPred):'—'}
-
-VO2MAX : ${vo2Summary}
-TARGET_TIME CALCULÉ : ${targetTimeAlgo} — reprends cette valeur telle quelle.
-
-PROCHAINES SEMAINES DU PLAN :
-${remainingWeeks||'(toutes réalisées)'}
+${recentAnalyses ? '━━━ OBSERVATIONS SÉANCES RÉCENTES ━━━\n' + recentAnalyses : ''}
 
 INSTRUCTIONS :
-1. TU ES L'AUTEUR DU PLAN — ne critique pas le volume ou la structure, évalue l'exécution
-2. Évalue le taux d'exécution (séances réalisées vs prévues)
-3. Identifie les séances manquées ou mal exécutées
-4. Chiffres précis uniquement — pas d'affirmations sans données
+1. Structure ton analyse en 4 sections claires avec ces titres exacts :
+   📊 CHARGE D'ENTRAÎNEMENT | 🎯 EXÉCUTION DU PLAN | 📈 PROGRESSION | ⚡ RECOMMANDATIONS
+2. Dans chaque section, cite les chiffres fournis — ne les invente pas
+3. Compare les métriques aux normes scientifiques fournies
+4. NE modifie PAS le plan — donne uniquement des conseils d'exécution
+5. Les recommandations doivent être concrètes et actionnables pour les 2 prochaines semaines
 
-RÉPONDS EN JSON STRICT, sans texte avant ni après, sans backticks :
-{"prediction_direction":"up ou down vs 1h50","prediction_comment":"phrase courte avec chiffres","target_time":"${targetTimeAlgo}","plan_adjustment_needed":false,"plan_adjustment":"résumé 1-2 phrases","analysis":"analyse en 5-6 phrases : (1) taux exécution, (2) qualité VMA/seuil/longues, (3) progression observable, (4) point fort avec chiffres, (5) point à améliorer, (6) conseil 2 prochaines semaines","plan_modifications":[]}`;
+RÉPONDS EN JSON STRICT sans backticks :
+{
+  "prediction_direction": "up ou down vs 1h50",
+  "prediction_comment": "phrase avec chiffres de prédiction",
+  "target_time": "1h50",
+  "analysis": "analyse structurée en 4 sections (utilise les titres emoji ci-dessus), ~8-10 phrases factuelles avec chiffres",
+  "ctlNow": ${ctlNow},
+  "atlNow": ${atlNow},
+  "tsb": ${tsb},
+  "tsbZone": "${tsbZone}",
+  "adherenceRate": ${adherenceRate},
+  "pctZ1": ${pctZ1},
+  "pctZ2": ${pctZ2},
+  "pctZ3": ${pctZ3}
+}`;
 
   try {
     const controller = new AbortController();
     const timeoutId  = setTimeout(()=>controller.abort(), 90000);
     let countdown = 90;
-    const loadEl    = document.getElementById('coach-loading');
-    const loadSpan  = loadEl ? loadEl.querySelector('span') : null;
+    const loadEl   = document.getElementById('coach-loading');
+    const loadSpan = loadEl ? loadEl.querySelector('span') : null;
     const countdownInterval = setInterval(()=>{
       countdown--;
-      if(loadSpan) loadSpan.textContent=`Analyse en cours… (${countdown}s)`;
-      if(countdown<=0) clearInterval(countdownInterval);
-    },1000);
+      if(loadSpan) loadSpan.textContent = `Analyse en cours… (${countdown}s)`;
+      if(countdown <= 0) clearInterval(countdownInterval);
+    }, 1000);
 
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST', signal:controller.signal,
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,temperature:0,messages:[{role:'user',content:prompt}]})
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:2000, temperature:0,
+        messages:[{role:'user', content:prompt}]})
     });
     clearTimeout(timeoutId);
     clearInterval(countdownInterval);
 
     const data = await res.json();
-    document.getElementById('coach-loading').style.display='none';
-    btn.disabled=false; btn.textContent='🔍 Relancer l\'analyse';
+    document.getElementById('coach-loading').style.display = 'none';
+    btn.disabled = false; btn.textContent = '🔍 Relancer l\'analyse';
 
-    if(!data.content||!data.content[0]){
-      toast('Erreur analyse coach — vérifie ta clé API dans Réglages');
+    if(!data.content || !data.content[0]){
+      toast('Erreur API — vérifie ta clé dans Réglages');
       return;
     }
 
-    let raw = data.content[0].text.trim();
-    raw = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+    let raw = data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
     const json = JSON.parse(raw);
 
-    // Appliquer les modifications du plan si proposées
-    if(json.plan_modifications && json.plan_modifications.length){
-      json.plan_modifications.forEach(mod=>{
-        if(!mod.week)return;
-        planOverrides[mod.week]={};
-        if(mod.title) planOverrides[mod.week].title=mod.title;
-        if(mod.s1) planOverrides[mod.week].s1={title:mod.s1.title,steps:mod.s1.steps};
-        if(mod.s2) planOverrides[mod.week].s2={title:mod.s2.title,steps:mod.s2.steps};
-      });
-      localStorage.setItem('smi_plan_overrides',JSON.stringify(planOverrides));
-      renderPlan();
-    }
-
-    localStorage.setItem('smi_coach', JSON.stringify({...json, savedAt:new Date().toISOString()}));
+    // Sauvegarder sans modifications de plan
+    localStorage.setItem('smi_coach', JSON.stringify({...json, savedAt: new Date().toISOString()}));
     renderCoachCard(json);
 
   } catch(e){
-    document.getElementById('coach-loading').style.display='none';
-    btn.disabled=false; btn.textContent='🔍 Relancer l\'analyse';
-    if(e.name==='AbortError') toast('⏱ Timeout — relance l\'analyse');
-    else toast('Erreur : '+(e.message||'inconnue'));
-    console.error('Coach IA error:', e);
+    document.getElementById('coach-loading').style.display = 'none';
+    btn.disabled = false; btn.textContent = '🔍 Relancer l\'analyse';
+    if(e.name === 'AbortError') toast('⏱ Timeout — relance l\'analyse');
+    else toast('Erreur : ' + (e.message || 'inconnue'));
+    console.error('Coach IA:', e);
   }
 }
+
+
 
 
 // ── FORMULAIRE DE SAISIE ───────────────────────────────────────────────────
